@@ -6,8 +6,8 @@ WORKDIR /build
 ENV PNPM_CACHE_FOLDER=.cache/pnpm/
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV CYPRESS_INSTALL_BINARY=0
-
-COPY frontend/pnpm-lock.yaml frontend/package.json frontend/.npmrc ./ 
+ENV NODE_OPTIONS="--max-old-space-size=2048"
+COPY frontend/pnpm-lock.yaml frontend/package.json frontend/.npmrc ./
 COPY frontend/patches ./patches
 RUN npm install -g corepack && corepack enable && \
     pnpm install --frozen-lockfile
@@ -16,7 +16,8 @@ ARG RELEASE_VERSION=dev
 RUN echo "{\"VERSION\": \"${RELEASE_VERSION/-g/-}\"}" > src/version.json && pnpm run build
 
 FROM --platform=$BUILDPLATFORM ghcr.io/techknowlogick/xgo:go-1.25.x@sha256:11ac5e6cb8767caea0c62c420e053cb69554638ec255f9bbef8ed411e70c9eec AS apibuilder
-
+ENV GOPROXY=https://goproxy.cn,direct
+ENV GOSUMDB=off
 RUN go install github.com/magefile/mage@latest && \
     mv /go/bin/mage /usr/local/go/bin
 
@@ -28,7 +29,7 @@ ARG TARGETOS TARGETARCH TARGETVARIANT RELEASE_VERSION
 ENV RELEASE_VERSION=$RELEASE_VERSION
 
 RUN export PATH=$PATH:$GOPATH/bin && \
-	mage build:clean && \
+        mage build:clean && \
     mage release:xgo "${TARGETOS}/${TARGETARCH}/${TARGETVARIANT}"
 
 #  ┬─┐┬ ┐┌┐┐┌┐┐┬─┐┬─┐

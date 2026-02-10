@@ -190,15 +190,19 @@ func setRootPath() {
 }
 
 func setGoFiles() {
-	// GOFILES := $(shell find . -name "*.go" -type f ! -path "*/bindata.go")
-	files, err := runCmdWithOutput("find", "./pkg", "-name", "*.go", "-type", "f", "!", "-path", "*/bindata.go")
+	// Use filepath.Glob to avoid external find command dependency on Windows
+	matches, err := filepath.Glob("./pkg/**/*.go")
 	if err != nil {
 		fmt.Printf("Error getting go files: %s\n", err)
 		os.Exit(1)
 	}
-	for _, f := range strings.Split(string(files), "\n") {
+	for _, f := range matches {
+		// Skip bindata.go files
+		if strings.Contains(f, "bindata.go") {
+			continue
+		}
 		if strings.HasSuffix(f, ".go") {
-			GoFiles = append(GoFiles, RootPath+strings.TrimLeft(f, "."))
+			GoFiles = append(GoFiles, RootPath+f)
 		}
 	}
 }

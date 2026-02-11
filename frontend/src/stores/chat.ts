@@ -96,6 +96,9 @@ export const useChatStore = defineStore('chat', () => {
 
 				if (response.navigationCommand && router) {
 					await router.push({name: response.navigationCommand.routeName, params: response.navigationCommand.params})
+					if (isMobile.value) {
+						isOpen.value = false
+					}
 				}
 			} catch (err: any) {
 				if (err?.response?.status === 401) {

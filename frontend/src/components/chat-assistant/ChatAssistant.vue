@@ -4,9 +4,8 @@
 			<aside
 				v-if="chatStore.isOpen && chatStore.isAvailable"
 				class="chat-assistant-panel"
-				:class="{'keyboard-open': isKeyboardOpen}"
 			>
-				<header v-show="!isKeyboardOpen" class="chat-header">
+				<header class="chat-header">
 					<h3>{{ $t('chatAssistant.title') }}</h3>
 					<div class="header-actions">
 						<BaseButton
@@ -25,7 +24,7 @@
 						</BaseButton>
 					</div>
 				</header>
-				<div v-show="!isKeyboardOpen || hasInteracted" ref="messagesContainer" class="chat-messages">
+				<div ref="messagesContainer" class="chat-messages">
 					<div
 						v-for="msg in chatStore.messages"
 						:key="msg.id"
@@ -40,12 +39,9 @@
 						{{ chatStore.error }}
 					</div>
 					<input
-						ref="inputField"
 						v-model="userInput"
 						class="input"
 						:placeholder="$t('chatAssistant.placeholder')"
-						@focus="handleInputFocus"
-						@blur="handleInputBlur"
 						@keyup.enter="sendMessage"
 					>
 					<BaseButton
@@ -62,7 +58,7 @@
 </template>
 
 <script lang="ts" setup>
-  import {ref, watch, nextTick, onMounted, onBeforeUnmount} from 'vue'
+  import {ref, watch, nextTick, onMounted} from 'vue'
   import {useI18n} from 'vue-i18n'
   import {useRouter} from 'vue-router'
 
@@ -76,23 +72,12 @@
   const router = useRouter()
 
   const userInput = ref('')
-  const inputField = ref<HTMLInputElement | null>(null)
   const messagesContainer = ref<HTMLElement | null>(null)
-  const isKeyboardOpen = ref(false)
-  const hasInteracted = ref(false)
-  let initialViewportHeight = 0
 
   onMounted(() => {
 	chatStore.loadSession()
 	detectMobile()
-	initialViewportHeight = window.visualViewport?.height || window.innerHeight
-	setupKeyboardDetection()
-  })
-
-  onBeforeUnmount(() => {
-	if (window.visualViewport) {
-		window.visualViewport.removeEventListener('resize', handleViewportResize)
-	}
+	scrollToBottom()
   })
 
   function detectMobile() {
@@ -100,42 +85,24 @@
 	chatStore.setMobile(isMobileDevice)
   }
 
-  function setupKeyboardDetection() {
-	if (window.visualViewport) {
-		window.visualViewport.addEventListener('resize', handleViewportResize)
-	}
-  }
-
-  function handleViewportResize() {
-	if (!window.visualViewport) return
-	const currentHeight = window.visualViewport.height
-	const heightDiff = initialViewportHeight - currentHeight
-	isKeyboardOpen.value = heightDiff > 150
-  }
-
-  function handleInputFocus() {
-	isKeyboardOpen.value = true
-  }
-
-  function handleInputBlur() {
-	setTimeout(() => {
-		if (document.activeElement !== inputField.value) {
-			isKeyboardOpen.value = false
-		}
-	}, 100)
-  }
-
   function sendMessage() {
 	if (userInput.value.trim() === '') {
 		return
 	}
-	hasInteracted.value = true
 	chatStore.sendMessage(userInput.value, router)
 	userInput.value = ''
   }
 
   function clearMessages() {
 	chatStore.clearMessages()
+  }
+
+  function scrollToBottom() {
+	nextTick(() => {
+		if (messagesContainer.value) {
+			messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+		}
+	})
   }
 
   function formatTime(timestamp: number): string {
@@ -148,17 +115,14 @@
   watch(
 	() => chatStore.messages.length,
 	() => {
-		nextTick(() => {
-			if (messagesContainer.value) {
-				messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-			}
-		})
+		scrollToBottom()
 	},
   )
 
   watch(
 	() => chatStore.isOpen,
 	() => {
+		scrollToBottom()
 	},
   )
 </script>
@@ -174,19 +138,13 @@
 	z-index: 3000;
 
 	@media screen and (max-width: $tablet) {
-		inset: auto 0 0 0;
-		height: 33vh;
-		border-radius: 1rem 1rem 0 0;
+		inset: 0 0 0 0;
+		height: 100dvh;
+		border-radius: 0;
 		border-inline-start: none;
-		border-top: 1px solid var(--grey-200);
+		border-top: none;
 		transform: translateY(0);
-		transition: transform 0.3s ease, height 0.3s ease;
-
-		&.keyboard-open {
-			height: auto;
-			min-height: 60px;
-			padding: 0.5rem;
-		}
+		transition: transform 0.3s ease;
 	}
 
 	@media screen and (min-width: $tablet) {
@@ -316,13 +274,6 @@
 	border-block-start: 1px solid var(--grey-200);
 	background: var(--white);
 	flex-shrink: 0;
-
-	@media screen and (max-width: $tablet) {
-		.chat-assistant-panel.keyboard-open & {
-			padding: 0.5rem;
-			border-block-start: none;
-		}
-	}
 }
 
 .error-message {
@@ -348,13 +299,6 @@
 		outline: none;
 		border-color: var(--primary);
 	}
-
-	@media screen and (max-width: $tablet) {
-		.chat-assistant-panel.keyboard-open & {
-			padding: 0.5rem 0.75rem;
-			font-size: 0.9rem;
-		}
-	}
 }
 
 .send-btn {
@@ -370,13 +314,6 @@
 	font-size: 1.1rem;
 	transition: background-color 0.2s;
 	flex-shrink: 0;
-
-	@media screen and (max-width: $tablet) {
-		.chat-assistant-panel.keyboard-open & {
-			inline-size: 2.25rem;
-			block-size: 2.25rem;
-		}
-	}
 
 	&:hover,
 	&:focus {

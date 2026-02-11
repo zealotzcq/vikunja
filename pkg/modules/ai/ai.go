@@ -1,13 +1,18 @@
 package ai
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"code.vikunja.io/api/pkg/modules/chat_session"
 )
 
 // GenerateResponse generates a mock AI response based on user input and current page context
+// This is legacy implementation, kept for backward compatibility
 func GenerateResponse(userContent string, routeName string, routeParams map[string]interface{}) (string, map[string]interface{}, bool) {
 	lowerContent := strings.ToLower(userContent)
 
@@ -21,6 +26,47 @@ func GenerateResponse(userContent string, routeName string, routeParams map[stri
 
 	// Default help message
 	return generateHelpMessage(), nil, false
+}
+
+// GenerateAgentResponse generates an AI response using the agent system
+func GenerateAgentResponse(ctx context.Context, userID int64, userContent string, routeName string, routeParams map[string]interface{}) (*AgentResponse, error) {
+	config, err := LoadConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+
+	log.Printf("[AI] GenerateAgentResponse - UserID: %d, Provider: %s, Model: %s", userID, config.LLMProvider, config.OpenAIModel)
+
+	agent, err := GetAgent()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get agent: %w", err)
+	}
+
+	session, err := chat_session.GetDefault().GetOrCreateSession(userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session: %w", err)
+	}
+
+	log.Printf("[AI] Session loaded - Messages count: %d", len(session.Messages))
+
+	agentCtx := &AgentContext{
+		UserID:         userID,
+		CurrentRoute:   routeName,
+		RouteParams:    routeParams,
+		SessionData:    make(map[string]interface{}),
+		MessageHistory: make([]Message, 0, len(session.Messages)),
+	}
+
+	for _, msg := range session.Messages {
+		agentCtx.MessageHistory = append(agentCtx.MessageHistory, Message{
+			Role:    msg.Role,
+			Content: msg.Content,
+		})
+	}
+
+	log.Printf("[AI] AgentContext created - History messages: %d", len(agentCtx.MessageHistory))
+
+	return agent.ProcessMessage(ctx, agentCtx, userContent)
 }
 
 // NavigationInfo contains navigation command details

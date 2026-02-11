@@ -26,6 +26,7 @@ export default class ChatService {
 				route_name: pageRoute,
 				params: pageParams,
 			},
+			use_agent: true,
 		})
 		return response.data
 	}

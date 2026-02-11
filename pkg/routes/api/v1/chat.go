@@ -2,6 +2,7 @@ package v1
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -34,6 +35,7 @@ func isUserAllowedForChat(a web.Auth) bool {
 type SendMessageRequest struct {
 	Message  string    `json:"message" validate:"required"`
 	PageInfo *PageInfo `json:"page_info"`
+	UseAgent bool      `json:"use_agent"` // Use the new agent system instead of mock
 }
 
 // PageInfo represents current page context
@@ -104,11 +106,40 @@ func SendMessage(c *echo.Context) error {
 		routeParams = req.PageInfo.Params
 	}
 
-	aiResponse, navInfo, shouldNavigate := ai.GenerateResponse(
-		req.Message,
-		routeName,
-		routeParams,
-	)
+	var aiResponse string
+	var navInfo map[string]interface{}
+	var shouldNavigate bool
+
+	if req.UseAgent {
+		log.Printf("[Chat] Using Agent system - UserID: %d, Message: %s, Route: %s", userID, req.Message, routeName)
+
+		agentResponse, err := ai.GenerateAgentResponse(c.Request().Context(), userID, req.Message, routeName, routeParams)
+		if err != nil {
+			log.Printf("[Chat] Agent error: %v", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("AI agent error: %v", err))
+		}
+
+		aiResponse = agentResponse.Content
+		shouldNavigate = agentResponse.ShouldNavigate
+		log.Printf("[Chat] Agent response: %s", aiResponse)
+
+		if agentResponse.NavigationInfo != nil {
+			navInfo = map[string]interface{}{
+				"route_name": agentResponse.NavigationInfo.RouteName,
+				"params":     agentResponse.NavigationInfo.Params,
+			}
+		}
+	} else {
+		log.Printf("[Chat] Using Mock system - UserID: %d, Message: %s", userID, req.Message)
+
+		aiResponse, navInfo, shouldNavigate = ai.GenerateResponse(
+			req.Message,
+			routeName,
+			routeParams,
+		)
+
+		log.Printf("[Chat] Mock response: %s", aiResponse)
+	}
 
 	var navigationCommand *NavigationCommand
 	if shouldNavigate && navInfo != nil {

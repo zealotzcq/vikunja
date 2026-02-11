@@ -67,14 +67,14 @@
 					<Icon icon="keyboard" />
 				</BaseButton>
 
-				<OpenChatAssistant />
+				<OpenChatAssistant v-if="chatStore.isAvailable" />
 			</main>
 		</div>
 	</div>
 </template>
 
 <script lang="ts" setup>
-import {watch, computed} from 'vue'
+import {watch, computed, onMounted} from 'vue'
 import {useRoute} from 'vue-router'
 
 import Navigation from '@/components/home/Navigation.vue'
@@ -85,6 +85,7 @@ import OpenChatAssistant from '@/components/chat-assistant/OpenChatAssistant.vue
 import {useBaseStore} from '@/stores/base'
 import {useLabelStore} from '@/stores/labels'
 import {useProjectStore} from '@/stores/projects'
+import {useChatStore} from '@/stores/chat'
 
 import {useRouteWithModal} from '@/composables/useRouteWithModal'
 import {useRenewTokenOnFocus} from '@/composables/useRenewTokenOnFocus'
@@ -92,6 +93,21 @@ import {useSidebarResize} from '@/composables/useSidebarResize'
 import {useAuthStore} from '@/stores/auth'
 
 const authStore = useAuthStore()
+const chatStore = useChatStore()
+
+onMounted(() => {
+	chatStore.loadSession()
+})
+
+watch(() => authStore.authUser, (user) => {
+	if (user) {
+		chatStore.loadSession()
+	} else {
+		chatStore.isAvailable = false
+		chatStore.isOpen = false
+	}
+})
+
 const backgroundBrightness = computed(() =>
 	authStore.settings?.frontendSettings?.backgroundBrightness,
 )

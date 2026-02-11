@@ -49,7 +49,7 @@ func extractNavigationCommand(userContent, currentRoute string) *NavigationInfo 
 
 	if strings.Contains(userContent, "project") || strings.Contains(userContent, "项目") {
 		return &NavigationInfo{
-			Message:   "跳转到项目列表",
+			Message:   "正在为您导航到项目列表",
 			RouteName: "projects.index",
 			Params:    nil,
 		}

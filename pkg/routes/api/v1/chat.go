@@ -9,9 +9,26 @@ import (
 	"code.vikunja.io/api/pkg/modules/ai"
 	"code.vikunja.io/api/pkg/modules/auth"
 	"code.vikunja.io/api/pkg/modules/chat_session"
+	"code.vikunja.io/api/pkg/user"
+	"code.vikunja.io/api/pkg/web"
 
 	"github.com/labstack/echo/v5"
 )
+
+// Allowed usernames for chat assistant
+var allowedChatUsernames = map[string]bool{
+	"leader": true,
+	"王大牛":    true,
+}
+
+// isUserAllowedForChat checks if user is allowed to use the chat assistant
+func isUserAllowedForChat(a web.Auth) bool {
+	userObj, isUser := a.(*user.User)
+	if !isUser {
+		return false
+	}
+	return allowedChatUsernames[userObj.Username]
+}
 
 // SendMessageRequest represents a request to send a chat message
 type SendMessageRequest struct {
@@ -27,10 +44,18 @@ type PageInfo struct {
 
 // ChatMessage represents a message in the conversation
 type ChatMessage struct {
-	ID        string `json:"id"`
-	Role      string `json:"role"` // "user" | "assistant"
-	Content   string `json:"content"`
-	Timestamp int64  `json:"timestamp"`
+	ID                string             `json:"id"`
+	Role              string             `json:"role"` // "user" | "assistant"
+	Content           string             `json:"content"`
+	Timestamp         int64              `json:"timestamp"`
+	NavigationCommand *NavigationCommand `json:"navigationCommand,omitempty"`
+}
+
+// NavigationCommand represents a navigation action
+type NavigationCommand struct {
+	RouteName string                 `json:"routeName"`
+	Params    map[string]interface{} `json:"params"`
+	Label     string                 `json:"label"`
 }
 
 // SendMessage handles sending a message to the chat assistant
@@ -42,6 +67,10 @@ func SendMessage(c *echo.Context) error {
 
 	if _, is := a.(*models.LinkSharing); is {
 		return echo.ErrForbidden
+	}
+
+	if !isUserAllowedForChat(a) {
+		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
 	}
 
 	userID := a.GetID()
@@ -75,11 +104,20 @@ func SendMessage(c *echo.Context) error {
 		routeParams = req.PageInfo.Params
 	}
 
-	aiResponse, _, _ := ai.GenerateResponse(
+	aiResponse, navInfo, shouldNavigate := ai.GenerateResponse(
 		req.Message,
 		routeName,
 		routeParams,
 	)
+
+	var navigationCommand *NavigationCommand
+	if shouldNavigate && navInfo != nil {
+		navigationCommand = &NavigationCommand{
+			RouteName: navInfo["route_name"].(string),
+			Params:    navInfo["params"].(map[string]interface{}),
+			Label:     aiResponse,
+		}
+	}
 
 	// Generate assistant message ID
 	assistantMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
@@ -98,10 +136,11 @@ func SendMessage(c *echo.Context) error {
 
 	// Return the assistant message
 	return c.JSON(http.StatusOK, ChatMessage{
-		ID:        assistantMsgID,
-		Role:      "assistant",
-		Content:   aiResponse,
-		Timestamp: time.Now().Unix(),
+		ID:                assistantMsgID,
+		Role:              "assistant",
+		Content:           aiResponse,
+		Timestamp:         time.Now().Unix(),
+		NavigationCommand: navigationCommand,
 	})
 }
 
@@ -114,6 +153,10 @@ func GetSession(c *echo.Context) error {
 
 	if _, is := a.(*models.LinkSharing); is {
 		return echo.ErrForbidden
+	}
+
+	if !isUserAllowedForChat(a) {
+		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
 	}
 
 	userID := a.GetID()
@@ -136,6 +179,10 @@ func ClearSession(c *echo.Context) error {
 
 	if _, is := a.(*models.LinkSharing); is {
 		return echo.ErrForbidden
+	}
+
+	if !isUserAllowedForChat(a) {
+		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
 	}
 
 	userID := a.GetID()

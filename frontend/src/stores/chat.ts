@@ -8,12 +8,21 @@ import {useAuthStore} from '@/stores/auth'
 
 export const useChatStore = defineStore('chat', () => {
 	const authStore = useAuthStore()
+	const isMobile = ref(false)
+	const isAvailable = ref(false)
 	const isOpen = ref(false)
 	const messages = ref<IChatMessage[]>([])
 	const isLoading = ref(false)
 	const error = ref<string | null>(null)
 
 	const chatService = new ChatService()
+
+	function setMobile(value: boolean) {
+		isMobile.value = value
+		if (value && isOpen.value === false && authStore.authUser !== null && isAvailable.value) {
+			isOpen.value = true
+		}
+	}
 
 	async function loadSession() {
 		if (isLoading.value) return
@@ -23,15 +32,25 @@ export const useChatStore = defineStore('chat', () => {
 		isLoading.value = true
 		error.value = null
 		try {
+			console.log('Loading chat session...')
 			const sessionData = await chatService.getSession()
+			console.log('Chat session loaded:', sessionData)
+			isAvailable.value = true
 			messages.value = sessionData.messages.map(msg => ({
 				id: msg.id,
 				role: msg.role,
 				content: msg.content,
 				timestamp: msg.timestamp,
+				navigationCommand: msg.navigationCommand,
 			}))
+			if (isMobile.value) {
+				isOpen.value = true
+			}
 		} catch (err: any) {
-			if (err?.response?.status === 401) {
+			console.error('Failed to load chat session:', err)
+			if (err?.response?.status === 403) {
+				isAvailable.value = false
+			} else if (err?.response?.status === 401) {
 				error.value = '请先登录以使用聊天助手'
 			} else {
 				console.error('Failed to load chat session:', err)
@@ -70,9 +89,14 @@ export const useChatStore = defineStore('chat', () => {
 					role: 'assistant',
 					content: response.content,
 					timestamp: Date.now(),
+					navigationCommand: response.navigationCommand,
 				}
 				messages.value.push(assistantMessage)
 				saveChatHistory(messages.value)
+
+				if (response.navigationCommand && router) {
+					await router.push({name: response.navigationCommand.routeName, params: response.navigationCommand.params})
+				}
 			} catch (err: any) {
 				if (err?.response?.status === 401) {
 					error.value = '请先登录以使用聊天助手'
@@ -103,6 +127,8 @@ export const useChatStore = defineStore('chat', () => {
 	}, {immediate: true})
 
 	return {
+		isMobile,
+		isAvailable,
 		isOpen,
 		messages,
 		isLoading,
@@ -111,6 +137,7 @@ export const useChatStore = defineStore('chat', () => {
 		clearMessages,
 		toggleOpen,
 		loadSession,
+		setMobile,
 	}
 })
 

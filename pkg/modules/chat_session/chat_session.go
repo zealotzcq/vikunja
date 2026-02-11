@@ -25,10 +25,18 @@ type ChatSession struct {
 
 // Message represents a chat message
 type Message struct {
-	ID        string `json:"id"`
-	Role      string `json:"role"` // "user" | "assistant"
-	Content   string `json:"content"`
-	Timestamp int64  `json:"timestamp"`
+	ID                string             `json:"id"`
+	Role              string             `json:"role"` // "user" | "assistant"
+	Content           string             `json:"content"`
+	Timestamp         int64              `json:"timestamp"`
+	NavigationCommand *NavigationCommand `json:"navigationCommand,omitempty"`
+}
+
+// NavigationCommand represents a navigation action
+type NavigationCommand struct {
+	RouteName string                 `json:"routeName"`
+	Params    map[string]interface{} `json:"params"`
+	Label     string                 `json:"label"`
 }
 
 // Manager manages chat sessions in memory

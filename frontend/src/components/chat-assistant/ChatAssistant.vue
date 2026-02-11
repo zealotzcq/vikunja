@@ -2,10 +2,11 @@
 	<Teleport to="body">
 		<transition name="chat-slide">
 			<aside
-				v-if="chatStore.isOpen"
+				v-if="chatStore.isOpen && chatStore.isAvailable"
 				class="chat-assistant-panel"
+				:class="{'keyboard-open': isKeyboardOpen}"
 			>
-				<header class="chat-header">
+				<header v-show="!isKeyboardOpen" class="chat-header">
 					<h3>{{ $t('chatAssistant.title') }}</h3>
 					<div class="header-actions">
 						<BaseButton
@@ -24,7 +25,7 @@
 						</BaseButton>
 					</div>
 				</header>
-				<div ref="messagesContainer" class="chat-messages">
+				<div v-show="!isKeyboardOpen || hasInteracted" ref="messagesContainer" class="chat-messages">
 					<div
 						v-for="msg in chatStore.messages"
 						:key="msg.id"
@@ -43,6 +44,8 @@
 						v-model="userInput"
 						class="input"
 						:placeholder="$t('chatAssistant.placeholder')"
+						@focus="handleInputFocus"
+						@blur="handleInputBlur"
 						@keyup.enter="sendMessage"
 					>
 					<BaseButton
@@ -59,48 +62,90 @@
 </template>
 
 <script lang="ts" setup>
- import {ref, watch, nextTick} from 'vue'
- import {useI18n} from 'vue-i18n'
- import {onMounted} from 'vue'
- import {useRouter} from 'vue-router'
+  import {ref, watch, nextTick, onMounted, onBeforeUnmount} from 'vue'
+  import {useI18n} from 'vue-i18n'
+  import {useRouter} from 'vue-router'
 
- import BaseButton from '@/components/base/BaseButton.vue'
- import Icon from '@/components/misc/Icon'
+  import BaseButton from '@/components/base/BaseButton.vue'
+  import Icon from '@/components/misc/Icon'
 
- import {useChatStore} from '@/stores/chat'
+  import {useChatStore} from '@/stores/chat'
 
- const {t} = useI18n({useScope: 'global'})
- const chatStore = useChatStore()
- const router = useRouter()
+  const {t} = useI18n({useScope: 'global'})
+  const chatStore = useChatStore()
+  const router = useRouter()
 
- const userInput = ref('')
- const inputField = ref<HTMLInputElement | null>(null)
- const messagesContainer = ref<HTMLElement | null>(null)
+  const userInput = ref('')
+  const inputField = ref<HTMLInputElement | null>(null)
+  const messagesContainer = ref<HTMLElement | null>(null)
+  const isKeyboardOpen = ref(false)
+  const hasInteracted = ref(false)
+  let initialViewportHeight = 0
 
- onMounted(() => {
+  onMounted(() => {
 	chatStore.loadSession()
- })
+	detectMobile()
+	initialViewportHeight = window.visualViewport?.height || window.innerHeight
+	setupKeyboardDetection()
+  })
 
- function sendMessage() {
+  onBeforeUnmount(() => {
+	if (window.visualViewport) {
+		window.visualViewport.removeEventListener('resize', handleViewportResize)
+	}
+  })
+
+  function detectMobile() {
+	const isMobileDevice = window.innerWidth < 768
+	chatStore.setMobile(isMobileDevice)
+  }
+
+  function setupKeyboardDetection() {
+	if (window.visualViewport) {
+		window.visualViewport.addEventListener('resize', handleViewportResize)
+	}
+  }
+
+  function handleViewportResize() {
+	if (!window.visualViewport) return
+	const currentHeight = window.visualViewport.height
+	const heightDiff = initialViewportHeight - currentHeight
+	isKeyboardOpen.value = heightDiff > 150
+  }
+
+  function handleInputFocus() {
+	isKeyboardOpen.value = true
+  }
+
+  function handleInputBlur() {
+	setTimeout(() => {
+		if (document.activeElement !== inputField.value) {
+			isKeyboardOpen.value = false
+		}
+	}, 100)
+  }
+
+  function sendMessage() {
 	if (userInput.value.trim() === '') {
 		return
 	}
+	hasInteracted.value = true
 	chatStore.sendMessage(userInput.value, router)
 	userInput.value = ''
- }
+  }
 
-function clearMessages() {
+  function clearMessages() {
 	chatStore.clearMessages()
-}
+  }
 
-function formatTime(timestamp: number): string {
+  function formatTime(timestamp: number): string {
 	const date = new Date(timestamp)
 	const hours = date.getHours().toString().padStart(2, '0')
 	const minutes = date.getMinutes().toString().padStart(2, '0')
 	return `${hours}:${minutes}`
-}
+  }
 
-watch(
+  watch(
 	() => chatStore.messages.length,
 	() => {
 		nextTick(() => {
@@ -109,18 +154,13 @@ watch(
 			}
 		})
 	},
-)
+  )
 
-watch(
+  watch(
 	() => chatStore.isOpen,
-	(newOpen) => {
-		if (newOpen) {
-			nextTick(() => {
-				inputField.value?.focus()
-			})
-		}
+	() => {
 	},
-)
+  )
 </script>
 
 <style lang="scss" scoped>
@@ -140,7 +180,13 @@ watch(
 		border-inline-start: none;
 		border-top: 1px solid var(--grey-200);
 		transform: translateY(0);
-		transition: transform 0.3s ease;
+		transition: transform 0.3s ease, height 0.3s ease;
+
+		&.keyboard-open {
+			height: auto;
+			min-height: 60px;
+			padding: 0.5rem;
+		}
 	}
 
 	@media screen and (min-width: $tablet) {
@@ -167,12 +213,12 @@ watch(
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	padding: 1rem;
+	padding: 0.5rem 1rem;
 	border-block-end: 1px solid var(--grey-200);
 
 	h3 {
 		margin: 0;
-		font-size: 1.1rem;
+		font-size: 0.95rem;
 		font-weight: 600;
 		color: var(--grey-800);
 	}
@@ -184,7 +230,7 @@ watch(
 }
 
 .action-btn {
-	font-size: 1.2rem;
+	font-size: 1rem;
 	color: var(--grey-500);
 	background: transparent;
 	border: none;
@@ -198,7 +244,7 @@ watch(
 }
 
 .close-btn {
-	font-size: 1.5rem;
+	font-size: 1.2rem;
 }
 
 .chat-messages {
@@ -269,6 +315,14 @@ watch(
 	padding: 1rem;
 	border-block-start: 1px solid var(--grey-200);
 	background: var(--white);
+	flex-shrink: 0;
+
+	@media screen and (max-width: $tablet) {
+		.chat-assistant-panel.keyboard-open & {
+			padding: 0.5rem;
+			border-block-start: none;
+		}
+	}
 
 	.error-message {
 		inline-size: 100%;
@@ -293,6 +347,13 @@ watch(
 			outline: none;
 			border-color: var(--primary);
 		}
+
+		@media screen and (max-width: $tablet) {
+			.chat-assistant-panel.keyboard-open & {
+				padding: 0.5rem 0.75rem;
+				font-size: 0.9rem;
+			}
+		}
 	}
 }
 
@@ -308,6 +369,14 @@ watch(
 	border-radius: 0.5rem;
 	font-size: 1.1rem;
 	transition: background-color 0.2s;
+	flex-shrink: 0;
+
+	@media screen and (max-width: $tablet) {
+		.chat-assistant-panel.keyboard-open & {
+			inline-size: 2.25rem;
+			block-size: 2.25rem;
+		}
+	}
 
 	&:hover,
 	&:focus {

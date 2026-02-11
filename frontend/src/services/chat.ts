@@ -9,6 +9,11 @@ export default class ChatService {
 		role: 'user' | 'assistant'
 		content: string
 		timestamp: number
+		navigationCommand?: {
+			routeName: string
+			params?: Record<string, any>
+			label: string
+		}
 	}> {
 		const token = getToken()
 		if (!token) {
@@ -34,6 +39,11 @@ export default class ChatService {
 			role: 'user' | 'assistant'
 			content: string
 			timestamp: number
+			navigationCommand?: {
+				routeName: string
+				params?: Record<string, any>
+				label: string
+			}
 		}>
 		expires_at: number
 	}> {

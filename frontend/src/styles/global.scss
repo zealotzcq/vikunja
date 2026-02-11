@@ -11,14 +11,13 @@
 // ###################
 //
 // The following imports are the same as in "bulma/bulma.sass"
-// with the exception of the bulma utilities – They are
+// with the exception of bulma utilities – They are
 // imported globally in common-imports.scss
 
 // imports from "bulma-css-variables/sass/base/_all";
 @import "bulma-css-variables/sass/base/minireset";
 @import "bulma-css-variables/sass/base/generic";
 @import "bulma-css-variables/sass/base/animations";
-
 
 // imports from "bulma-css-variables/sass/elements/_all";
 @import "bulma-css-variables/sass/elements/box";
@@ -33,7 +32,8 @@
 @import "bulma-css-variables/sass/elements/tag";
 @import "bulma-css-variables/sass/elements/title";
 
-@import "bulma-css-variables/sass/elements/other";
+
+// imports from "bulma-css-variables/sass/elements/other";
 
 
 // imports from "bulma-css-variables/sass/form/_all";
@@ -70,8 +70,8 @@
 @import "bulma-css-variables/sass/helpers/flexbox";
 @import "bulma-css-variables/sass/helpers/float";
 // @import "bulma-css-variables/sass/helpers/other"; // not used
-// @import "bulma-css-variables/sass/helpers/overflow";
-// @import "bulma-css-variables/sass/helpers/position";
+@import "bulma-css-variables/sass/helpers/overflow";
+@import "bulma-css-variables/sass/helpers/position";
 // @import "bulma-css-variables/sass/helpers/spacing"; // using logical units instead
 @import "bulma-css-variables/sass/helpers/typography";
 @import "bulma-css-variables/sass/helpers/visibility";
@@ -82,6 +82,7 @@
 // @import "bulma-css-variables/sass/layout/section"; // not used
 // @import "bulma-css-variables/sass/layout/footer"; // not used
 
+
 // #################
 // END BULMA IMPORTS
 // #################
@@ -90,3 +91,65 @@
 @import "components";
 
 @import "custom-properties";
+
+// ###################
+// COMPACT MODE STYLES
+// ###################
+
+body.compact-mode {
+	@media screen and (max-width: $tablet) {
+		font-size: 0.85rem;
+		line-height: 1.3;
+
+		* {
+			font-size: inherit;
+			line-height: inherit;
+		}
+
+		h1, h2, h3, h4, h5, h6 {
+			font-size: 1.2em;
+		}
+
+		.button {
+			font-size: 0.85rem;
+			padding: 0.35rem 0.75rem;
+			height: auto;
+			min-height: 2rem;
+		}
+
+		.input, .textarea {
+			font-size: 0.85rem;
+			padding: 0.4rem 0.6rem;
+		}
+
+		.card {
+			padding: 0.75rem;
+		}
+
+		.notification {
+			padding: 0.75rem 0.85rem;
+			font-size: 0.85rem;
+		}
+
+		.task {
+			padding: 0.5rem 0.6rem;
+
+			.task-title {
+				font-size: 0.9rem;
+			}
+		}
+
+		.card-content {
+			padding: 0.75rem;
+		}
+
+		.table td, .table th {
+			padding: 0.4rem 0.5rem;
+		}
+
+		.dropdown-item {
+			padding: 0.4rem 0.75rem;
+			font-size: 0.85rem;
+		}
+	}
+}

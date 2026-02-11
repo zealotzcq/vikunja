@@ -38,6 +38,7 @@ export const useBaseStore = defineStore('base', () => {
 	const quickActionsActive = ref(false)
 	const logoVisible = ref(true)
 	const updateAvailable = ref(false)
+	const compactMode = ref(false)
 
 	function setCurrentProject(newCurrentProject: IProject | null, currentViewId?: IProjectView['id']) {
 		// Server updates don't return the permission. Therefore, the permission is reset after updating the project which is
@@ -97,6 +98,11 @@ export const useBaseStore = defineStore('base', () => {
 		updateAvailable.value = value
 	}
 
+	function toggleCompactMode() {
+		compactMode.value = !compactMode.value
+		localStorage.setItem('compactMode', String(compactMode.value))
+	}
+
 	async function handleSetCurrentProject(
 		{project, forceUpdate = false, currentProjectViewId = undefined}: {project: IProject | null, forceUpdate?: boolean, currentProjectViewId?: IProjectView['id']},
 	) {
@@ -147,6 +153,16 @@ export const useBaseStore = defineStore('base', () => {
 		try {
 			await checkAndSetApiUrl(window.API_URL)
 			await authStore.checkAuth()
+
+			const isMobile = window.innerWidth < 768
+			const savedCompactMode = localStorage.getItem('compactMode')
+			if (savedCompactMode === null) {
+				compactMode.value = isMobile
+				localStorage.setItem('compactMode', String(isMobile))
+			} else {
+				compactMode.value = savedCompactMode === 'true'
+			}
+
 			ready.value = true
 		} catch (e: unknown) {
 			if (e instanceof NoApiUrlProvidedError) {
@@ -178,6 +194,7 @@ export const useBaseStore = defineStore('base', () => {
 		quickActionsActive: readonly(quickActionsActive),
 		logoVisible: readonly(logoVisible),
 		updateAvailable: readonly(updateAvailable),
+		compactMode: readonly(compactMode),
 
 		setCurrentProject,
 		setCurrentProjectViewId,
@@ -188,6 +205,7 @@ export const useBaseStore = defineStore('base', () => {
 		setBlurHash,
 		setLogoVisible,
 		setUpdateAvailable,
+		toggleCompactMode,
 
 		handleSetCurrentProject,
 		handleSetCurrentProjectIfNotSet,

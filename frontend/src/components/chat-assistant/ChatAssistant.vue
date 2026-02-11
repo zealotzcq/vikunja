@@ -96,7 +96,7 @@
   })
 
   function detectMobile() {
-	const isMobileDevice = window.innerWidth < 768
+	const isMobileDevice = typeof window !== 'undefined' && window.innerWidth < 768
 	chatStore.setMobile(isMobileDevice)
   }
 
@@ -323,36 +323,36 @@
 			border-block-start: none;
 		}
 	}
+}
 
-	.error-message {
-		inline-size: 100%;
-		padding: 0.5rem;
-		background: #fee;
-		border: 1px solid #fcc;
-		border-radius: 0.375rem;
-		color: #c33;
-		font-size: 0.875rem;
-		margin-block-end: 0.5rem;
+.error-message {
+	inline-size: 100%;
+	padding: 0.5rem;
+	background: #fee;
+	border: 1px solid #fcc;
+	border-radius: 0.375rem;
+	color: #c33;
+	font-size: 0.875rem;
+	margin-block-end: 0.5rem;
+}
+
+.input {
+	flex: 1;
+	border: 1px solid var(--grey-200);
+	border-radius: 0.5rem;
+	padding: 0.625rem 0.875rem;
+	font-size: 0.95rem;
+	transition: border-color 0.2s;
+
+	&:focus {
+		outline: none;
+		border-color: var(--primary);
 	}
 
-	.input {
-		flex: 1;
-		border: 1px solid var(--grey-200);
-		border-radius: 0.5rem;
-		padding: 0.625rem 0.875rem;
-		font-size: 0.95rem;
-		transition: border-color 0.2s;
-
-		&:focus {
-			outline: none;
-			border-color: var(--primary);
-		}
-
-		@media screen and (max-width: $tablet) {
-			.chat-assistant-panel.keyboard-open & {
-				padding: 0.5rem 0.75rem;
-				font-size: 0.9rem;
-			}
+	@media screen and (max-width: $tablet) {
+		.chat-assistant-panel.keyboard-open & {
+			padding: 0.5rem 0.75rem;
+			font-size: 0.9rem;
 		}
 	}
 }

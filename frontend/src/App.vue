@@ -60,6 +60,7 @@ const baseStore = useBaseStore()
 const route = useRoute()
 
 useBodyClass('is-touch', isTouchDevice())
+useBodyClass('compact-mode', baseStore.compactMode)
 const keyboardShortcutsActive = computed(() => baseStore.keyboardShortcutsActive)
 
 const {t} = useI18n({useScope: 'global'})

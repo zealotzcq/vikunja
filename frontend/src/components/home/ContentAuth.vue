@@ -94,6 +94,7 @@ import {useAuthStore} from '@/stores/auth'
 
 const authStore = useAuthStore()
 const chatStore = useChatStore()
+const baseStore = useBaseStore()
 
 onMounted(() => {
 	chatStore.loadSession()
@@ -116,7 +117,6 @@ const {sidebarWidth} = useSidebarResize()
 
 const {routeWithModal, currentModal, closeModal} = useRouteWithModal()
 
-const baseStore = useBaseStore()
 const background = computed(() => baseStore.background)
 const blurHash = computed(() => baseStore.blurHash)
 const menuActive = computed(() => baseStore.menuActive)

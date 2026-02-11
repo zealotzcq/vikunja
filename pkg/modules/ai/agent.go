@@ -190,12 +190,16 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 			return nil, fmt.Errorf("LLM generation failed: %w", err)
 		}
 
+		log.Printf("[AI] LLM response: %s", llmResponse)
+
 		toolCall, err := a.parseToolCall(llmResponse)
 		if err != nil {
+			log.Printf("[AI] Parse tool call error: %v", err)
 			continue
 		}
 
 		if toolCall == nil {
+			log.Printf("[AI] No tool call found, returning response")
 			return &AgentResponse{
 				Content:        llmResponse,
 				NavigationInfo: agentCtx.NavigationInfo,
@@ -204,6 +208,8 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 				TokensUsed:     agentCtx.TokensUsed,
 			}, nil
 		}
+
+		log.Printf("[AI] Tool call detected - Name: %s, Input: %s", toolCall.Name, toolCall.InputJSON)
 
 		step := ExecutionStep{
 			StepNumber: i + 1,
@@ -220,6 +226,19 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 		}
 
 		agentCtx.ExecutionSteps = append(agentCtx.ExecutionSteps, step)
+
+		log.Printf("[AI] Tool execution completed - Result: %s", toolResult)
+
+		if agentCtx.ShouldNavigate {
+			log.Printf("[AI] Navigation requested, returning response")
+			return &AgentResponse{
+				Content:        toolResult,
+				NavigationInfo: agentCtx.NavigationInfo,
+				ShouldNavigate: true,
+				ExecutionSteps: agentCtx.ExecutionSteps,
+				TokensUsed:     agentCtx.TokensUsed,
+			}, nil
+		}
 	}
 
 	return &AgentResponse{

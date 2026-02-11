@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 )
 
@@ -27,8 +28,20 @@ type openAIRequest struct {
 }
 
 type openAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role      string           `json:"role"`
+	Content   string           `json:"content,omitempty"`
+	ToolCalls []openAIToolCall `json:"tool_calls,omitempty"`
+}
+
+type openAIToolCall struct {
+	ID       string             `json:"id"`
+	Type     string             `json:"type"`
+	Function openAIFunctionCall `json:"function"`
+}
+
+type openAIFunctionCall struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
 }
 
 type openAITool struct {
@@ -84,6 +97,8 @@ func (p *OpenAIProvider) GenerateWithTools(ctx context.Context, prompt string, t
 		desc, _ := toolDef["description"].(string)
 		params, _ := toolDef["parameters"].(map[string]interface{})
 
+		log.Printf("[OpenAI Tool Def] Name: %s", name)
+
 		openAITools = append(openAITools, openAITool{
 			Type: "function",
 			Function: openAIFunction{
@@ -93,6 +108,8 @@ func (p *OpenAIProvider) GenerateWithTools(ctx context.Context, prompt string, t
 			},
 		})
 	}
+
+	log.Printf("[OpenAI] Sending request with %d tools", len(openAITools))
 
 	return p.makeRequest(ctx, messages, openAITools)
 }
@@ -121,6 +138,8 @@ func (p *OpenAIProvider) makeRequest(ctx context.Context, messages []openAIMessa
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
+	log.Printf("[OpenAI Request] %s", string(jsonBody))
+
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
@@ -145,6 +164,8 @@ func (p *OpenAIProvider) makeRequest(ctx context.Context, messages []openAIMessa
 		return "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
+	log.Printf("[OpenAI Response] %s", string(body))
+
 	var openAIResp openAIResponse
 	if err := json.Unmarshal(body, &openAIResp); err != nil {
 		return "", fmt.Errorf("failed to unmarshal response: %w", err)
@@ -154,5 +175,17 @@ func (p *OpenAIProvider) makeRequest(ctx context.Context, messages []openAIMessa
 		return "", fmt.Errorf("no choices in response")
 	}
 
-	return openAIResp.Choices[0].Message.Content, nil
+	choice := openAIResp.Choices[0]
+	log.Printf("[OpenAI Choice] FinishReason: %s, Content: %s, ToolCalls count: %d",
+		choice.FinishReason, choice.Message.Content, len(choice.Message.ToolCalls))
+
+	if len(choice.Message.ToolCalls) > 0 {
+		var toolCallStrs []string
+		for _, tc := range choice.Message.ToolCalls {
+			toolCallStrs = append(toolCallStrs, fmt.Sprintf("TOOL: %s\nINPUT: %s", tc.Function.Name, tc.Function.Arguments))
+		}
+		return fmt.Sprintf("%s\n%s", choice.Message.Content, toolCallStrs[0]), nil
+	}
+
+	return choice.Message.Content, nil
 }

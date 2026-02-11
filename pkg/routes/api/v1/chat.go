@@ -121,13 +121,16 @@ func SendMessage(c *echo.Context) error {
 
 		aiResponse = agentResponse.Content
 		shouldNavigate = agentResponse.ShouldNavigate
-		log.Printf("[Chat] Agent response: %s", aiResponse)
+		log.Printf("[Chat] Agent response - Content: %s, ShouldNavigate: %t", aiResponse, shouldNavigate)
 
 		if agentResponse.NavigationInfo != nil {
 			navInfo = map[string]interface{}{
 				"route_name": agentResponse.NavigationInfo.RouteName,
 				"params":     agentResponse.NavigationInfo.Params,
 			}
+			log.Printf("[Chat] Navigation info - RouteName: %s, Params: %v", agentResponse.NavigationInfo.RouteName, agentResponse.NavigationInfo.Params)
+		} else {
+			log.Printf("[Chat] No navigation info in agent response")
 		}
 	} else {
 		log.Printf("[Chat] Using Mock system - UserID: %d, Message: %s", userID, req.Message)

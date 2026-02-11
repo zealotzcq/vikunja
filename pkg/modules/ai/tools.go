@@ -3,6 +3,7 @@ package ai
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"sync"
 )
 
@@ -129,7 +130,13 @@ func (tm *ToolManager) ExecuteTool(name string, ctx *AgentContext, params map[st
 		return "", fmt.Errorf("tool '%s' not found", name)
 	}
 
-	return tool.Execute(ctx, params)
+	log.Printf("[AI Tool] Executing tool '%s' with params: %s", name, formatMap(params))
+
+	result, err := tool.Execute(ctx, params)
+
+	log.Printf("[AI Tool] Tool '%s' result: %s, error: %v", name, result, err)
+
+	return result, err
 }
 
 // RegisterDefaultTools registers the default set of tools
@@ -137,18 +144,39 @@ func RegisterDefaultTools() error {
 	tm := GetToolManager()
 
 	navigationTool := &Tool{
-		Name:        "navigate",
-		Description: "Navigate to a specific page in the application",
+		Name: "navigate",
+		Description: `Navigate to a specific page in the application.
+
+Available routes:
+- home: Homepage/Dashboard
+- projects.index: Project list page
+- project.index: Specific project detail (requires projectId in params). Use projectId: -1 for favorites
+- tasks.range: Task list page
+- task.detail: Specific task detail (requires id in params)
+- teams.index: Team list page
+- teams.edit: Specific team detail/edit (requires id in params)
+- labels.index: Label list page
+
+Usage examples:
+- Navigate to homepage: {"route_name": "home"}
+- Navigate to projects: {"route_name": "projects.index"}
+- Navigate to project 123: {"route_name": "project.index", "params": {"projectId": 123}}
+- Navigate to favorites: {"route_name": "project.index", "params": {"projectId": -1}}
+- Navigate to tasks: {"route_name": "tasks.range"}
+- Navigate to task 456: {"route_name": "task.detail", "params": {"id": 456}}
+- Navigate to teams: {"route_name": "teams.index"}
+- Navigate to team 789: {"route_name": "teams.edit", "params": {"id": 789}}
+- Navigate to labels: {"route_name": "labels.index"}`,
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"route_name": map[string]interface{}{
 					"type":        "string",
-					"description": "The name of the route to navigate to (e.g., 'projects.index', 'tasks.range', 'teams.index')",
+					"description": "The name of the route to navigate to",
 				},
 				"params": map[string]interface{}{
 					"type":        "object",
-					"description": "Optional route parameters",
+					"description": "Optional route parameters (e.g., projectId, id)",
 				},
 			},
 			"required": []string{"route_name"},
@@ -164,100 +192,58 @@ func RegisterDefaultTools() error {
 				routeParams = p
 			}
 
+			var message string
+			if routeName == "home" {
+				message = "正在为您返回首页"
+			} else if routeName == "projects.index" {
+				message = "正在为您打开项目列表"
+			} else if routeName == "project.index" {
+				if pid, ok := routeParams["projectId"].(float64); ok {
+					if int64(pid) == -1 {
+						message = "正在为您打开收藏"
+					} else {
+						message = fmt.Sprintf("正在为您打开项目 %d", int64(pid))
+					}
+				} else {
+					message = "正在为您打开项目详情"
+				}
+			} else if routeName == "tasks.range" {
+				message = "正在为您打开任务列表"
+			} else if routeName == "task.detail" {
+				if tid, ok := routeParams["id"].(float64); ok {
+					message = fmt.Sprintf("正在为您打开任务 %d", int64(tid))
+				} else {
+					message = "正在为您打开任务详情"
+				}
+			} else if routeName == "teams.index" {
+				message = "正在为您打开团队列表"
+			} else if routeName == "teams.edit" {
+				if tid, ok := routeParams["id"].(float64); ok {
+					message = fmt.Sprintf("正在为您打开团队 %d", int64(tid))
+				} else {
+					message = "正在为您打开团队详情"
+				}
+			} else if routeName == "labels.index" {
+				message = "正在为您打开标签列表"
+			} else {
+				message = fmt.Sprintf("正在导航到 %s", routeName)
+			}
+
 			ctx.NavigationInfo = &NavigationInfo{
+				Message:   message,
 				RouteName: routeName,
 				Params:    routeParams,
 			}
 			ctx.ShouldNavigate = true
 
-			return fmt.Sprintf("Navigating to %s", routeName), nil
+			log.Printf("[AI Tool] Navigation set - Route: %s, Params: %v, Message: %s", routeName, routeParams, message)
+
+			return message, nil
 		},
 	}
 
 	if err := tm.RegisterTool(navigationTool); err != nil {
 		return fmt.Errorf("failed to register navigation tool: %w", err)
-	}
-
-	createTaskTool := &Tool{
-		Name:        "create_task",
-		Description: "Create a new task",
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"title": map[string]interface{}{
-					"type":        "string",
-					"description": "The title of the task",
-				},
-				"description": map[string]interface{}{
-					"type":        "string",
-					"description": "The description of the task (optional)",
-				},
-				"project_id": map[string]interface{}{
-					"type":        "integer",
-					"description": "The project ID to add the task to (optional)",
-				},
-			},
-			"required": []string{"title"},
-		},
-		Execute: func(ctx *AgentContext, params map[string]interface{}) (string, error) {
-			title, ok := params["title"].(string)
-			if !ok {
-				return "", fmt.Errorf("title is required")
-			}
-
-			var description string
-			if d, ok := params["description"].(string); ok {
-				description = d
-			}
-
-			result := fmt.Sprintf("Created task: %s", title)
-			if description != "" {
-				result += fmt.Sprintf("\nDescription: %s", description)
-			}
-
-			return result, nil
-		},
-	}
-
-	if err := tm.RegisterTool(createTaskTool); err != nil {
-		return fmt.Errorf("failed to register create_task tool: %w", err)
-	}
-
-	searchTool := &Tool{
-		Name:        "search",
-		Description: "Search for tasks, projects, or teams",
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"query": map[string]interface{}{
-					"type":        "string",
-					"description": "The search query",
-				},
-				"type": map[string]interface{}{
-					"type":        "string",
-					"description": "The type of search (tasks, projects, teams)",
-					"enum":        []string{"tasks", "projects", "teams"},
-				},
-			},
-			"required": []string{"query", "type"},
-		},
-		Execute: func(ctx *AgentContext, params map[string]interface{}) (string, error) {
-			query, ok := params["query"].(string)
-			if !ok {
-				return "", fmt.Errorf("query is required")
-			}
-
-			searchType, ok := params["type"].(string)
-			if !ok {
-				searchType = "tasks"
-			}
-
-			return fmt.Sprintf("Searching for %s: %s", searchType, query), nil
-		},
-	}
-
-	if err := tm.RegisterTool(searchTool); err != nil {
-		return fmt.Errorf("failed to register search tool: %w", err)
 	}
 
 	return nil
@@ -279,4 +265,12 @@ func (t *Tool) MarshalJSON() ([]byte, error) {
 	}{
 		Alias: (*Alias)(t),
 	})
+}
+
+func formatMap(m map[string]interface{}) string {
+	if len(m) == 0 {
+		return "{}"
+	}
+	b, _ := json.Marshal(m)
+	return string(b)
 }

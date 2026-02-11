@@ -139,9 +139,19 @@ async function loadNotifications() {
 	if (document.visibilityState !== 'visible') {
 		return
 	}
-	// We're recreating the notification service here to make sure it uses the latest api user token
-	const notificationService = new NotificationService()
-	allNotifications.value = await notificationService.getAll()
+	if (!authStore.authUser) {
+		return
+	}
+	try {
+		// We're recreating the notification service here to make sure it uses the latest api user token
+		const notificationService = new NotificationService()
+		allNotifications.value = await notificationService.getAll()
+	} catch (error) {
+		// Ignore 401 errors (user not authenticated)
+		if (error?.response?.status !== 401) {
+			console.error('Failed to load notifications:', error)
+		}
+	}
 }
 
 function hidePopup(e) {

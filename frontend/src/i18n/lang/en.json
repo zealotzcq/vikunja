@@ -1212,6 +1212,13 @@
       "newTeam": "New team"
     }
   },
+  "chatAssistant": {
+    "title": "AI Assistant",
+    "placeholder": "Ask me anything...",
+    "send": "Send",
+    "close": "Close chat",
+    "clear": "Clear messages"
+  },
   "date": {
     "altFormatLong": "j M Y, H:i",
     "altFormatShort": "j M Y"

@@ -66,6 +66,8 @@
 					<span class="is-sr-only">{{ $t('keyboardShortcuts.title') }}</span>
 					<Icon icon="keyboard" />
 				</BaseButton>
+
+				<OpenChatAssistant />
 			</main>
 		</div>
 	</div>
@@ -78,6 +80,7 @@ import {useRoute} from 'vue-router'
 import Navigation from '@/components/home/Navigation.vue'
 import QuickActions from '@/components/quick-actions/QuickActions.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
+import OpenChatAssistant from '@/components/chat-assistant/OpenChatAssistant.vue'
 
 import {useBaseStore} from '@/stores/base'
 import {useLabelStore} from '@/stores/labels'

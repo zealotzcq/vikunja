@@ -639,6 +639,12 @@ func registerAPIRoutes(a *echo.Group) {
 		}
 	}
 
+	// Chat Assistant
+	chat := a.Group("/chat")
+	chat.POST("/send", apiv1.SendMessage)
+	chat.GET("/session", apiv1.GetSession)
+	chat.DELETE("/session", apiv1.ClearSession)
+
 	// API Tokens
 	apiTokenProvider := &handler.WebHandler{
 		EmptyStruct: func() handler.CObject {

@@ -35,6 +35,6 @@ func ExampleLoadConfig() {
 	fmt.Printf("Max Iterations: %d\n", config.MaxIterations)
 
 	// Output:
-	// LLM Provider: openai
+	// LLM Provider: mock
 	// Max Iterations: 10
 }

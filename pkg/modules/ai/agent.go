@@ -104,6 +104,9 @@ func (a *Agent) Initialize() error {
 	}
 	a.llmProvider = provider
 
+	sm := GetSkillManager()
+	log.Printf("[AI] Loaded %d skills from directories", len(sm.GetAllSkills()))
+
 	if err := RegisterDefaultTools(); err != nil {
 		return fmt.Errorf("failed to register default tools: %w", err)
 	}

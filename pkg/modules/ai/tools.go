@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 )
 
@@ -142,6 +143,7 @@ func (tm *ToolManager) ExecuteTool(name string, ctx *AgentContext, params map[st
 // RegisterDefaultTools registers the default set of tools
 func RegisterDefaultTools() error {
 	tm := GetToolManager()
+	sm := GetSkillManager()
 
 	navigationTool := &Tool{
 		Name: "navigate",
@@ -244,6 +246,70 @@ Usage examples:
 
 	if err := tm.RegisterTool(navigationTool); err != nil {
 		return fmt.Errorf("failed to register navigation tool: %w", err)
+	}
+
+	skillTool := &Tool{
+		Name: "skill",
+		Description: sm.FormatSkillsForTool() + `
+
+Use this tool to load a skill's full instructions when you need them. Call with:
+
+{
+  "name": "skill-name"
+}
+
+The skill's complete content will be returned, including all instructions, workflows, and additional details.`,
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"name": map[string]interface{}{
+					"type":        "string",
+					"description": "The name of the skill to load",
+				},
+			},
+			"required": []string{"name"},
+		},
+		Execute: func(ctx *AgentContext, params map[string]interface{}) (string, error) {
+			skillName, ok := params["name"].(string)
+			if !ok {
+				return "", fmt.Errorf("name is required")
+			}
+
+			skillContent, err := sm.LoadSkillContent(skillName)
+			if err != nil {
+				available := strings.Join(func() []string {
+					skills := sm.GetAllSkills()
+					names := make([]string, 0, len(skills))
+					for name := range skills {
+						names = append(names, name)
+					}
+					return names
+				}(), ", ")
+				return "", fmt.Errorf("skill '%s' not found. Available skills: %s", skillName, available)
+			}
+
+			log.Printf("[AI Tool] Loading skill: %s", skillName)
+
+			var sb strings.Builder
+			sb.WriteString(fmt.Sprintf("## Skill: %s\n\n", skillContent.Metadata.Name))
+			sb.WriteString(fmt.Sprintf("**Base directory**: %s\n\n", skillContent.Dir))
+			if skillContent.Metadata.Description != "" {
+				sb.WriteString(fmt.Sprintf("**Description**: %s\n\n", skillContent.Metadata.Description))
+			}
+			if skillContent.Metadata.License != "" {
+				sb.WriteString(fmt.Sprintf("**License**: %s\n\n", skillContent.Metadata.License))
+			}
+			if skillContent.Metadata.Compatibility != "" {
+				sb.WriteString(fmt.Sprintf("**Compatibility**: %s\n\n", skillContent.Metadata.Compatibility))
+			}
+			sb.WriteString(strings.TrimSpace(skillContent.Content))
+
+			return sb.String(), nil
+		},
+	}
+
+	if err := tm.RegisterTool(skillTool); err != nil {
+		return fmt.Errorf("failed to register skill tool: %w", err)
 	}
 
 	return nil

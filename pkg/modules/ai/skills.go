@@ -2,24 +2,42 @@ package ai
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"sync"
+
+	"go.yaml.in/yaml/v2"
 )
 
-// Skill represents a capability that the agent can use
-type Skill interface {
-	// Name returns the skill name
-	Name() string
-	// Description returns a description of what the skill does
-	Description() string
-	// Execute executes the skill with the given input
-	Execute(ctx *AgentContext, input string) (string, error)
-	// CanHandle returns true if this skill can handle the given input
-	CanHandle(input string) bool
+// SkillInfo represents basic skill information from SKILL.md frontmatter
+type SkillInfo struct {
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
+	Location    string
+}
+
+// SkillMetadata represents the full skill metadata from SKILL.md frontmatter
+type SkillMetadata struct {
+	Name          string            `yaml:"name"`
+	Description   string            `yaml:"description"`
+	License       string            `yaml:"license,omitempty"`
+	Compatibility string            `yaml:"compatibility,omitempty"`
+	Metadata      map[string]string `yaml:"metadata,omitempty"`
+}
+
+// SkillContent represents a skill with full metadata and content
+type SkillContent struct {
+	Metadata SkillMetadata
+	Content  string
+	Dir      string
 }
 
 // SkillManager manages available skills
 type SkillManager struct {
-	skills map[string]Skill
+	skills map[string]*SkillInfo
 	mu     sync.RWMutex
 }
 
@@ -28,77 +46,246 @@ var (
 	skillOnce    sync.Once
 )
 
+// skillSearchPaths returns the directories to search for skills
+func skillSearchPaths() []string {
+	return []string{
+		"skills",
+	}
+}
+
+// discoverSkills scans configured directories for SKILL.md files
+func discoverSkills() (map[string]*SkillInfo, error) {
+	skills := make(map[string]*SkillInfo)
+	searchPaths := skillSearchPaths()
+
+	for _, basePath := range searchPaths {
+		if _, err := os.Stat(basePath); os.IsNotExist(err) {
+			continue
+		}
+
+		entries, err := os.ReadDir(basePath)
+		if err != nil {
+			log.Printf("[AI Skills] Failed to read directory %s: %v", basePath, err)
+			continue
+		}
+
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+
+			skillName := entry.Name()
+			skillFile := filepath.Join(basePath, skillName, "SKILL.md")
+
+			if _, err := os.Stat(skillFile); os.IsNotExist(err) {
+				continue
+			}
+
+			content, err := os.ReadFile(skillFile)
+			if err != nil {
+				log.Printf("[AI Skills] Failed to read skill file %s: %v", skillFile, err)
+				continue
+			}
+
+			metadata, _, err := parseSkillMetadata(content)
+			if err != nil {
+				log.Printf("[AI Skills] Failed to parse skill %s: %v", skillName, err)
+				continue
+			}
+
+			if metadata.Name == "" || metadata.Description == "" {
+				log.Printf("[AI Skills] Invalid skill %s: missing name or description", skillName)
+				continue
+			}
+
+			if existing, exists := skills[metadata.Name]; exists {
+				log.Printf("[AI Skills] Duplicate skill name %s, existing: %s, skipping: %s",
+					metadata.Name, existing.Location, skillFile)
+				continue
+			}
+
+			skills[metadata.Name] = &SkillInfo{
+				Name:        metadata.Name,
+				Description: metadata.Description,
+				Location:    skillFile,
+			}
+
+			log.Printf("[AI Skills] Loaded skill: %s - %s", metadata.Name, metadata.Description)
+		}
+	}
+
+	return skills, nil
+}
+
+// preprocessFrontmatter preprocesses YAML frontmatter to handle values containing colons
+func preprocessFrontmatter(content string) string {
+	if !strings.HasPrefix(content, "---") {
+		return content
+	}
+
+	endIndex := strings.Index(content[4:], "---")
+	if endIndex == -1 {
+		return content
+	}
+
+	frontmatter := content[4 : endIndex+4]
+	contentAfter := content[endIndex+8:]
+	lines := strings.Split(frontmatter, "\n")
+	result := make([]string, 0, len(lines))
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			result = append(result, line)
+			continue
+		}
+
+		if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
+			result = append(result, line)
+			continue
+		}
+
+		re := regexp.MustCompile(`^([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(.*)$`)
+		matches := re.FindStringSubmatch(line)
+		if matches == nil {
+			result = append(result, line)
+			continue
+		}
+
+		key := matches[1]
+		value := strings.TrimSpace(matches[2])
+
+		if value == "" || value == ">" || value == "|" || strings.HasPrefix(value, `"`) || strings.HasPrefix(value, `'`) {
+			result = append(result, line)
+			continue
+		}
+
+		if strings.Contains(value, ":") {
+			result = append(result, fmt.Sprintf("%s: |", key))
+			result = append(result, fmt.Sprintf("  %s", value))
+			continue
+		}
+
+		result = append(result, line)
+	}
+
+	processed := strings.Join(result, "\n")
+	return "---\n" + processed + "\n---\n" + contentAfter
+}
+
+// parseSkillMetadata extracts YAML frontmatter and content from SKILL.md
+func parseSkillMetadata(content []byte) (*SkillMetadata, string, error) {
+	contentStr := string(content)
+
+	if !strings.HasPrefix(contentStr, "---") {
+		return nil, contentStr, fmt.Errorf("missing frontmatter delimiter")
+	}
+
+	endIndex := strings.Index(contentStr[4:], "---")
+	if endIndex == -1 {
+		return nil, contentStr, fmt.Errorf("missing frontmatter end delimiter")
+	}
+
+	skillContent := contentStr[endIndex+8:]
+
+	preprocessed := preprocessFrontmatter(contentStr)
+	preprocessedEndIndex := strings.Index(preprocessed[4:], "---")
+	if preprocessedEndIndex == -1 {
+		return nil, skillContent, fmt.Errorf("missing preprocessed frontmatter end delimiter")
+	}
+	preprocessedFrontmatter := preprocessed[4 : preprocessedEndIndex+4]
+
+	var metadata SkillMetadata
+	if err := yaml.Unmarshal([]byte(preprocessedFrontmatter), &metadata); err != nil {
+		return nil, skillContent, fmt.Errorf("failed to parse frontmatter: %w", err)
+	}
+
+	skillContent = preprocessed[preprocessedEndIndex+8:]
+
+	return &metadata, skillContent, nil
+}
+
 // GetSkillManager returns the singleton skill manager
 func GetSkillManager() *SkillManager {
 	skillOnce.Do(func() {
 		skillManager = &SkillManager{
-			skills: make(map[string]Skill),
+			skills: make(map[string]*SkillInfo),
 		}
+		skillManager.initialize()
 	})
 	return skillManager
 }
 
-// RegisterSkill registers a new skill
-func (sm *SkillManager) RegisterSkill(skill Skill) error {
+// initialize loads skills from configured directories
+func (sm *SkillManager) initialize() {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	if skill == nil {
-		return fmt.Errorf("skill cannot be nil")
+	skills, err := discoverSkills()
+	if err != nil {
+		log.Printf("[AI Skills] Failed to discover skills: %v", err)
+		return
 	}
 
-	name := skill.Name()
-	if name == "" {
-		return fmt.Errorf("skill name cannot be empty")
-	}
-
-	sm.skills[name] = skill
-	return nil
+	sm.skills = skills
+	log.Printf("[AI Skills] Loaded %d skills", len(sm.skills))
 }
 
-// UnregisterSkill removes a skill
-func (sm *SkillManager) UnregisterSkill(name string) {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-	delete(sm.skills, name)
+// Reload reloads skills from configured directories
+func (sm *SkillManager) Reload() {
+	sm.initialize()
 }
 
 // GetSkill returns a skill by name
-func (sm *SkillManager) GetSkill(name string) (Skill, bool) {
+func (sm *SkillManager) GetSkill(name string) (*SkillInfo, bool) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	skill, exists := sm.skills[name]
 	return skill, exists
 }
 
-// GetAllSkills returns all registered skills
-func (sm *SkillManager) GetAllSkills() []Skill {
+// LoadSkillContent loads the full content of a skill
+func (sm *SkillManager) LoadSkillContent(name string) (*SkillContent, error) {
 	sm.mu.RLock()
-	defer sm.mu.RUnlock()
+	skillInfo, exists := sm.skills[name]
+	sm.mu.RUnlock()
 
-	skills := make([]Skill, 0, len(sm.skills))
-	for _, skill := range sm.skills {
-		skills = append(skills, skill)
+	if !exists {
+		return nil, fmt.Errorf("skill '%s' not found", name)
 	}
-	return skills
+
+	content, err := os.ReadFile(skillInfo.Location)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read skill file: %w", err)
+	}
+
+	metadata, skillContent, err := parseSkillMetadata(content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse skill: %w", err)
+	}
+
+	return &SkillContent{
+		Metadata: *metadata,
+		Content:  skillContent,
+		Dir:      filepath.Dir(skillInfo.Location),
+	}, nil
 }
 
-// FindMatchingSkills returns skills that can handle the given input
-func (sm *SkillManager) FindMatchingSkills(input string) []Skill {
+// GetAllSkills returns all loaded skills
+func (sm *SkillManager) GetAllSkills() map[string]*SkillInfo {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
-	var matching []Skill
-	for _, skill := range sm.skills {
-		if skill.CanHandle(input) {
-			matching = append(matching, skill)
-		}
+	result := make(map[string]*SkillInfo, len(sm.skills))
+	for k, v := range sm.skills {
+		result[k] = v
 	}
-	return matching
+	return result
 }
 
 // GetEnabledSkills returns skills that are enabled in the configuration
-func (sm *SkillManager) GetEnabledSkills() []Skill {
+func (sm *SkillManager) GetEnabledSkills() map[string]*SkillInfo {
 	cfg := GetConfig()
 	if len(cfg.EnabledSkills) == 0 {
 		return sm.GetAllSkills()
@@ -107,11 +294,30 @@ func (sm *SkillManager) GetEnabledSkills() []Skill {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
-	enabled := make([]Skill, 0)
+	enabled := make(map[string]*SkillInfo)
 	for _, name := range cfg.EnabledSkills {
 		if skill, exists := sm.skills[name]; exists {
-			enabled = append(enabled, skill)
+			enabled[name] = skill
 		}
 	}
 	return enabled
+}
+
+// FormatSkillsForTool formats available skills for the skill tool description
+func (sm *SkillManager) FormatSkillsForTool() string {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+
+	if len(sm.skills) == 0 {
+		return "<available_skills>\n  No skills available\n</available_skills>"
+	}
+
+	var sb strings.Builder
+	sb.WriteString("<available_skills>\n")
+	for _, skill := range sm.skills {
+		sb.WriteString(fmt.Sprintf("  <skill>\n    <name>%s</name>\n    <description>%s</description>\n  </skill>\n",
+			skill.Name, skill.Description))
+	}
+	sb.WriteString("</available_skills>")
+	return sb.String()
 }

@@ -138,7 +138,7 @@ func (p *OpenAIProvider) makeRequest(ctx context.Context, messages []openAIMessa
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	log.Printf("[OpenAI Request] %s", string(jsonBody))
+	// log.Printf("[OpenAI Request] %s", string(jsonBody))
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {

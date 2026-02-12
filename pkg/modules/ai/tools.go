@@ -3,7 +3,6 @@ package ai
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 )
@@ -131,11 +130,11 @@ func (tm *ToolManager) ExecuteTool(name string, ctx *AgentContext, params map[st
 		return "", fmt.Errorf("tool '%s' not found", name)
 	}
 
-	log.Printf("[AI Tool] Executing tool '%s' with params: %s", name, formatMap(params))
+
 
 	result, err := tool.Execute(ctx, params)
 
-	log.Printf("[AI Tool] Tool '%s' result: %s, error: %v", name, result, err)
+
 
 	return result, err
 }
@@ -238,7 +237,7 @@ Usage examples:
 			}
 			ctx.ShouldNavigate = true
 
-			log.Printf("[AI Tool] Navigation set - Route: %s, Params: %v, Message: %s", routeName, routeParams, message)
+
 
 			return message, nil
 		},
@@ -288,7 +287,7 @@ The skill's complete content will be returned, including all instructions, workf
 				return "", fmt.Errorf("skill '%s' not found. Available skills: %s", skillName, available)
 			}
 
-			log.Printf("[AI Tool] Loading skill: %s", skillName)
+
 
 			var sb strings.Builder
 			sb.WriteString(fmt.Sprintf("## Skill: %s\n\n", skillContent.Metadata.Name))

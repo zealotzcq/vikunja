@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 )
 
@@ -97,8 +96,6 @@ func (p *OpenAIProvider) GenerateWithTools(ctx context.Context, prompt string, t
 		desc, _ := toolDef["description"].(string)
 		params, _ := toolDef["parameters"].(map[string]interface{})
 
-		log.Printf("[OpenAI Tool Def] Name: %s", name)
-
 		openAITools = append(openAITools, openAITool{
 			Type: "function",
 			Function: openAIFunction{
@@ -108,8 +105,6 @@ func (p *OpenAIProvider) GenerateWithTools(ctx context.Context, prompt string, t
 			},
 		})
 	}
-
-	log.Printf("[OpenAI] Sending request with %d tools", len(openAITools))
 
 	return p.makeRequest(ctx, messages, openAITools)
 }
@@ -161,10 +156,11 @@ func (p *OpenAIProvider) makeRequest(ctx context.Context, messages []openAIMessa
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		GetLLMLogger().LogExchange("openai", string(jsonBody), string(body))
 		return "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
-	log.Printf("[OpenAI Response] %s", string(body))
+	GetLLMLogger().LogExchange("openai", string(jsonBody), string(body))
 
 	var openAIResp openAIResponse
 	if err := json.Unmarshal(body, &openAIResp); err != nil {
@@ -176,8 +172,6 @@ func (p *OpenAIProvider) makeRequest(ctx context.Context, messages []openAIMessa
 	}
 
 	choice := openAIResp.Choices[0]
-	log.Printf("[OpenAI Choice] FinishReason: %s, Content: %s, ToolCalls count: %d",
-		choice.FinishReason, choice.Message.Content, len(choice.Message.ToolCalls))
 
 	if len(choice.Message.ToolCalls) > 0 {
 		var toolCallStrs []string

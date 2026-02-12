@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 )
@@ -104,8 +103,7 @@ func (a *Agent) Initialize() error {
 	}
 	a.llmProvider = provider
 
-	sm := GetSkillManager()
-	log.Printf("[AI] Loaded %d skills from directories", len(sm.GetAllSkills()))
+
 
 	if err := RegisterDefaultTools(); err != nil {
 		return fmt.Errorf("failed to register default tools: %w", err)
@@ -116,20 +114,20 @@ func (a *Agent) Initialize() error {
 }
 
 func (a *Agent) createLLMProvider() (LLMProvider, error) {
-	log.Printf("[AI] Creating LLM provider: %s", a.config.LLMProvider)
+
 
 	switch a.config.LLMProvider {
 	case "openai":
-		log.Printf("[AI] Created OpenAI provider - Model: %s, BaseURL: %s", a.config.OpenAIModel, a.config.OpenAIBaseURL)
+
 		return NewOpenAIProvider(a.config), nil
 	case "ollama":
-		log.Printf("[AI] Created Ollama provider - Model: %s, BaseURL: %s", a.config.OllamaModel, a.config.OllamaBaseURL)
+
 		return NewOllamaProvider(a.config), nil
 	case "mock":
-		log.Printf("[AI] Created Mock provider")
+
 		return NewMockLLMProvider(), nil
 	default:
-		log.Printf("[AI] Unknown provider '%s', falling back to Mock", a.config.LLMProvider)
+
 		return NewMockLLMProvider(), nil
 	}
 }
@@ -193,16 +191,16 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 			return nil, fmt.Errorf("LLM generation failed: %w", err)
 		}
 
-		log.Printf("[AI] LLM response: %s", llmResponse)
+
 
 		toolCall, err := a.parseToolCall(llmResponse)
 		if err != nil {
-			log.Printf("[AI] Parse tool call error: %v", err)
+
 			continue
 		}
 
 		if toolCall == nil {
-			log.Printf("[AI] No tool call found, returning response")
+
 			return &AgentResponse{
 				Content:        llmResponse,
 				NavigationInfo: agentCtx.NavigationInfo,
@@ -212,7 +210,7 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 			}, nil
 		}
 
-		log.Printf("[AI] Tool call detected - Name: %s, Input: %s", toolCall.Name, toolCall.InputJSON)
+
 
 		step := ExecutionStep{
 			StepNumber: i + 1,
@@ -230,10 +228,10 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 
 		agentCtx.ExecutionSteps = append(agentCtx.ExecutionSteps, step)
 
-		log.Printf("[AI] Tool execution completed - Result: %s", toolResult)
+
 
 		if agentCtx.ShouldNavigate {
-			log.Printf("[AI] Navigation requested, returning response")
+
 			return &AgentResponse{
 				Content:        toolResult,
 				NavigationInfo: agentCtx.NavigationInfo,

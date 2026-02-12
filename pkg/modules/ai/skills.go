@@ -2,7 +2,6 @@ package ai
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -65,7 +64,6 @@ func discoverSkills() (map[string]*SkillInfo, error) {
 
 		entries, err := os.ReadDir(basePath)
 		if err != nil {
-			log.Printf("[AI Skills] Failed to read directory %s: %v", basePath, err)
 			continue
 		}
 
@@ -83,38 +81,31 @@ func discoverSkills() (map[string]*SkillInfo, error) {
 
 			content, err := os.ReadFile(skillFile)
 			if err != nil {
-				log.Printf("[AI Skills] Failed to read skill file %s: %v", skillFile, err)
 				continue
 			}
 
 			metadata, _, err := parseSkillMetadata(content)
 			if err != nil {
-				log.Printf("[AI Skills] Failed to parse skill %s: %v", skillName, err)
 				continue
 			}
 
 			if metadata.Name == "" || metadata.Description == "" {
-				log.Printf("[AI Skills] Invalid skill %s: missing name or description", skillName)
 				continue
 			}
 
-			if existing, exists := skills[metadata.Name]; exists {
-				log.Printf("[AI Skills] Duplicate skill name %s, existing: %s, skipping: %s",
-					metadata.Name, existing.Location, skillFile)
+			if _, exists := skills[metadata.Name]; exists {
 				continue
 			}
 
-			skills[metadata.Name] = &SkillInfo{
-				Name:        metadata.Name,
-				Description: metadata.Description,
-				Location:    skillFile,
-			}
+        skills[metadata.Name] = &SkillInfo{
+            Name:        metadata.Name,
+            Description: metadata.Description,
+            Location:    skillFile,
+        }
+    }
+}
 
-			log.Printf("[AI Skills] Loaded skill: %s - %s", metadata.Name, metadata.Description)
-		}
-	}
-
-	return skills, nil
+return skills, nil
 }
 
 // preprocessFrontmatter preprocesses YAML frontmatter to handle values containing colons
@@ -224,12 +215,12 @@ func (sm *SkillManager) initialize() {
 
 	skills, err := discoverSkills()
 	if err != nil {
-		log.Printf("[AI Skills] Failed to discover skills: %v", err)
+
 		return
 	}
 
 	sm.skills = skills
-	log.Printf("[AI Skills] Loaded %d skills", len(sm.skills))
+
 }
 
 // Reload reloads skills from configured directories

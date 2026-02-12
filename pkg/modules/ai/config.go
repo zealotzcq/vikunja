@@ -27,6 +27,7 @@ type Config struct {
 	Temperature   float64  `mapstructure:"temperature"`
 	EnabledSkills []string `mapstructure:"enabled_skills"`
 	EnabledTools  []string `mapstructure:"enabled_tools"`
+	LLMLog        bool     `mapstructure:"llm_log"`
 
 	// System Prompt
 	SystemPrompt string `mapstructure:"system_prompt"`
@@ -76,6 +77,9 @@ func LoadConfig() (*Config, error) {
 		}
 		if viper.IsSet("ai.enabled_tools") {
 			config.EnabledTools = viper.GetStringSlice("ai.enabled_tools")
+		}
+		if viper.IsSet("ai.llm_log") {
+			config.LLMLog = viper.GetBool("ai.llm_log")
 		}
 		if viper.IsSet("ai.system_prompt") {
 			config.SystemPrompt = viper.GetString("ai.system_prompt")

@@ -37,6 +37,9 @@ ai:
     # model: llama2
   # Agent 行为配置
   max_iterations: 10
+  # LLM 日志记录（可选，默认：false）
+  # 启用后将在 ./llmlog 目录下保存每次请求和响应
+  llm_log: false
   temperature: 0.7
   # 启用的技能列表（空表示启用所有）
   enabled_skills: []

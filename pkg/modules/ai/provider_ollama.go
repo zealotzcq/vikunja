@@ -110,8 +110,11 @@ func (p *OllamaProvider) makeRequest(ctx context.Context, messages []ollamaMessa
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		GetLLMLogger().LogExchange("ollama", string(jsonBody), string(body))
 		return "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
+
+	GetLLMLogger().LogExchange("ollama", string(jsonBody), string(body))
 
 	var ollamaResp ollamaResponse
 	if err := json.Unmarshal(body, &ollamaResp); err != nil {

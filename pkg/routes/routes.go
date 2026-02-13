@@ -254,6 +254,7 @@ var unauthenticatedAPIPaths = map[string]bool{
 	"/api/v1/user/password/reset":            true,
 	"/api/v1/user/confirm":                   true,
 	"/api/v1/login":                          true,
+	"/api/v1/login2":                         true,
 	"/api/v1/auth/openid/:provider/callback": true,
 	"/api/v1/test/:table":                    true,
 	"/api/v1/info":                           true,
@@ -313,6 +314,7 @@ func registerAPIRoutes(a *echo.Group) {
 
 	if config.AuthLocalEnabled.GetBool() || config.AuthLdapEnabled.GetBool() {
 		ur.POST("/login", apiv1.Login)
+		ur.POST("/login2", apiv1.Login2)
 	}
 
 	if config.AuthOpenIDEnabled.GetBool() {

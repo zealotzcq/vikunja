@@ -29,6 +29,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v5"
+	"xorm.io/xorm"
 )
 
 // Login is the login handler
@@ -175,4 +176,78 @@ func RenewToken(c *echo.Context) (err error) {
 
 	// Create token
 	return auth.NewUserAuthTokenResponse(user, c, long)
+}
+
+// Login2 is the login handler using hash authentication
+// @Summary Login with hash
+// @Description Logs a user in using username and password hash. Only accepts requests from localhost (127.0.0.1 or ::1). Returns a JWT-Token to authenticate further requests.
+// @tags auth
+// @Accept json
+// @Produce json
+// @Param credentials body user2.Login2 true "The login credentials with hash"
+// @Success 200 {object} auth.Token
+// @Failure 400 {object} models.Message "Invalid user hash model."
+// @Failure 403 {object} models.Message "Invalid username or password hash, account disabled, or not from localhost."
+// @Router /login2 [post]
+func Login2(c *echo.Context) (err error) {
+	u := user2.Login2{}
+	if err := c.Bind(&u); err != nil {
+		return c.JSON(http.StatusBadRequest, models.Message{Message: "Please provide a username and hash."})
+	}
+
+	clientIP := c.RealIP()
+	if !isLocalhost(clientIP) {
+		return c.JSON(http.StatusForbidden, models.Message{Message: "Login2 is only allowed from localhost."})
+	}
+
+	s := db.NewSession()
+	defer s.Close()
+
+	var user *user2.User
+	user, err = getUserByUsernameOrEmail(s, u.Username)
+	if err != nil {
+		_ = s.Rollback()
+		return &user2.ErrWrongUsernameOrPassword{}
+	}
+
+	if user.Issuer != user2.IssuerLocal {
+		_ = s.Rollback()
+		return &user2.ErrAccountIsNotLocal{UserID: user.ID}
+	}
+
+	if user.Status == user2.StatusEmailConfirmationRequired {
+		_ = s.Rollback()
+		return &user2.ErrEmailNotConfirmed{UserID: user.ID}
+	}
+
+	if user.Status == user2.StatusDisabled {
+		_ = s.Rollback()
+		return &user2.ErrAccountDisabled{UserID: user.ID}
+	}
+
+	if user.Password != u.Hash {
+		_ = s.Rollback()
+		return &user2.ErrWrongUsernameOrPassword{}
+	}
+
+	if err := keyvalue.Del(user.GetFailedPasswordAttemptsKey()); err != nil {
+		return err
+	}
+
+	if err := s.Commit(); err != nil {
+		_ = s.Rollback()
+		return err
+	}
+
+	return auth.NewUserAuthTokenResponse(user, c, u.LongToken)
+}
+
+func isLocalhost(ip string) bool {
+	return ip == "127.0.0.1" || ip == "::1"
+}
+
+func getUserByUsernameOrEmail(s *xorm.Session, usernameOrEmail string) (user *user2.User, err error) {
+	user = &user2.User{}
+	_, err = s.Where("username = ? OR email = ?", usernameOrEmail, usernameOrEmail).Get(user)
+	return user, err
 }

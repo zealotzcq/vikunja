@@ -4,23 +4,19 @@ import {getToken} from '@/helpers/auth'
 export default class ChatService {
 	http = AuthenticatedHTTPFactory()
 
-	async sendMessage(message: string, pageRoute: string, pageParams: Record<string, any> = {}): Promise<{
-		id: string
-		role: 'user' | 'assistant'
-		content: string
-		timestamp: number
-		navigationCommand?: {
-			routeName: string
-			params?: Record<string, any>
-			label: string
-		}
-	}> {
+	async sendMessage(
+		message: string,
+		pageRoute: string,
+		pageParams: Record<string, any> = {},
+		messageID?: string,
+	): Promise<void> {
 		const token = getToken()
 		if (!token) {
 			throw new Error('No authentication token available')
 		}
 
-		const response = await this.http.post('/chat/send', {
+		await this.http.post('/chat/send', {
+			message_id: messageID,
 			message,
 			page_info: {
 				route_name: pageRoute,
@@ -28,10 +24,9 @@ export default class ChatService {
 			},
 			use_agent: true,
 		})
-		return response.data
 	}
 
-	async getSession(): Promise<{
+	async getHistory(): Promise<{
 		id: string
 		user_id: number
 		created_at: number
@@ -53,7 +48,7 @@ export default class ChatService {
 			throw new Error('No authentication token available')
 		}
 
-		const response = await this.http.get('/chat/session')
+		const response = await this.http.get('/chat/history')
 		return response.data
 	}
 

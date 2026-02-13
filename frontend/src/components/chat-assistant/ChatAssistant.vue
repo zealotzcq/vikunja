@@ -58,7 +58,7 @@
 </template>
 
 <script lang="ts" setup>
-  import {ref, watch, nextTick, onMounted} from 'vue'
+  import {ref, watch, nextTick, onMounted, onUnmounted} from 'vue'
   import {useI18n} from 'vue-i18n'
   import {useRouter} from 'vue-router'
 
@@ -75,9 +75,13 @@
   const messagesContainer = ref<HTMLElement | null>(null)
 
   onMounted(() => {
-	chatStore.loadSession()
+	chatStore.loadChatHistory()
 	detectMobile()
 	scrollToBottom()
+  })
+
+  onUnmounted(() => {
+	chatStore.disconnectSSE()
   })
 
   function detectMobile() {
@@ -89,7 +93,7 @@
 	if (userInput.value.trim() === '') {
 		return
 	}
-	chatStore.sendMessage(userInput.value, router)
+	chatStore.sendMessage(userInput.value)
 	userInput.value = ''
   }
 

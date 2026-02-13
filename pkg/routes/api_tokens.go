@@ -35,9 +35,15 @@ func SetupTokenMiddleware() echo.MiddlewareFunc {
 	return echojwt.WithConfig(echojwt.Config{
 		SigningKey: []byte(config.ServiceJWTSecret.GetString()),
 		Skipper: func(c *echo.Context) bool {
+			// Check if this is an SSE connection with token in query parameter
+			if c.Request().URL.Path == "/api/v1/chat/stream" && c.QueryParam("token") != "" {
+				// Skip JWT middleware - authentication will be handled in handler
+				return true
+			}
+
 			authHeader := c.Request().Header.Values("Authorization")
 			if len(authHeader) == 0 {
-				return false // let the jwt middleware handle invalid headers
+				return false // let's jwt middleware handle invalid headers
 			}
 
 			for _, s := range authHeader {

@@ -27,10 +27,11 @@ type openAIRequest struct {
 }
 
 type openAIMessage struct {
-	Role      string           `json:"role"`
-	Name      string           `json:"name,omitempty"`
-	Content   string           `json:"content,omitempty"`
-	ToolCalls []openAIToolCall `json:"tool_calls,omitempty"`
+	Role       string           `json:"role"`
+	Name       string           `json:"name,omitempty"`
+	Content    string           `json:"content,omitempty"`
+	ToolCalls  []openAIToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string           `json:"tool_call_id,omitempty"` // Used in tool result messages to reference the tool call
 }
 
 type openAIToolCall struct {
@@ -115,9 +116,10 @@ func (p *OpenAIProvider) GenerateWithMessages(ctx context.Context, messages []Me
 
 	for _, msg := range messages {
 		openAIMessage := openAIMessage{
-			Role:    msg.Role,
-			Name:    msg.Name,
-			Content: msg.Content,
+			Role:       msg.Role,
+			Name:       msg.Name,
+			Content:    msg.Content,
+			ToolCallID: msg.ToolCallID,
 		}
 		openAIMessages = append(openAIMessages, openAIMessage)
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 )
 
 // LLMProvider defines the interface for LLM providers
@@ -31,9 +32,10 @@ type AgentContext struct {
 
 // Message represents a message in the conversation
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-	Name    string `json:"name,omitempty"`
+	Role       string `json:"role"`
+	Content    string `json:"content"`
+	Name       string `json:"name,omitempty"`
+	ToolCallID string `json:"tool_call_id,omitempty"` // Used in tool result messages to reference the tool call
 }
 
 // ExecutionStep represents a step in the agent's execution
@@ -172,12 +174,13 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 
 	messages := a.buildMessages(agentCtx)
 
-	for i := 0; i < maxIterations; i++ {
-		messages = append(messages, Message{
-			Role:    "user",
-			Content: userMessage,
-		})
+	// Add user message only once at the beginning
+	messages = append(messages, Message{
+		Role:    "user",
+		Content: userMessage,
+	})
 
+	for i := 0; i < maxIterations; i++ {
 		tools := a.toolManager.GetEnabledTools()
 		toolDefinitions := a.toolManager.GetToolDefinitions()
 
@@ -231,14 +234,17 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 
 		agentCtx.ExecutionSteps = append(agentCtx.ExecutionSteps, step)
 
+		// Generate a unique tool call ID
+		toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
+
 		messages = append(messages, Message{
 			Role:    "assistant",
 			Content: llmResponse,
 		})
 		messages = append(messages, Message{
-			Role:    "tool",
-			Name:    toolCall.Name,
-			Content: step.Output,
+			Role:       "tool",
+			ToolCallID: toolCallID,
+			Content:    step.Output,
 		})
 
 		if agentCtx.ShouldNavigate {

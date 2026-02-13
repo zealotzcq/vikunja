@@ -1,9 +1,11 @@
 package v1
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"code.vikunja.io/api/pkg/models"
@@ -33,9 +35,10 @@ func isUserAllowedForChat(a web.Auth) bool {
 
 // SendMessageRequest represents a request to send a chat message
 type SendMessageRequest struct {
-	Message  string    `json:"message" validate:"required"`
-	PageInfo *PageInfo `json:"page_info"`
-	UseAgent bool      `json:"use_agent"` // Use the new agent system instead of mock
+	MessageID string    `json:"message_id"`
+	Message   string    `json:"message" validate:"required"`
+	PageInfo  *PageInfo `json:"page_info"`
+	UseAgent  bool      `json:"use_agent"` // Use the new agent system instead of mock
 }
 
 // PageInfo represents current page context
@@ -83,98 +86,31 @@ func SendMessage(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
 	}
 
-	// Generate user message ID
-	userMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
+	userMsgID := req.MessageID
+	if userMsgID == "" {
+		userMsgID = fmt.Sprintf("msg_%d", time.Now().UnixNano())
+	}
 
-	// Add user message to session
 	userMessage := chat_session.Message{
 		ID:        userMsgID,
+		Type:      "user_input",
 		Role:      "user",
 		Content:   req.Message,
 		Timestamp: time.Now().Unix(),
 	}
 
+	log.Printf("[Chat] Adding user message for user %d: id=%s, type=%s", userID, userMsgID, userMessage.Type)
+
 	if err := chat_session.GetDefault().AddMessage(userID, userMessage); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to save message: %v", err))
 	}
 
-	// Generate AI response based on message and page context
-	routeName := ""
-	var routeParams map[string]interface{}
-	if req.PageInfo != nil {
-		routeName = req.PageInfo.RouteName
-		routeParams = req.PageInfo.Params
-	}
+	go processUserMessageAsync(context.Background(), userID, userMsgID, req)
 
-	var aiResponse string
-	var navInfo map[string]interface{}
-	var shouldNavigate bool
-
-	if req.UseAgent {
-		log.Printf("[Chat] Using Agent system - UserID: %d, Message: %s, Route: %s", userID, req.Message, routeName)
-
-		agentResponse, err := ai.GenerateAgentResponse(c.Request().Context(), userID, req.Message, routeName, routeParams)
-		if err != nil {
-			log.Printf("[Chat] Agent error: %v", err)
-			return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("AI agent error: %v", err))
-		}
-
-		aiResponse = agentResponse.Content
-		shouldNavigate = agentResponse.ShouldNavigate
-		log.Printf("[Chat] Agent response - Content: %s, ShouldNavigate: %t", aiResponse, shouldNavigate)
-
-		if agentResponse.NavigationInfo != nil {
-			navInfo = map[string]interface{}{
-				"route_name": agentResponse.NavigationInfo.RouteName,
-				"params":     agentResponse.NavigationInfo.Params,
-			}
-			log.Printf("[Chat] Navigation info - RouteName: %s, Params: %v", agentResponse.NavigationInfo.RouteName, agentResponse.NavigationInfo.Params)
-		} else {
-			log.Printf("[Chat] No navigation info in agent response")
-		}
-	} else {
-		log.Printf("[Chat] Using Mock system - UserID: %d, Message: %s", userID, req.Message)
-
-		aiResponse, navInfo, shouldNavigate = ai.GenerateResponse(
-			req.Message,
-			routeName,
-			routeParams,
-		)
-
-		log.Printf("[Chat] Mock response: %s", aiResponse)
-	}
-
-	var navigationCommand *NavigationCommand
-	if shouldNavigate && navInfo != nil {
-		navigationCommand = &NavigationCommand{
-			RouteName: navInfo["route_name"].(string),
-			Params:    navInfo["params"].(map[string]interface{}),
-			Label:     aiResponse,
-		}
-	}
-
-	// Generate assistant message ID
-	assistantMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
-
-	// Add assistant message to session
-	assistantMessage := chat_session.Message{
-		ID:        assistantMsgID,
-		Role:      "assistant",
-		Content:   aiResponse,
-		Timestamp: time.Now().Unix(),
-	}
-
-	if err := chat_session.GetDefault().AddMessage(userID, assistantMessage); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to save assistant message: %v", err))
-	}
-
-	// Return the assistant message
-	return c.JSON(http.StatusOK, ChatMessage{
-		ID:                assistantMsgID,
-		Role:              "assistant",
-		Content:           aiResponse,
-		Timestamp:         time.Now().Unix(),
-		NavigationCommand: navigationCommand,
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"id":        userMsgID,
+		"status":    "processing",
+		"timestamp": time.Now().Unix(),
 	})
 }
 
@@ -227,4 +163,219 @@ func ClearSession(c *echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, models.Message{Message: "Session cleared successfully"})
+}
+
+// GetChatHistory retrieves the current user's chat history (filtered for frontend)
+func GetChatHistory(c *echo.Context) error {
+	a, err := auth.GetAuthFromClaims(c)
+	if err != nil {
+		return err
+	}
+
+	if _, is := a.(*models.LinkSharing); is {
+		return echo.ErrForbidden
+	}
+
+	if !isUserAllowedForChat(a) {
+		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
+	}
+
+	userID := a.GetID()
+
+	sessionData, err := chat_session.GetDefault().GetOrCreateSession(userID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to get session: %v", err))
+	}
+
+	frontendMessages := []ChatMessage{}
+	for _, msg := range sessionData.Messages {
+		if msg.Type == "user_input" || msg.Type == "assistant_response" {
+			var navigationCommand *NavigationCommand
+			if msg.NavigationCommand != nil {
+				navigationCommand = &NavigationCommand{
+					RouteName: msg.NavigationCommand.RouteName,
+					Params:    msg.NavigationCommand.Params,
+					Label:     msg.NavigationCommand.Label,
+				}
+			}
+			frontendMessages = append(frontendMessages, ChatMessage{
+				ID:                msg.ID,
+				Role:              msg.Role,
+				Content:           msg.Content,
+				Timestamp:         msg.Timestamp,
+				NavigationCommand: navigationCommand,
+			})
+		}
+	}
+
+	response := map[string]interface{}{
+		"id":         sessionData.ID,
+		"user_id":    sessionData.UserID,
+		"created_at": sessionData.CreatedAt.Unix(),
+		"messages":   frontendMessages,
+		"expires_at": sessionData.ExpiresAt.Unix(),
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
+// processUserMessageAsync processes a user message asynchronously
+func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string, req *SendMessageRequest) {
+	log.Printf("[Chat] Processing message async for user %d: id=%s", userID, userMsgID)
+
+	routeName := ""
+	var routeParams map[string]interface{}
+	if req.PageInfo != nil {
+		routeName = req.PageInfo.RouteName
+		routeParams = req.PageInfo.Params
+	}
+
+	agent, err := ai.GetAgent()
+	if err != nil {
+		log.Printf("[Chat] Failed to get agent: %v", err)
+		return
+	}
+
+	agentCtx := &ai.AgentContext{
+		UserID:         userID,
+		CurrentRoute:   routeName,
+		RouteParams:    routeParams,
+		SessionData:    make(map[string]interface{}),
+		MessageHistory: []ai.Message{},
+	}
+
+	session, err := chat_session.GetDefault().GetOrCreateSession(userID)
+	if err != nil {
+		log.Printf("[Chat] Failed to get session: %v", err)
+		return
+	}
+
+	for _, msg := range session.Messages {
+		// Skip the current user message we're processing (it will be added separately)
+		if msg.ID == userMsgID {
+			continue
+		}
+
+		switch msg.Type {
+		case "user_input":
+			// User input message
+			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
+				Role:    msg.Role,
+				Content: msg.Content,
+			})
+
+		case "assistant_response":
+			// Final assistant response to user
+			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
+				Role:    msg.Role,
+				Content: msg.Content,
+			})
+
+		case "tool_call":
+			// Tool call from assistant
+			// Format as assistant message with tool call information
+			toolCallContent := fmt.Sprintf("TOOL: %s\nINPUT: %s", msg.ToolName, msg.ToolInput)
+			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
+				Role:    msg.Role,
+				Content: toolCallContent,
+			})
+
+		case "tool_result":
+			// Result from tool execution
+			// Format as tool message with tool output
+			// Use message ID as tool_call_id for reference
+			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
+				Role:       msg.Role,
+				Content:    msg.ToolOutput,
+				ToolCallID: msg.ID,
+			})
+		}
+	}
+
+	agentResponse, err := agent.ProcessMessage(ctx, agentCtx, req.Message)
+	if err != nil {
+		log.Printf("[Chat] Agent error: %v", err)
+		return
+	}
+
+	assistantMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
+	var navigationCommand *chat_session.NavigationCommand
+	if agentResponse.ShouldNavigate && agentResponse.NavigationInfo != nil {
+		navigationCommand = &chat_session.NavigationCommand{
+			RouteName: agentResponse.NavigationInfo.RouteName,
+			Params:    agentResponse.NavigationInfo.Params,
+			Label:     agentResponse.Content,
+		}
+	}
+
+	metadata := make(map[string]interface{})
+	if len(agentResponse.ExecutionSteps) > 0 {
+		metadata["execution_steps"] = agentResponse.ExecutionSteps
+	}
+	if agentResponse.TokensUsed > 0 {
+		metadata["tokens_used"] = agentResponse.TokensUsed
+	}
+
+	// Save tool calls and tool results to session
+	for _, step := range agentResponse.ExecutionSteps {
+		// Parse tool call from the thought (thought contains the tool call info)
+		// Step.Thought format: "TOOL: tool_name\nINPUT: {json_params}"
+		toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
+		var toolName string
+		var toolInput string
+
+		lines := strings.Split(step.Thought, "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "TOOL:") {
+				toolName = strings.TrimSpace(strings.TrimPrefix(line, "TOOL:"))
+			} else if strings.HasPrefix(line, "INPUT:") {
+				toolInput = strings.TrimSpace(strings.TrimPrefix(line, "INPUT:"))
+			}
+		}
+
+		// Save tool call message
+		toolCallMsg := chat_session.Message{
+			ID:        toolCallID,
+			Type:      "tool_call",
+			Role:      "assistant",
+			ToolName:  toolName,
+			ToolInput: toolInput,
+			Timestamp: time.Now().Unix(),
+		}
+		log.Printf("[Chat] Saving tool call for user %d: tool=%s", userID, toolName)
+		if err := chat_session.GetDefault().AddMessage(userID, toolCallMsg); err != nil {
+			log.Printf("[Chat] Failed to save tool call message: %v", err)
+		}
+
+		// Save tool result message
+		toolResultMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
+		toolResultMsg := chat_session.Message{
+			ID:         toolResultMsgID,
+			Type:       "tool_result",
+			Role:       "tool",
+			ToolName:   toolName,
+			ToolOutput: step.Output,
+			Timestamp:  time.Now().Unix(),
+		}
+		log.Printf("[Chat] Saving tool result for user %d: tool=%s", userID, toolName)
+		if err := chat_session.GetDefault().AddMessage(userID, toolResultMsg); err != nil {
+			log.Printf("[Chat] Failed to save tool result message: %v", err)
+		}
+	}
+
+	assistantMessage := chat_session.Message{
+		ID:                assistantMsgID,
+		Type:              "assistant_response",
+		Role:              "assistant",
+		Content:           agentResponse.Content,
+		Timestamp:         time.Now().Unix(),
+		NavigationCommand: navigationCommand,
+		Metadata:          metadata,
+	}
+
+	log.Printf("[Chat] Adding assistant message for user %d: id=%s, type=%s", userID, assistantMsgID, assistantMessage.Type)
+	if err := chat_session.GetDefault().AddMessage(userID, assistantMessage); err != nil {
+		log.Printf("[Chat] Failed to save assistant message: %v", err)
+	}
 }

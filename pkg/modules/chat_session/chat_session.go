@@ -25,11 +25,16 @@ type ChatSession struct {
 
 // Message represents a chat message
 type Message struct {
-	ID                string             `json:"id"`
-	Role              string             `json:"role"` // "user" | "assistant"
-	Content           string             `json:"content"`
-	Timestamp         int64              `json:"timestamp"`
-	NavigationCommand *NavigationCommand `json:"navigationCommand,omitempty"`
+	ID                string                 `json:"id"`
+	Type              string                 `json:"type"` // "user_input", "tool_call", "tool_result", "assistant_response"
+	Role              string                 `json:"role"` // "user" | "assistant" | "tool"
+	Content           string                 `json:"content"`
+	Timestamp         int64                  `json:"timestamp"`
+	NavigationCommand *NavigationCommand     `json:"navigationCommand,omitempty"`
+	ToolName          string                 `json:"toolName,omitempty"`
+	ToolInput         string                 `json:"toolInput,omitempty"`
+	ToolOutput        string                 `json:"toolOutput,omitempty"`
+	Metadata          map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // NavigationCommand represents a navigation action
@@ -41,7 +46,8 @@ type NavigationCommand struct {
 
 // Manager manages chat sessions in memory
 type Manager struct {
-	mu sync.RWMutex
+	mu        sync.RWMutex
+	listeners map[int64][]chan Message
 }
 
 var defaultManager = &Manager{}
@@ -113,13 +119,62 @@ func (m *Manager) GetOrCreateSession(userID int64) (*ChatSession, error) {
 	return m.createNewSessionWithoutLock(userID)
 }
 
+// RegisterListener registers a listener for a user's session updates
+func (m *Manager) RegisterListener(userID int64, listener chan Message) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.listeners == nil {
+		m.listeners = make(map[int64][]chan Message)
+	}
+	m.listeners[userID] = append(m.listeners[userID], listener)
+	fmt.Printf("[Chat] Registered listener for user %d, total listeners: %d\n", userID, len(m.listeners[userID]))
+}
+
+// UnregisterListener removes a listener for a user
+func (m *Manager) UnregisterListener(userID int64, listener chan Message) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	listeners, exists := m.listeners[userID]
+	if !exists {
+		return
+	}
+	for i, l := range listeners {
+		if l == listener {
+			m.listeners[userID] = append(listeners[:i], listeners[i+1:]...)
+			break
+		}
+	}
+}
+
+// notifyListeners notifies all registered listeners of a new message
+func (m *Manager) notifyListeners(userID int64, msg Message) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	listeners, exists := m.listeners[userID]
+	if !exists {
+		fmt.Printf("[Chat] No listeners for user %d\n", userID)
+		return
+	}
+	fmt.Printf("[Chat] Notifying %d listeners for user %d, message type: %s, id: %s\n", len(listeners), userID, msg.Type, msg.ID)
+	sentCount := 0
+	for _, listener := range listeners {
+		select {
+		case listener <- msg:
+			sentCount++
+		default:
+			fmt.Printf("[Chat] Listener channel full, skipping\n")
+		}
+	}
+	fmt.Printf("[Chat] Sent message to %d/%d listeners\n", sentCount, len(listeners))
+}
+
 // AddMessage adds a message to a session
 func (m *Manager) AddMessage(userID int64, msg Message) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 
 	session, err := m.GetOrCreateSession(userID)
 	if err != nil {
+		m.mu.Unlock()
 		return err
 	}
 
@@ -130,8 +185,16 @@ func (m *Manager) AddMessage(userID int64, msg Message) error {
 
 	sessionKey := getSessionKey(userID)
 	if err := keyvalue.Put(sessionKey, updatedSession); err != nil {
+		m.mu.Unlock()
 		return fmt.Errorf("failed to update session: %w", err)
 	}
+
+	// Save message data for notification
+	notifyMsg := msg
+
+	// Release lock before notifying listeners to avoid deadlock
+	m.mu.Unlock()
+	m.notifyListeners(userID, notifyMsg)
 
 	return nil
 }

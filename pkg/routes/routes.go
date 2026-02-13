@@ -645,6 +645,8 @@ func registerAPIRoutes(a *echo.Group) {
 	chat := a.Group("/chat")
 	chat.POST("/send", apiv1.SendMessage)
 	chat.GET("/session", apiv1.GetSession)
+	chat.GET("/history", apiv1.GetChatHistory)
+	chat.GET("/stream", apiv1.ChatStream)
 	chat.DELETE("/session", apiv1.ClearSession)
 
 	// API Tokens

@@ -97,12 +97,12 @@ const chatStore = useChatStore()
 const baseStore = useBaseStore()
 
 onMounted(() => {
-	chatStore.loadSession()
+	chatStore.loadChatHistory()
 })
 
 watch(() => authStore.authUser, (user) => {
 	if (user) {
-		chatStore.loadSession()
+		chatStore.loadChatHistory()
 	} else {
 		chatStore.isAvailable = false
 		chatStore.isOpen = false

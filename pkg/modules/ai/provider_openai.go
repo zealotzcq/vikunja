@@ -24,6 +24,7 @@ type openAIRequest struct {
 	Temperature float64         `json:"temperature"`
 	MaxTokens   int             `json:"max_tokens,omitempty"`
 	Tools       []openAITool    `json:"tools,omitempty"`
+	ToolChoice  string          `json:"tool_choice,omitempty"`
 }
 
 type openAIMessage struct {
@@ -160,6 +161,7 @@ func (p *OpenAIProvider) makeRequest(ctx context.Context, messages []openAIMessa
 
 	if tools != nil {
 		reqBody.Tools = tools
+		reqBody.ToolChoice = "auto"
 	}
 
 	jsonBody, err := json.Marshal(reqBody)

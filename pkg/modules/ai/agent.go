@@ -23,6 +23,7 @@ type AgentContext struct {
 	CurrentRoute   string                 `json:"current_route"`
 	RouteParams    map[string]interface{} `json:"route_params"`
 	SessionData    map[string]interface{} `json:"session_data"`
+	Language       string                 `json:"language"`
 
 	NavigationInfo *NavigationInfo `json:"navigation_info,omitempty"`
 	ShouldNavigate bool            `json:"should_navigate"`
@@ -309,6 +310,9 @@ func (a *Agent) buildSystemPrompt(agentCtx *AgentContext) string {
 	sb.WriteString("## Environment Information\n")
 	if agentCtx.UserID > 0 {
 		sb.WriteString(fmt.Sprintf("- User ID: %d\n", agentCtx.UserID))
+	}
+	if agentCtx.Language != "" {
+		sb.WriteString(fmt.Sprintf("- Language: %s\n", agentCtx.Language))
 	}
 	if agentCtx.CurrentRoute != "" {
 		sb.WriteString(fmt.Sprintf("- Current Route: %s\n", agentCtx.CurrentRoute))

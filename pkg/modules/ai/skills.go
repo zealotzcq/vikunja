@@ -97,15 +97,15 @@ func discoverSkills() (map[string]*SkillInfo, error) {
 				continue
 			}
 
-        skills[metadata.Name] = &SkillInfo{
-            Name:        metadata.Name,
-            Description: metadata.Description,
-            Location:    skillFile,
-        }
-    }
-}
+			skills[metadata.Name] = &SkillInfo{
+				Name:        metadata.Name,
+				Description: metadata.Description,
+				Location:    skillFile,
+			}
+		}
+	}
 
-return skills, nil
+	return skills, nil
 }
 
 // preprocessFrontmatter preprocesses YAML frontmatter to handle values containing colons
@@ -300,15 +300,12 @@ func (sm *SkillManager) FormatSkillsForTool() string {
 	defer sm.mu.RUnlock()
 
 	if len(sm.skills) == 0 {
-		return "<available_skills>\n  No skills available\n</available_skills>"
+		return "<available_skills>  No skills available  </available_skills>"
 	}
 
-	var sb strings.Builder
-	sb.WriteString("<available_skills>\n")
+	var parts []string
 	for _, skill := range sm.skills {
-		sb.WriteString(fmt.Sprintf("  <skill>\n    <name>%s</name>\n    <description>%s</description>\n  </skill>\n",
-			skill.Name, skill.Description))
+		parts = append(parts, fmt.Sprintf("   <skill>     <name>%s</name>     <description>%s</description>   </skill> ", skill.Name, skill.Description))
 	}
-	sb.WriteString("</available_skills>")
-	return sb.String()
+	return "<available_skills> " + strings.Join(parts, "") + " </available_skills>"
 }

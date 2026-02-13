@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"code.vikunja.io/api/pkg/db"
 	"code.vikunja.io/api/pkg/models"
 	"code.vikunja.io/api/pkg/modules/ai"
 	"code.vikunja.io/api/pkg/modules/auth"
@@ -236,12 +237,19 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 		return
 	}
 
+	u, err := user.GetUserByID(db.NewSession(), userID)
+	if err != nil {
+		log.Printf("[Chat] Failed to get user: %v", err)
+		return
+	}
+
 	agentCtx := &ai.AgentContext{
 		UserID:         userID,
 		CurrentRoute:   routeName,
 		RouteParams:    routeParams,
 		SessionData:    make(map[string]interface{}),
 		MessageHistory: []ai.Message{},
+		Language:       u.Language,
 	}
 
 	session, err := chat_session.GetDefault().GetOrCreateSession(userID)

@@ -3,6 +3,7 @@ package ai
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/spf13/viper"
@@ -29,8 +30,9 @@ type Config struct {
 	EnabledTools  []string `mapstructure:"enabled_tools"`
 	LLMLog        bool     `mapstructure:"llm_log"`
 
-	// System Prompt
-	SystemPrompt string `mapstructure:"system_prompt"`
+	// System Prompt File (path to file containing the system prompt)
+	SystemPromptFile string `mapstructure:"system_prompt_file"`
+	SystemPrompt     string
 }
 
 var (
@@ -81,8 +83,17 @@ func LoadConfig() (*Config, error) {
 		if viper.IsSet("ai.llm_log") {
 			config.LLMLog = viper.GetBool("ai.llm_log")
 		}
-		if viper.IsSet("ai.system_prompt") {
-			config.SystemPrompt = viper.GetString("ai.system_prompt")
+
+		systemPromptFile := "./soul.md"
+		if viper.IsSet("ai.system_prompt_file") {
+			systemPromptFile = viper.GetString("ai.system_prompt_file")
+		}
+		config.SystemPromptFile = systemPromptFile
+		promptContent, err := os.ReadFile(systemPromptFile)
+		if err == nil {
+			config.SystemPrompt = string(promptContent)
+		} else {
+			config.SystemPrompt = getDefaultSystemPrompt()
 		}
 
 		// Set defaults

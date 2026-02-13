@@ -130,11 +130,7 @@ func (tm *ToolManager) ExecuteTool(name string, ctx *AgentContext, params map[st
 		return "", fmt.Errorf("tool '%s' not found", name)
 	}
 
-
-
 	result, err := tool.Execute(ctx, params)
-
-
 
 	return result, err
 }
@@ -237,8 +233,6 @@ Usage examples:
 			}
 			ctx.ShouldNavigate = true
 
-
-
 			return message, nil
 		},
 	}
@@ -248,25 +242,19 @@ Usage examples:
 	}
 
 	skillTool := &Tool{
-		Name: "skill",
-		Description: sm.FormatSkillsForTool() + `
-
-Use this tool to load a skill's full instructions when you need them. Call with:
-
-{
-  "name": "skill-name"
-}
-
-The skill's complete content will be returned, including all instructions, workflows, and additional details.`,
+		Name:        "skill",
+		Description: `Load a skill to get detailed instructions for a specific task. Skills provide specialized knowledge and step-by-step guidance. Use this when a task matches an available skill's description. Only the skills listed here are available: ` + sm.FormatSkillsForTool(),
 		Parameters: map[string]interface{}{
-			"type": "object",
+			"$schema": "https://json-schema.org/draft-2020-12/schema",
+			"type":    "object",
 			"properties": map[string]interface{}{
 				"name": map[string]interface{}{
+					"description": "The skill identifier from available_skills (e.g., 'skill-creator', 'chinese-novelist', ...)",
 					"type":        "string",
-					"description": "The name of the skill to load",
 				},
 			},
-			"required": []string{"name"},
+			"required":             []string{"name"},
+			"additionalProperties": false,
 		},
 		Execute: func(ctx *AgentContext, params map[string]interface{}) (string, error) {
 			skillName, ok := params["name"].(string)
@@ -286,8 +274,6 @@ The skill's complete content will be returned, including all instructions, workf
 				}(), ", ")
 				return "", fmt.Errorf("skill '%s' not found. Available skills: %s", skillName, available)
 			}
-
-
 
 			var sb strings.Builder
 			sb.WriteString(fmt.Sprintf("## Skill: %s\n\n", skillContent.Metadata.Name))

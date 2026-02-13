@@ -13,15 +13,29 @@ if sys.platform == 'win32':
         sys.stderr.reconfigure(encoding='utf-8')
 
 import requests
+import sqlite3
 from typing import Dict, List, Optional, Any, Union
 
 
-def login(base_url: str, username: str, password: str) -> str:
-    """Login and get JWT token"""
-    url = f"{base_url.rstrip('/')}/api/v1/login"
+def get_user_password_hash(username: str, db_path: str) -> str:
+    """Get password hash from SQLite database"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
+    result = cursor.fetchone()
+    conn.close()
+    if result is None:
+        raise Exception(f"User '{username}' not found in database")
+    return result[0]
+
+
+def login(base_url: str, username: str, db_path: str) -> str:
+    """Login and get JWT token using hash from database"""
+    password_hash = get_user_password_hash(username, db_path)
+    url = f"{base_url.rstrip('/')}/api/v1/login2"
     response = requests.post(
         url,
-        json={'username': username, 'password': password}
+        json={'username': username, 'hash': password_hash}
     )
     response.raise_for_status()
     token = response.json().get('token')
@@ -219,9 +233,9 @@ def add_team_member(base_url: str, token: str, team_id: int, username: str) -> U
 if __name__ == '__main__':
     import sys
 
-    BASE_URL = "http://127.0.0.1:3456"
+    BASE_URL = "http://127.0.0.1:80"
     ADMIN_USERNAME = "王大牛"
-    ADMIN_PASSWORD = "50095152"
+    DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "vikunja.db")
 
     if len(sys.argv) > 1:
         test_name = sys.argv[1]
@@ -229,7 +243,7 @@ if __name__ == '__main__':
         if test_name == 'login':
             print("=== Test: Login ===")
             try:
-                token = login(BASE_URL, ADMIN_USERNAME, ADMIN_PASSWORD)
+                token = login(BASE_URL, ADMIN_USERNAME, DB_PATH)
                 print(f"[OK] Login successful")
                 print(f"Token: {token}")
             except Exception as e:
@@ -238,7 +252,7 @@ if __name__ == '__main__':
         elif test_name == 'get_user':
             print("=== Test: Get User ===")
             try:
-                token = login(BASE_URL, ADMIN_USERNAME, ADMIN_PASSWORD)
+                token = login(BASE_URL, ADMIN_USERNAME, DB_PATH)
                 print(f"[OK] Login successful")
 
                 user_info = get_user(BASE_URL, token)
@@ -332,7 +346,7 @@ if __name__ == '__main__':
 
             print(f"\nStep 2: Login")
             try:
-                token = login(BASE_URL, test_username, test_password)
+                token = login(BASE_URL, test_username, DB_PATH)
                 print(f"[OK] Login successful")
             except Exception as e:
                 print(f"[FAIL] Login failed: {e}")
@@ -350,7 +364,7 @@ if __name__ == '__main__':
 
             print("\nStep 1: Login")
             try:
-                token = login(BASE_URL, ADMIN_USERNAME, ADMIN_PASSWORD)
+                token = login(BASE_URL, ADMIN_USERNAME, DB_PATH)
                 print(f"[OK] Login successful")
             except Exception as e:
                 print(f"[FAIL] Login failed: {e}")
@@ -371,7 +385,7 @@ if __name__ == '__main__':
 
             print("\nStep 1: Login")
             try:
-                token = login(BASE_URL, ADMIN_USERNAME, ADMIN_PASSWORD)
+                token = login(BASE_URL, ADMIN_USERNAME, DB_PATH)
                 print(f"[OK] Login successful")
             except Exception as e:
                 print(f"[FAIL] Login failed: {e}")
@@ -411,7 +425,7 @@ if __name__ == '__main__':
                 sys.exit(1)
 
             print(f"\nStep 2: Update test user settings (make discoverable)")
-            test_user_token = login(BASE_URL, test_username, test_password)
+            test_user_token = login(BASE_URL, test_username, DB_PATH)
             result = update_user_settings(BASE_URL, test_user_token, "测试用户")
             if result is True:
                 print(f"[OK] User settings updated")
@@ -420,7 +434,7 @@ if __name__ == '__main__':
                 sys.exit(1)
 
             print(f"\nStep 3: Login as admin and create project")
-            admin_token = login(BASE_URL, ADMIN_USERNAME, ADMIN_PASSWORD)
+            admin_token = login(BASE_URL, ADMIN_USERNAME, DB_PATH)
             project_title = f"共享测试项目_{timestamp}"
             result = create_project(BASE_URL, admin_token, project_title)
             if isinstance(result, int):
@@ -460,7 +474,7 @@ if __name__ == '__main__':
                 sys.exit(1)
 
             print(f"\nStep 2: Update test user settings (make discoverable)")
-            test_user_token = login(BASE_URL, test_username, test_password)
+            test_user_token = login(BASE_URL, test_username, DB_PATH)
             result = update_user_settings(BASE_URL, test_user_token, "测试用户")
             if result is True:
                 print(f"[OK] User settings updated")
@@ -469,7 +483,7 @@ if __name__ == '__main__':
                 sys.exit(1)
 
             print(f"\nStep 3: Login as admin and create team")
-            admin_token = login(BASE_URL, ADMIN_USERNAME, ADMIN_PASSWORD)
+            admin_token = login(BASE_URL, ADMIN_USERNAME, DB_PATH)
             team_name = f"测试团队_{timestamp}"
             result = create_team(BASE_URL, admin_token, team_name)
             if isinstance(result, int):

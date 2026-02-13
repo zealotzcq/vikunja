@@ -150,16 +150,15 @@ func (a *Agent) ProcessMessage(ctx context.Context, agentCtx *AgentContext, mess
 		}
 	}
 
-	agentCtx.MessageHistory = append(agentCtx.MessageHistory, Message{
-		Role:    "user",
-		Content: message,
-	})
-
 	response, err := a.runAgentLoop(ctx, agentCtx, message)
 	if err != nil {
 		return nil, fmt.Errorf("agent execution failed: %w", err)
 	}
 
+	agentCtx.MessageHistory = append(agentCtx.MessageHistory, Message{
+		Role:    "user",
+		Content: message,
+	})
 	agentCtx.MessageHistory = append(agentCtx.MessageHistory, Message{
 		Role:    "assistant",
 		Content: response.Content,
@@ -312,35 +311,6 @@ func (a *Agent) buildSystemPrompt(agentCtx *AgentContext) string {
 		}
 	}
 	sb.WriteString("\n")
-
-	tools := a.toolManager.GetEnabledTools()
-	if len(tools) > 0 {
-		sb.WriteString("## Available Tools\n")
-		for _, tool := range tools {
-			sb.WriteString(fmt.Sprintf("### %s\n%s\n", tool.Name, tool.Description))
-			if params, ok := tool.Parameters["properties"].(map[string]interface{}); ok && len(params) > 0 {
-				sb.WriteString("Parameters:\n")
-				for paramName, paramInfo := range params {
-					if paramMap, ok := paramInfo.(map[string]interface{}); ok {
-						if desc, ok := paramMap["description"].(string); ok {
-							sb.WriteString(fmt.Sprintf("- %s: %s\n", paramName, desc))
-						}
-					}
-				}
-			}
-			sb.WriteString("\n")
-		}
-	}
-
-	skills := a.skillManager.GetEnabledSkills()
-	if len(skills) > 0 {
-		sb.WriteString("## Available Skills\n")
-		sb.WriteString("Use the 'skill' tool to load detailed instructions when needed.\n\n")
-		for _, skill := range skills {
-			sb.WriteString(fmt.Sprintf("- **%s**: %s\n", skill.Name, skill.Description))
-		}
-		sb.WriteString("\n")
-	}
 
 	return sb.String()
 }

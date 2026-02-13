@@ -84,7 +84,8 @@ func (p *OpenAIProvider) Generate(ctx context.Context, prompt string) (string, e
 		{Role: "user", Content: prompt},
 	}
 
-	return p.makeRequest(ctx, messages, nil)
+	content, _, err := p.makeRequest(ctx, messages, nil)
+	return content, err
 }
 
 func (p *OpenAIProvider) GenerateWithTools(ctx context.Context, prompt string, tools []map[string]interface{}) (string, error) {
@@ -109,10 +110,11 @@ func (p *OpenAIProvider) GenerateWithTools(ctx context.Context, prompt string, t
 		})
 	}
 
-	return p.makeRequest(ctx, messages, openAITools)
+	content, _, err := p.makeRequest(ctx, messages, openAITools)
+	return content, err
 }
 
-func (p *OpenAIProvider) GenerateWithMessages(ctx context.Context, messages []Message, tools []map[string]interface{}) (string, error) {
+func (p *OpenAIProvider) GenerateWithMessages(ctx context.Context, messages []Message, tools []map[string]interface{}) (string, string, error) {
 	openAIMessages := make([]openAIMessage, 0, len(messages))
 
 	for _, msg := range messages {
@@ -122,6 +124,22 @@ func (p *OpenAIProvider) GenerateWithMessages(ctx context.Context, messages []Me
 			Content:    msg.Content,
 			ToolCallID: msg.ToolCallID,
 		}
+
+		// Convert ToolCalls to OpenAI format
+		if len(msg.ToolCalls) > 0 {
+			openAIMessage.ToolCalls = make([]openAIToolCall, len(msg.ToolCalls))
+			for i, tc := range msg.ToolCalls {
+				openAIMessage.ToolCalls[i] = openAIToolCall{
+					ID:   tc.ID,
+					Type: tc.Type,
+					Function: openAIFunctionCall{
+						Name:      tc.Name,
+						Arguments: tc.Arguments,
+					},
+				}
+			}
+		}
+
 		openAIMessages = append(openAIMessages, openAIMessage)
 	}
 
@@ -144,7 +162,7 @@ func (p *OpenAIProvider) GenerateWithMessages(ctx context.Context, messages []Me
 	return p.makeRequest(ctx, openAIMessages, openAITools)
 }
 
-func (p *OpenAIProvider) makeRequest(ctx context.Context, messages []openAIMessage, tools []openAITool) (string, error) {
+func (p *OpenAIProvider) makeRequest(ctx context.Context, messages []openAIMessage, tools []openAITool) (string, string, error) {
 	baseURL := p.config.OpenAIBaseURL
 	if baseURL == "" {
 		baseURL = "https://api.openai.com/v1"
@@ -166,14 +184,14 @@ func (p *OpenAIProvider) makeRequest(ctx context.Context, messages []openAIMessa
 
 	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
+		return "", "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
 	// log.Printf("[OpenAI Request] %s", string(jsonBody))
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
+		return "", "", fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -182,29 +200,29 @@ func (p *OpenAIProvider) makeRequest(ctx context.Context, messages []openAIMessa
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to make request: %w", err)
+		return "", "", fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
+		return "", "", fmt.Errorf("failed to read response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		GetLLMLogger().LogExchange("openai", string(jsonBody), string(body))
-		return "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		return "", "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
 	GetLLMLogger().LogExchange("openai", string(jsonBody), string(body))
 
 	var openAIResp openAIResponse
 	if err := json.Unmarshal(body, &openAIResp); err != nil {
-		return "", fmt.Errorf("failed to unmarshal response: %w", err)
+		return "", "", fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	if len(openAIResp.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
+		return "", "", fmt.Errorf("no choices in response")
 	}
 
 	choice := openAIResp.Choices[0]
@@ -214,8 +232,8 @@ func (p *OpenAIProvider) makeRequest(ctx context.Context, messages []openAIMessa
 		for _, tc := range choice.Message.ToolCalls {
 			toolCallStrs = append(toolCallStrs, fmt.Sprintf("TOOL: %s\nINPUT: %s", tc.Function.Name, tc.Function.Arguments))
 		}
-		return fmt.Sprintf("%s\n%s", choice.Message.Content, toolCallStrs[0]), nil
+		return fmt.Sprintf("%s\n%s", choice.Message.Content, toolCallStrs[0]), choice.FinishReason, nil
 	}
 
-	return choice.Message.Content, nil
+	return choice.Message.Content, choice.FinishReason, nil
 }

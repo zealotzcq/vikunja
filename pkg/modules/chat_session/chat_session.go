@@ -34,6 +34,7 @@ type Message struct {
 	ToolName          string                 `json:"toolName,omitempty"`
 	ToolInput         string                 `json:"toolInput,omitempty"`
 	ToolOutput        string                 `json:"toolOutput,omitempty"`
+	ToolCallID        string                 `json:"toolCallID,omitempty"`
 	Metadata          map[string]interface{} `json:"metadata,omitempty"`
 }
 

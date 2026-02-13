@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -13,8 +14,10 @@ var (
 )
 
 type LLMLogger struct {
-	enabled bool
-	logDir  string
+	enabled    bool
+	logDir     string
+	counter    uint64
+	counterMux sync.Mutex
 }
 
 func GetLLMLogger() *LLMLogger {
@@ -23,9 +26,17 @@ func GetLLMLogger() *LLMLogger {
 		llmLogger = &LLMLogger{
 			enabled: config.LLMLog,
 			logDir:  "llmlog",
+			counter: 0,
 		}
 	}
 	return llmLogger
+}
+
+func (l *LLMLogger) nextCounter() uint64 {
+	l.counterMux.Lock()
+	defer l.counterMux.Unlock()
+	l.counter++
+	return l.counter
 }
 
 func (l *LLMLogger) LogRequest(provider, prompt string) error {
@@ -34,7 +45,8 @@ func (l *LLMLogger) LogRequest(provider, prompt string) error {
 	}
 
 	timestamp := time.Now().Format("20060102_150405_000")
-	filename := fmt.Sprintf("%s_req_%s.json", provider, timestamp)
+	counter := l.nextCounter()
+	filename := fmt.Sprintf("%s_req_%s_%04d.json", provider, timestamp, counter)
 
 	return l.writeJSONLog(filename, map[string]interface{}{
 		"request": parseJSON(prompt),
@@ -47,7 +59,8 @@ func (l *LLMLogger) LogResponse(provider, response string) error {
 	}
 
 	timestamp := time.Now().Format("20060102_150405_000")
-	filename := fmt.Sprintf("%s_resp_%s.json", provider, timestamp)
+	counter := l.nextCounter()
+	filename := fmt.Sprintf("%s_resp_%s_%04d.json", provider, timestamp, counter)
 
 	return l.writeJSONLog(filename, map[string]interface{}{
 		"response": parseJSON(response),
@@ -60,7 +73,8 @@ func (l *LLMLogger) LogExchange(provider, request, response string) error {
 	}
 
 	timestamp := time.Now().Format("20060102_150405_000")
-	filename := fmt.Sprintf("%s_%s.json", provider, timestamp)
+	counter := l.nextCounter()
+	filename := fmt.Sprintf("%s_%s_%04d.json", provider, timestamp, counter)
 
 	return l.writeJSONLog(filename, map[string]interface{}{
 		"request":  parseJSON(request),

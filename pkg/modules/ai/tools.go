@@ -154,16 +154,18 @@ Available routes:
 - teams.edit: Specific team detail/edit (requires id in params)
 - labels.index: Label list page
 
+IMPORTANT: You MUST provide a 'content' parameter with a natural language response to the user explaining the navigation action. This will be shown to the user.
+
 Usage examples:
-- Navigate to homepage: {"route_name": "home"}
-- Navigate to projects: {"route_name": "projects.index"}
-- Navigate to project 123: {"route_name": "project.index", "params": {"projectId": 123}}
-- Navigate to favorites: {"route_name": "project.index", "params": {"projectId": -1}}
-- Navigate to tasks: {"route_name": "tasks.range"}
-- Navigate to task 456: {"route_name": "task.detail", "params": {"id": 456}}
-- Navigate to teams: {"route_name": "teams.index"}
-- Navigate to team 789: {"route_name": "teams.edit", "params": {"id": 789}}
-- Navigate to labels: {"route_name": "labels.index"}`,
+- Navigate to homepage: {"route_name": "home", "content": "好的，我正在为您返回首页"}
+- Navigate to projects: {"route_name": "projects.index", "content": "正在为您打开项目列表"}
+- Navigate to project 123: {"route_name": "project.index", "params": {"projectId": 123}, "content": "正在为您打开项目 123"}
+- Navigate to favorites: {"route_name": "project.index", "params": {"projectId": -1}, "content": "正在为您打开收藏"}
+- Navigate to tasks: {"route_name": "tasks.range", "content": "正在为您打开任务列表"}
+- Navigate to task 456: {"route_name": "task.detail", "params": {"id": 456}, "content": "正在为您打开任务 456"}
+- Navigate to teams: {"route_name": "teams.index", "content": "正在为您打开团队列表"}
+- Navigate to team 789: {"route_name": "teams.edit", "params": {"id": 789}, "content": "正在为您打开团队 789"}
+- Navigate to labels: {"route_name": "labels.index", "content": "正在为您打开标签列表"}`,
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -175,8 +177,12 @@ Usage examples:
 					"type":        "object",
 					"description": "Optional route parameters (e.g., projectId, id)",
 				},
+				"content": map[string]interface{}{
+					"type":        "string",
+					"description": "Natural language response to the user explaining the navigation action. This is REQUIRED and will be shown to the user.",
+				},
 			},
-			"required": []string{"route_name"},
+			"required": []string{"route_name", "content"},
 		},
 		Execute: func(ctx *AgentContext, params map[string]interface{}) (string, error) {
 			routeName, ok := params["route_name"].(string)
@@ -184,56 +190,23 @@ Usage examples:
 				return "", fmt.Errorf("route_name is required")
 			}
 
+			content, ok := params["content"].(string)
+			if !ok {
+				return "", fmt.Errorf("content is required")
+			}
+
 			var routeParams map[string]interface{}
 			if p, ok := params["params"].(map[string]interface{}); ok {
 				routeParams = p
 			}
 
-			var message string
-			if routeName == "home" {
-				message = "正在为您返回首页"
-			} else if routeName == "projects.index" {
-				message = "正在为您打开项目列表"
-			} else if routeName == "project.index" {
-				if pid, ok := routeParams["projectId"].(float64); ok {
-					if int64(pid) == -1 {
-						message = "正在为您打开收藏"
-					} else {
-						message = fmt.Sprintf("正在为您打开项目 %d", int64(pid))
-					}
-				} else {
-					message = "正在为您打开项目详情"
-				}
-			} else if routeName == "tasks.range" {
-				message = "正在为您打开任务列表"
-			} else if routeName == "task.detail" {
-				if tid, ok := routeParams["id"].(float64); ok {
-					message = fmt.Sprintf("正在为您打开任务 %d", int64(tid))
-				} else {
-					message = "正在为您打开任务详情"
-				}
-			} else if routeName == "teams.index" {
-				message = "正在为您打开团队列表"
-			} else if routeName == "teams.edit" {
-				if tid, ok := routeParams["id"].(float64); ok {
-					message = fmt.Sprintf("正在为您打开团队 %d", int64(tid))
-				} else {
-					message = "正在为您打开团队详情"
-				}
-			} else if routeName == "labels.index" {
-				message = "正在为您打开标签列表"
-			} else {
-				message = fmt.Sprintf("正在导航到 %s", routeName)
-			}
-
 			ctx.NavigationInfo = &NavigationInfo{
-				Message:   message,
 				RouteName: routeName,
 				Params:    routeParams,
 			}
 			ctx.ShouldNavigate = true
 
-			return message, nil
+			return content, nil
 		},
 	}
 

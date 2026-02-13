@@ -13,7 +13,13 @@ import (
 type LLMProvider interface {
 	Generate(ctx context.Context, prompt string) (string, error)
 	GenerateWithTools(ctx context.Context, prompt string, tools []map[string]interface{}) (string, error)
-	GenerateWithMessages(ctx context.Context, messages []Message, tools []map[string]interface{}) (string, error)
+	GenerateWithMessages(ctx context.Context, messages []Message, tools []map[string]interface{}) (string, string, error)
+}
+
+// LLMResponse represents response from an LLM
+type LLMResponse struct {
+	Content      string `json:"content"`
+	FinishReason string `json:"finish_reason"`
 }
 
 // AgentContext holds the context for an agent execution
@@ -33,10 +39,19 @@ type AgentContext struct {
 
 // Message represents a message in the conversation
 type Message struct {
-	Role       string `json:"role"`
-	Content    string `json:"content"`
-	Name       string `json:"name,omitempty"`
-	ToolCallID string `json:"tool_call_id,omitempty"` // Used in tool result messages to reference the tool call
+	Role       string         `json:"role"`
+	Content    string         `json:"content"`
+	Name       string         `json:"name,omitempty"`
+	ToolCallID string         `json:"tool_call_id,omitempty"` // Used in tool result messages to reference the tool call
+	ToolCalls  []ToolCallInfo `json:"tool_calls,omitempty"`   // Tool call information for assistant messages
+}
+
+// ToolCallInfo represents information about a tool call
+type ToolCallInfo struct {
+	ID        string `json:"id"`
+	Type      string `json:"type"`
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
 }
 
 // ExecutionStep represents a step in the agent's execution
@@ -186,25 +201,45 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 		toolDefinitions := a.toolManager.GetToolDefinitions()
 
 		var llmResponse string
+		var finishReason string
 		var err error
 
 		if len(tools) > 0 {
-			llmResponse, err = a.llmProvider.GenerateWithMessages(ctx, messages, toolDefinitions)
+			llmResponse, finishReason, err = a.llmProvider.GenerateWithMessages(ctx, messages, toolDefinitions)
 		} else {
 			prompt := messagesToPrompt(messages)
 			llmResponse, err = a.llmProvider.Generate(ctx, prompt)
+			finishReason = "stop"
 		}
 
 		if err != nil {
 			return nil, fmt.Errorf("LLM generation failed: %w", err)
 		}
 
+		// Check if LLM wants to stop
+		if finishReason == "stop" {
+			messages = append(messages, Message{
+				Role:    "assistant",
+				Content: llmResponse,
+			})
+
+			return &AgentResponse{
+				Content:        llmResponse,
+				NavigationInfo: agentCtx.NavigationInfo,
+				ShouldNavigate: agentCtx.ShouldNavigate,
+				ExecutionSteps: agentCtx.ExecutionSteps,
+				TokensUsed:     agentCtx.TokensUsed,
+			}, nil
+		}
+
+		// Parse tool call
 		toolCall, err := a.parseToolCall(llmResponse)
 		if err != nil {
 			continue
 		}
 
 		if toolCall == nil {
+			// No tool call but finish_reason is not stop, treat as response
 			messages = append(messages, Message{
 				Role:    "assistant",
 				Content: llmResponse,
@@ -238,9 +273,23 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 		// Generate a unique tool call ID
 		toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
 
+		// Use is LLM's content from the tool call as assistant message content
+		assistantContent := toolCall.Content
+		if assistantContent == "" {
+			assistantContent = llmResponse
+		}
+
 		messages = append(messages, Message{
 			Role:    "assistant",
-			Content: llmResponse,
+			Content: assistantContent,
+			ToolCalls: []ToolCallInfo{
+				{
+					ID:        toolCallID,
+					Type:      "function",
+					Name:      toolCall.Name,
+					Arguments: toolCall.InputJSON,
+				},
+			},
 		})
 		messages = append(messages, Message{
 			Role:       "tool",
@@ -248,6 +297,7 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 			Content:    step.Output,
 		})
 
+		// Check if tool result indicates we should stop (e.g., navigation tool completed)
 		if agentCtx.ShouldNavigate {
 			return &AgentResponse{
 				Content:        toolResult,
@@ -352,6 +402,7 @@ type ToolCall struct {
 	Name      string
 	Input     map[string]interface{}
 	InputJSON string
+	Content   string
 }
 
 func (a *Agent) parseToolCall(response string) (*ToolCall, error) {
@@ -359,6 +410,7 @@ func (a *Agent) parseToolCall(response string) (*ToolCall, error) {
 
 	var toolName string
 	var inputLine string
+	var contentLines []string
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -366,6 +418,8 @@ func (a *Agent) parseToolCall(response string) (*ToolCall, error) {
 			toolName = strings.TrimSpace(strings.TrimPrefix(line, "TOOL:"))
 		} else if strings.HasPrefix(line, "INPUT:") {
 			inputLine = strings.TrimSpace(strings.TrimPrefix(line, "INPUT:"))
+		} else if line != "" {
+			contentLines = append(contentLines, line)
 		}
 	}
 
@@ -374,7 +428,11 @@ func (a *Agent) parseToolCall(response string) (*ToolCall, error) {
 	}
 
 	if inputLine == "" {
-		return &ToolCall{Name: toolName, Input: make(map[string]interface{})}, nil
+		return &ToolCall{
+			Name:    toolName,
+			Input:   make(map[string]interface{}),
+			Content: strings.Join(contentLines, "\n"),
+		}, nil
 	}
 
 	var input map[string]interface{}
@@ -386,6 +444,7 @@ func (a *Agent) parseToolCall(response string) (*ToolCall, error) {
 		Name:      toolName,
 		Input:     input,
 		InputJSON: inputLine,
+		Content:   strings.Join(contentLines, "\n"),
 	}, nil
 }
 

@@ -281,21 +281,28 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 
 		case "tool_call":
 			// Tool call from assistant
-			// Format as assistant message with tool call information
-			toolCallContent := fmt.Sprintf("TOOL: %s\nINPUT: %s", msg.ToolName, msg.ToolInput)
+			// Convert to proper OpenAI tool_calls format
 			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
 				Role:    msg.Role,
-				Content: toolCallContent,
+				Content: msg.Content,
+				ToolCalls: []ai.ToolCallInfo{
+					{
+						ID:        msg.ID,
+						Type:      "function",
+						Name:      msg.ToolName,
+						Arguments: msg.ToolInput,
+					},
+				},
 			})
 
 		case "tool_result":
 			// Result from tool execution
 			// Format as tool message with tool output
-			// Use message ID as tool_call_id for reference
+			// ToolCallID should reference the corresponding tool call
 			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
 				Role:       msg.Role,
 				Content:    msg.ToolOutput,
-				ToolCallID: msg.ID,
+				ToolCallID: msg.ToolCallID,
 			})
 		}
 	}
@@ -327,10 +334,11 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 	// Save tool calls and tool results to session
 	for _, step := range agentResponse.ExecutionSteps {
 		// Parse tool call from the thought (thought contains the tool call info)
-		// Step.Thought format: "TOOL: tool_name\nINPUT: {json_params}"
+		// Step.Thought format: "{content}\nTOOL: tool_name\nINPUT: {json_params}"
 		toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
 		var toolName string
 		var toolInput string
+		var contentLines []string
 
 		lines := strings.Split(step.Thought, "\n")
 		for _, line := range lines {
@@ -339,6 +347,8 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 				toolName = strings.TrimSpace(strings.TrimPrefix(line, "TOOL:"))
 			} else if strings.HasPrefix(line, "INPUT:") {
 				toolInput = strings.TrimSpace(strings.TrimPrefix(line, "INPUT:"))
+			} else if line != "" {
+				contentLines = append(contentLines, line)
 			}
 		}
 
@@ -347,16 +357,17 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 			ID:        toolCallID,
 			Type:      "tool_call",
 			Role:      "assistant",
+			Content:   strings.Join(contentLines, "\n"),
 			ToolName:  toolName,
 			ToolInput: toolInput,
 			Timestamp: time.Now().Unix(),
 		}
-		log.Printf("[Chat] Saving tool call for user %d: tool=%s", userID, toolName)
+		log.Printf("[Chat] Saving tool call for user %d: tool=%s, content=%s", userID, toolName, toolCallMsg.Content)
 		if err := chat_session.GetDefault().AddMessage(userID, toolCallMsg); err != nil {
 			log.Printf("[Chat] Failed to save tool call message: %v", err)
 		}
 
-		// Save tool result message
+		// Save tool result message with ToolCallID referencing the tool call
 		toolResultMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
 		toolResultMsg := chat_session.Message{
 			ID:         toolResultMsgID,
@@ -364,6 +375,7 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 			Role:       "tool",
 			ToolName:   toolName,
 			ToolOutput: step.Output,
+			ToolCallID: toolCallID,
 			Timestamp:  time.Now().Unix(),
 		}
 		log.Printf("[Chat] Saving tool result for user %d: tool=%s", userID, toolName)

@@ -28,6 +28,7 @@ type openAIRequest struct {
 
 type openAIMessage struct {
 	Role      string           `json:"role"`
+	Name      string           `json:"name,omitempty"`
 	Content   string           `json:"content,omitempty"`
 	ToolCalls []openAIToolCall `json:"tool_calls,omitempty"`
 }
@@ -107,6 +108,37 @@ func (p *OpenAIProvider) GenerateWithTools(ctx context.Context, prompt string, t
 	}
 
 	return p.makeRequest(ctx, messages, openAITools)
+}
+
+func (p *OpenAIProvider) GenerateWithMessages(ctx context.Context, messages []Message, tools []map[string]interface{}) (string, error) {
+	openAIMessages := make([]openAIMessage, 0, len(messages))
+
+	for _, msg := range messages {
+		openAIMessage := openAIMessage{
+			Role:    msg.Role,
+			Name:    msg.Name,
+			Content: msg.Content,
+		}
+		openAIMessages = append(openAIMessages, openAIMessage)
+	}
+
+	openAITools := make([]openAITool, 0, len(tools))
+	for _, toolDef := range tools {
+		name, _ := toolDef["name"].(string)
+		desc, _ := toolDef["description"].(string)
+		params, _ := toolDef["parameters"].(map[string]interface{})
+
+		openAITools = append(openAITools, openAITool{
+			Type: "function",
+			Function: openAIFunction{
+				Name:        name,
+				Description: desc,
+				Parameters:  params,
+			},
+		})
+	}
+
+	return p.makeRequest(ctx, openAIMessages, openAITools)
 }
 
 func (p *OpenAIProvider) makeRequest(ctx context.Context, messages []openAIMessage, tools []openAITool) (string, error) {

@@ -103,3 +103,16 @@ INPUT: {"query": "%s", "type": "tasks"}`, query), nil
 func (p *MockLLMProvider) GenerateWithTools(ctx context.Context, prompt string, tools []map[string]interface{}) (string, error) {
 	return p.Generate(ctx, prompt)
 }
+
+func (p *MockLLMProvider) GenerateWithMessages(ctx context.Context, messages []Message, tools []map[string]interface{}) (string, error) {
+	if len(messages) == 0 {
+		return "", fmt.Errorf("no messages provided")
+	}
+
+	var prompt strings.Builder
+	for _, msg := range messages {
+		prompt.WriteString(fmt.Sprintf("%s: %s\n", msg.Role, msg.Content))
+	}
+
+	return p.Generate(ctx, prompt.String())
+}

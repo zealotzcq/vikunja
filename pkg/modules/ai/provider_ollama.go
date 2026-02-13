@@ -72,6 +72,20 @@ func (p *OllamaProvider) GenerateWithTools(ctx context.Context, prompt string, t
 	return p.makeRequest(ctx, messages)
 }
 
+func (p *OllamaProvider) GenerateWithMessages(ctx context.Context, messages []Message, tools []map[string]interface{}) (string, error) {
+	ollamaMessages := make([]ollamaMessage, 0, len(messages))
+
+	for _, msg := range messages {
+		ollamaMessage := ollamaMessage{
+			Role:    msg.Role,
+			Content: msg.Content,
+		}
+		ollamaMessages = append(ollamaMessages, ollamaMessage)
+	}
+
+	return p.makeRequest(ctx, ollamaMessages)
+}
+
 func (p *OllamaProvider) makeRequest(ctx context.Context, messages []ollamaMessage) (string, error) {
 	url := fmt.Sprintf("%s/api/chat", p.config.OllamaBaseURL)
 

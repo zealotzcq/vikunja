@@ -12,6 +12,7 @@ import (
 type LLMProvider interface {
 	Generate(ctx context.Context, prompt string) (string, error)
 	GenerateWithTools(ctx context.Context, prompt string, tools []map[string]interface{}) (string, error)
+	GenerateWithMessages(ctx context.Context, messages []Message, tools []map[string]interface{}) (string, error)
 }
 
 // AgentContext holds the context for an agent execution
@@ -32,6 +33,7 @@ type AgentContext struct {
 type Message struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+	Name    string `json:"name,omitempty"`
 }
 
 // ExecutionStep represents a step in the agent's execution
@@ -103,8 +105,6 @@ func (a *Agent) Initialize() error {
 	}
 	a.llmProvider = provider
 
-
-
 	if err := RegisterDefaultTools(); err != nil {
 		return fmt.Errorf("failed to register default tools: %w", err)
 	}
@@ -114,7 +114,6 @@ func (a *Agent) Initialize() error {
 }
 
 func (a *Agent) createLLMProvider() (LLMProvider, error) {
-
 
 	switch a.config.LLMProvider {
 	case "openai":
@@ -172,8 +171,13 @@ func (a *Agent) ProcessMessage(ctx context.Context, agentCtx *AgentContext, mess
 func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMessage string) (*AgentResponse, error) {
 	maxIterations := a.config.MaxIterations
 
+	messages := a.buildMessages(agentCtx)
+
 	for i := 0; i < maxIterations; i++ {
-		prompt := a.buildPrompt(agentCtx, userMessage, i)
+		messages = append(messages, Message{
+			Role:    "user",
+			Content: userMessage,
+		})
 
 		tools := a.toolManager.GetEnabledTools()
 		toolDefinitions := a.toolManager.GetToolDefinitions()
@@ -182,8 +186,9 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 		var err error
 
 		if len(tools) > 0 {
-			llmResponse, err = a.llmProvider.GenerateWithTools(ctx, prompt, toolDefinitions)
+			llmResponse, err = a.llmProvider.GenerateWithMessages(ctx, messages, toolDefinitions)
 		} else {
+			prompt := messagesToPrompt(messages)
 			llmResponse, err = a.llmProvider.Generate(ctx, prompt)
 		}
 
@@ -191,15 +196,16 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 			return nil, fmt.Errorf("LLM generation failed: %w", err)
 		}
 
-
-
 		toolCall, err := a.parseToolCall(llmResponse)
 		if err != nil {
-
 			continue
 		}
 
 		if toolCall == nil {
+			messages = append(messages, Message{
+				Role:    "assistant",
+				Content: llmResponse,
+			})
 
 			return &AgentResponse{
 				Content:        llmResponse,
@@ -209,8 +215,6 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 				TokensUsed:     agentCtx.TokensUsed,
 			}, nil
 		}
-
-
 
 		step := ExecutionStep{
 			StepNumber: i + 1,
@@ -228,10 +232,17 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 
 		agentCtx.ExecutionSteps = append(agentCtx.ExecutionSteps, step)
 
-
+		messages = append(messages, Message{
+			Role:    "assistant",
+			Content: llmResponse,
+		})
+		messages = append(messages, Message{
+			Role:    "tool",
+			Name:    toolCall.Name,
+			Content: step.Output,
+		})
 
 		if agentCtx.ShouldNavigate {
-
 			return &AgentResponse{
 				Content:        toolResult,
 				NavigationInfo: agentCtx.NavigationInfo,
@@ -250,7 +261,7 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 }
 
 func (a *Agent) buildPrompt(agentCtx *AgentContext, userMessage string, iteration int) string {
-	prompt := a.config.SystemPrompt + "\n\n"
+	prompt := a.buildSystemPrompt(agentCtx) + "\n\n"
 
 	if len(agentCtx.MessageHistory) > 0 {
 		prompt += "Conversation history:\n"
@@ -282,6 +293,79 @@ func (a *Agent) buildPrompt(agentCtx *AgentContext, userMessage string, iteratio
 	prompt += "Otherwise, just provide your response directly."
 
 	return prompt
+}
+
+func (a *Agent) buildSystemPrompt(agentCtx *AgentContext) string {
+	var sb strings.Builder
+
+	sb.WriteString(a.config.SystemPrompt)
+	sb.WriteString("\n\n")
+
+	sb.WriteString("## Environment Information\n")
+	if agentCtx.UserID > 0 {
+		sb.WriteString(fmt.Sprintf("- User ID: %d\n", agentCtx.UserID))
+	}
+	if agentCtx.CurrentRoute != "" {
+		sb.WriteString(fmt.Sprintf("- Current Route: %s\n", agentCtx.CurrentRoute))
+		if len(agentCtx.RouteParams) > 0 {
+			sb.WriteString(fmt.Sprintf("- Route Params: %v\n", agentCtx.RouteParams))
+		}
+	}
+	sb.WriteString("\n")
+
+	tools := a.toolManager.GetEnabledTools()
+	if len(tools) > 0 {
+		sb.WriteString("## Available Tools\n")
+		for _, tool := range tools {
+			sb.WriteString(fmt.Sprintf("### %s\n%s\n", tool.Name, tool.Description))
+			if params, ok := tool.Parameters["properties"].(map[string]interface{}); ok && len(params) > 0 {
+				sb.WriteString("Parameters:\n")
+				for paramName, paramInfo := range params {
+					if paramMap, ok := paramInfo.(map[string]interface{}); ok {
+						if desc, ok := paramMap["description"].(string); ok {
+							sb.WriteString(fmt.Sprintf("- %s: %s\n", paramName, desc))
+						}
+					}
+				}
+			}
+			sb.WriteString("\n")
+		}
+	}
+
+	skills := a.skillManager.GetEnabledSkills()
+	if len(skills) > 0 {
+		sb.WriteString("## Available Skills\n")
+		sb.WriteString("Use the 'skill' tool to load detailed instructions when needed.\n\n")
+		for _, skill := range skills {
+			sb.WriteString(fmt.Sprintf("- **%s**: %s\n", skill.Name, skill.Description))
+		}
+		sb.WriteString("\n")
+	}
+
+	return sb.String()
+}
+
+func (a *Agent) buildMessages(agentCtx *AgentContext) []Message {
+	messages := []Message{
+		{
+			Role:    "system",
+			Content: a.buildSystemPrompt(agentCtx),
+		},
+	}
+
+	for _, msg := range agentCtx.MessageHistory {
+		messages = append(messages, msg)
+	}
+
+	return messages
+}
+
+func messagesToPrompt(messages []Message) string {
+	var sb strings.Builder
+	for _, msg := range messages {
+		sb.WriteString(fmt.Sprintf("%s: %s\n", msg.Role, msg.Content))
+	}
+	return sb.String()
 }
 
 type ToolCall struct {

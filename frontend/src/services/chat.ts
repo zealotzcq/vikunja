@@ -9,6 +9,7 @@ export default class ChatService {
 		pageRoute: string,
 		pageParams: Record<string, any> = {},
 		messageID?: string,
+		companyID?: number,
 	): Promise<void> {
 		const token = getToken()
 		if (!token) {
@@ -23,6 +24,7 @@ export default class ChatService {
 				params: pageParams,
 			},
 			use_agent: true,
+			company_id: companyID,
 		})
 	}
 

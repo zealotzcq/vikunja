@@ -649,6 +649,9 @@ func registerAPIRoutes(a *echo.Group) {
 	chat.GET("/stream", apiv1.ChatStream)
 	chat.DELETE("/session", apiv1.ClearSession)
 
+	// Company
+	a.GET("/companies", apiv1.GetUserCompanies)
+
 	// API Tokens
 	apiTokenProvider := &handler.WebHandler{
 		EmptyStruct: func() handler.CObject {

@@ -43,6 +43,7 @@ type SendMessageRequest struct {
 	Message   string    `json:"message" validate:"required"`
 	PageInfo  *PageInfo `json:"page_info"`
 	UseAgent  bool      `json:"use_agent"` // Use the new agent system instead of mock
+	CompanyID int64     `json:"company_id"`
 }
 
 // PageInfo represents current page context
@@ -248,6 +249,7 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 
 	agentCtx := &ai.AgentContext{
 		UserID:         userID,
+		CompanyID:      req.CompanyID,
 		CurrentRoute:   routeName,
 		RouteParams:    routeParams,
 		SessionData:    make(map[string]interface{}),

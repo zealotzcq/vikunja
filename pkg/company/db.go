@@ -99,6 +99,55 @@ func GetUserRole(s *xorm.Session, userID int64) string {
 	return staff.Role
 }
 
+type CompanyInfo struct {
+	ID          int64  `json:"id"`
+	Description string `json:"description"`
+	InviteCode  string `json:"invite_code"`
+	Role        string `json:"role"`
+}
+
+func GetUserCompanies(s *xorm.Session, userID int64) ([]*CompanyInfo, error) {
+	var staffList []*CompanyStaff
+	err := s.Where("user_id = ?", userID).Find(&staffList)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(staffList) == 0 {
+		return []*CompanyInfo{}, nil
+	}
+
+	var companyIDs []int64
+	for _, staff := range staffList {
+		companyIDs = append(companyIDs, staff.CompanyID)
+	}
+
+	var companies []*Company
+	err = s.In("id", companyIDs).Find(&companies)
+	if err != nil {
+		return nil, err
+	}
+
+	companyMap := make(map[int64]*Company)
+	for _, comp := range companies {
+		companyMap[comp.ID] = comp
+	}
+
+	var result []*CompanyInfo
+	for _, staff := range staffList {
+		if comp, exists := companyMap[staff.CompanyID]; exists {
+			result = append(result, &CompanyInfo{
+				ID:          comp.ID,
+				Description: comp.Description,
+				InviteCode:  comp.InviteCode,
+				Role:        staff.Role,
+			})
+		}
+	}
+
+	return result, nil
+}
+
 type ErrInvalidInviteCode struct {
 	InviteCode string
 }

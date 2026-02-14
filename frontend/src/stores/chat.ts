@@ -6,10 +6,12 @@
 	import {saveChatHistory} from '@/composables/useChatHistory'
 	import ChatService from '@/services/chat'
 	import {useAuthStore} from '@/stores/auth'
+	import {useCompanyStore} from '@/stores/company'
 	import {getToken} from '@/helpers/auth'
 
 export const useChatStore = defineStore('chat', () => {
 	const authStore = useAuthStore()
+	const companyStore = useCompanyStore()
 	const router = useRouter()
 	const isMobile = ref(false)
 	const isAvailable = ref(false)
@@ -163,6 +165,7 @@ export const useChatStore = defineStore('chat', () => {
 				route.name,
 				route.params,
 				msgId,
+				companyStore.currentCompanyId,
 			)
 		} catch (err: any) {
 			if (err?.response?.status === 401) {

@@ -40,6 +40,7 @@ type ProviderToolCall struct {
 // AgentContext holds the context for an agent execution
 type AgentContext struct {
 	UserID         int64                  `json:"user_id"`
+	CompanyID      int64                  `json:"company_id"`
 	MessageHistory []Message              `json:"message_history"`
 	CurrentRoute   string                 `json:"current_route"`
 	RouteParams    map[string]interface{} `json:"route_params"`
@@ -441,6 +442,9 @@ func (a *Agent) buildSystemPrompt(agentCtx *AgentContext) string {
 	sb.WriteString("## Environment Information\n")
 	if agentCtx.UserID > 0 {
 		sb.WriteString(fmt.Sprintf("- User ID: %d\n", agentCtx.UserID))
+	}
+	if agentCtx.CompanyID > 0 {
+		sb.WriteString(fmt.Sprintf("- Company ID: %d\n", agentCtx.CompanyID))
 	}
 	if agentCtx.Language != "" {
 		sb.WriteString(fmt.Sprintf("- Language: %s\n", agentCtx.Language))

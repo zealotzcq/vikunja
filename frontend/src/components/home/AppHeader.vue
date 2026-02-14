@@ -18,6 +18,42 @@
 		<MenuButton class="menu-button" />
 
 		<div
+			v-if="currentCompany"
+			class="company-title-wrapper"
+		>
+			<Dropdown v-if="companyStore.companies.length > 1">
+				<template #trigger="{ toggleOpen, open }">
+					<BaseButton
+						class="company-title-button"
+						@click="toggleOpen"
+					>
+						<h1 class="company-title">
+							{{ currentCompany.description }}
+						</h1>
+						<span
+							class="dropdown-icon icon is-small"
+							:style="{
+								transform: open ? 'rotate(180deg)' : 'rotate(0)',
+							}"
+						>
+							<Icon icon="chevron-down" />
+						</span>
+					</BaseButton>
+				</template>
+				<DropdownItem
+					v-for="company in companyStore.companies"
+					:key="company.id"
+					@click="companyStore.setCurrentCompany(company.id)"
+				>
+					{{ company.description }}
+				</DropdownItem>
+			</Dropdown>
+			<h1 v-else class="company-title">
+				{{ currentCompany.description }}
+			</h1>
+		</div>
+
+		<div
 			v-if="currentProject?.id"
 			class="project-title-wrapper"
 		>
@@ -114,7 +150,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 
 import { PERMISSIONS as Permissions } from '@/constants/permissions'
 
@@ -133,10 +169,22 @@ import { isEditorContentEmpty } from '@/helpers/editorContentEmpty'
 import { useBaseStore } from '@/stores/base'
 import { useConfigStore } from '@/stores/config'
 import { useAuthStore } from '@/stores/auth'
+import { useCompanyStore } from '@/stores/company'
 import type { IProject } from '@/modelTypes/IProject'
 
 const baseStore = useBaseStore()
-// Create a mutable copy to satisfy type requirements (readonly deep -> mutable)
+const authStore = useAuthStore()
+const companyStore = useCompanyStore()
+const configStore = useConfigStore()
+
+onMounted(() => {
+	if (authStore.authUser) {
+		companyStore.loadCompanies()
+	}
+})
+
+const currentCompany = computed(() => companyStore.currentCompany)
+
 const currentProject = computed<IProject | null>(() => {
 	const project = baseStore.currentProject
 	return project ? { ...project } as IProject : null
@@ -145,9 +193,6 @@ const background = computed(() => baseStore.background)
 const canWriteCurrentProject = computed(() => baseStore.currentProject?.maxPermission !== null && baseStore.currentProject?.maxPermission !== undefined && baseStore.currentProject.maxPermission > Permissions.READ)
 const menuActive = computed(() => baseStore.menuActive)
 
-const authStore = useAuthStore()
-
-const configStore = useConfigStore()
 const imprintUrl = computed(() => configStore.legal.imprintUrl)
 const privacyPolicyUrl = computed(() => configStore.legal.privacyPolicyUrl)
 </script>
@@ -209,6 +254,46 @@ $user-dropdown-width-mobile: 5rem;
 
 	@media screen and (max-width: $tablet) {
 		margin-inline-start: 1rem;
+	}
+}
+
+.company-title-wrapper {
+	margin-inline: auto;
+	display: flex;
+	align-items: center;
+	min-inline-size: 0;
+
+	@media screen and (min-width: $tablet) {
+		padding-inline: var(--navbar-gap-width);
+	}
+}
+
+.company-title-button {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	background: transparent;
+	border: none;
+	padding: 0;
+
+	.company-title {
+		margin: 0;
+		font-size: 1rem;
+
+		@media screen and (min-width: $tablet) {
+			font-size: 1.75rem;
+		}
+	}
+}
+
+.company-title {
+	font-size: 1rem;
+	text-overflow: ellipsis;
+	overflow: hidden;
+	white-space: nowrap;
+
+	@media screen and (min-width: $tablet) {
+		font-size: 1.75rem;
 	}
 }
 

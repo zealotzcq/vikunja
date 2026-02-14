@@ -54,35 +54,33 @@ def create_company_with_user(username, email, password, company_name, api_url=DE
         'message': ''
     }
 
-    # 步骤1: 创建用户（通过 API）
-    user_id = api_utils.create_user(api_url, username, email, password)
+    # 步骤1: 创建公司（生成邀请码）
+    invite_code = company_utility.generate_numeric_lowercase_invite_code(6)
+    company_id = company_utility.add_company(company_name, invite_code, db_path)
+    if not company_id:
+        result['message'] = f'公司创建失败'
+        return result
+
+    result['company_id'] = company_id
+    result['invite_code'] = invite_code
+    result['message'] = f'公司创建成功: {company_name}'
+
+    # 步骤2: 用邀请码注册用户（API 调用）
+    user_id = api_utils.create_user(api_url, username, email, password, invite_code)
     if isinstance(user_id, int):
         result['user_id'] = user_id
-        result['message'] = f'用户创建成功: {username}'
+        result['message'] += f', 用户创建成功: {username}'
     else:
-        result['message'] = f'用户创建失败: {user_id}'
+        result['message'] += f', 用户创建失败: {user_id}'
         return result
 
-    # 步骤2: 生成邀请码
-    invite_code = company_utility.generate_numeric_lowercase_invite_code(6)
-
-    # 步骤3: 创建公司
-    company_id = company_utility.add_company(company_name, invite_code, db_path)
-    if company_id:
-        result['company_id'] = company_id
-        result['invite_code'] = invite_code
-        result['message'] += f', 公司创建成功: {company_name}'
-    else:
-        result['message'] += f', 公司创建失败'
-        return result
-
-    # 步骤4: 添加用户为创建者
-    staff_result = company_utility.add_company_staff(company_id, user_id, 'creator', db_path)
-    if staff_result:
-        result['message'] += f', 用户已添加为创建者'
+    # 步骤3: 更新用户角色为 creator（因为注册时默认是 staff）
+    role_result = company_utility.update_user_role(company_id, user_id, 'creator', db_path)
+    if role_result:
+        result['message'] += f', 用户已设置为创建者'
         result['success'] = True
     else:
-        result['message'] += f', 添加创建者失败'
+        result['message'] += f', 设置创建者失败'
 
     return result
 

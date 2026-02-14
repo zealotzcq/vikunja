@@ -142,8 +142,8 @@
 	z-index: 3000;
 
 	@media screen and (max-width: $tablet) {
-		inset: 0 0 0 0;
-		height: 100dvh;
+		inset: auto 0 0 0;
+		height: 75dvh;
 		border-radius: 0;
 		border-inline-start: none;
 		border-top: none;

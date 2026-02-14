@@ -193,6 +193,63 @@ def add_company_staff(company_id, user_id, role, db_path=DEFAULT_DB_PATH):
         conn.close()
 
 
+def update_user_role(company_id, user_id, role, db_path=DEFAULT_DB_PATH):
+    """更新用户在公司中的角色
+    
+    参数:
+        company_id: 公司ID
+        user_id: 用户ID
+        role: 新角色 (creator/admin/staff)
+        db_path: 数据库路径
+    
+    返回:
+        True: 成功
+        False: 失败
+    """
+    if role not in ['creator', 'admin', 'staff']:
+        print(f'错误: 角色必须是 creator, admin 或 staff')
+        return False
+    
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    
+    try:
+        # 验证company_id是否存在
+        cursor.execute('''
+            SELECT id FROM company WHERE id = ?
+        ''', (company_id,))
+        company_exists = cursor.fetchone()
+        
+        if not company_exists:
+            print(f'错误: 公司ID {company_id} 不存在')
+            return False
+        
+        # 检查用户是否已经在公司
+        cursor.execute('''
+            SELECT id FROM company_staff WHERE company_id = ? AND user_id = ?
+        ''', (company_id, user_id))
+        existing = cursor.fetchone()
+        
+        if not existing:
+            print(f'用户不在该公司中: user_id={user_id}, company_id={company_id}')
+            return False
+        
+        # 更新角色
+        cursor.execute('''
+            UPDATE company_staff
+            SET role = ?
+            WHERE company_id = ? AND user_id = ?
+        ''', (role, company_id, user_id))
+        conn.commit()
+        print(f'用户角色更新成功: company_id={company_id}, user_id={user_id}, role={role}')
+        return True
+    except Exception as e:
+        print(f'更新角色失败: {e}')
+        return False
+    finally:
+        conn.close()
+
+
 def get_company_staff(company_id, db_path=DEFAULT_DB_PATH):
     """查询公司所有员工"""
     conn = get_connection(db_path)

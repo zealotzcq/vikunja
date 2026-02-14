@@ -180,24 +180,28 @@ func RenewToken(c *echo.Context) (err error) {
 
 // Login2 is the login handler using hash authentication
 // @Summary Login with hash
-// @Description Logs a user in using username and password hash. Only accepts requests from localhost (127.0.0.1 or ::1). Returns a JWT-Token to authenticate further requests.
+// @Description Logs a user in using username, password hash and auth key. Returns a JWT-Token to authenticate further requests.
 // @tags auth
 // @Accept json
 // @Produce json
-// @Param credentials body user2.Login2 true "The login credentials with hash"
+// @Param credentials body user2.Login2 true "The login credentials with hash and auth key"
 // @Success 200 {object} auth.Token
 // @Failure 400 {object} models.Message "Invalid user hash model."
-// @Failure 403 {object} models.Message "Invalid username or password hash, account disabled, or not from localhost."
+// @Failure 403 {object} models.Message "Invalid username, password hash, or auth key."
 // @Router /login2 [post]
 func Login2(c *echo.Context) (err error) {
 	u := user2.Login2{}
 	if err := c.Bind(&u); err != nil {
-		return c.JSON(http.StatusBadRequest, models.Message{Message: "Please provide a username and hash."})
+		return c.JSON(http.StatusBadRequest, models.Message{Message: "Please provide a username, hash and auth key."})
 	}
 
-	clientIP := c.RealIP()
-	if !isLocalhost(clientIP) {
-		return c.JSON(http.StatusForbidden, models.Message{Message: "Login2 is only allowed from localhost."})
+	login2Key := config.AuthLogin2Key.GetString()
+	if login2Key == "" {
+		return c.JSON(http.StatusForbidden, models.Message{Message: "Login2 auth key not configured."})
+	}
+
+	if u.AuthKey != login2Key {
+		return c.JSON(http.StatusForbidden, models.Message{Message: "Invalid auth key."})
 	}
 
 	s := db.NewSession()
@@ -240,10 +244,6 @@ func Login2(c *echo.Context) (err error) {
 	}
 
 	return auth.NewUserAuthTokenResponse(user, c, u.LongToken)
-}
-
-func isLocalhost(ip string) bool {
-	return ip == "127.0.0.1" || ip == "::1"
 }
 
 func getUserByUsernameOrEmail(s *xorm.Session, usernameOrEmail string) (user *user2.User, err error) {

@@ -14,7 +14,25 @@ if sys.platform == 'win32':
 
 import requests
 import sqlite3
+import yaml
 from typing import Dict, List, Optional, Any, Union
+
+
+def get_login2_key() -> str:
+    """Get login2 auth key from config.yml"""
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    config_path = os.path.join(project_root, 'config.yml')
+    
+    if not os.path.exists(config_path):
+        return ''
+    
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
+    
+    if config is None:
+        return ''
+    
+    return config.get('auth', {}).get('login2', {}).get('key', '')
 
 
 def get_user_password_hash(username: str, db_path: str) -> str:
@@ -32,10 +50,15 @@ def get_user_password_hash(username: str, db_path: str) -> str:
 def login(base_url: str, username: str, db_path: str) -> str:
     """Login and get JWT token using hash from database"""
     password_hash = get_user_password_hash(username, db_path)
+    auth_key = get_login2_key()
+    
+    if not auth_key:
+        raise Exception("Login2 auth key not configured in config.yml")
+    
     url = f"{base_url.rstrip('/')}/api/v1/login2"
     response = requests.post(
         url,
-        json={'username': username, 'hash': password_hash}
+        json={'username': username, 'hash': password_hash, 'auth_key': auth_key}
     )
     response.raise_for_status()
     token = response.json().get('token')
@@ -44,14 +67,24 @@ def login(base_url: str, username: str, db_path: str) -> str:
     return token
 
 
-def create_user(base_url: str, username: str, email: str, password: str) -> Union[int, str]:
-    """Create new user, returns user ID on success, failure reason on failure"""
+def create_user(base_url: str, username: str, email: str, password: str, invite_code: str = '') -> Union[int, str]:
+    """Create new user, returns user ID on success, failure reason on failure
+    
+    Args:
+        base_url: API base URL
+        username: Username
+        email: Email address
+        password: Password
+        invite_code: Optional invite code for company registration
+    """
     url = f"{base_url.rstrip('/')}/api/v1/register"
     data = {
         'username': username,
         'email': email,
         'password': password
     }
+    if invite_code:
+        data['invite_code'] = invite_code
     try:
         response = requests.post(url, json=data)
         if response.status_code == 200:

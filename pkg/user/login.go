@@ -22,6 +22,8 @@ type Login2 struct {
 	Username string `json:"username"`
 	// The hash of the password for the user.
 	Hash string `json:"hash"`
+	// The authorization key configured in config.yml
+	AuthKey string `json:"auth_key"`
 	// If true, the token returned will be valid a lot longer than default. Useful for "remember me" style logins.
 	LongToken bool `json:"long_token"`
 }

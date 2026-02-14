@@ -35,12 +35,6 @@ type UserRegister struct {
 	user.APIUserPassword
 }
 
-// isLocalConnection checks if the request is from localhost
-func isLocalConnection(c *echo.Context) bool {
-	ip := c.RealIP()
-	return ip == "127.0.0.1" || ip == "::1" || ip == "localhost"
-}
-
 // RegisterUser is the register handler
 // @Summary Register
 // @Description Creates a new user account.
@@ -76,21 +70,17 @@ func RegisterUser(c *echo.Context) error {
 	s := db.NewSession()
 	defer s.Close()
 
-	// Skip invite code validation for local connections
-	if !isLocalConnection(c) {
-		// Validate invite code is required
-		if userIn.InviteCode == "" {
-			_ = s.Rollback()
-			return c.JSON(http.StatusBadRequest, models.Message{Message: "Invite code is required"})
-		}
+	// Validate invite code is required
+	if userIn.InviteCode == "" {
+		_ = s.Rollback()
+		return c.JSON(http.StatusBadRequest, models.Message{Message: "Invite code is required"})
+	}
 
-		// Validate invite code
-		comp, err := company.GetCompanyByInviteCode(s, userIn.InviteCode)
-		if err != nil {
-			_ = s.Rollback()
-			return err
-		}
-		_ = comp
+	// Validate invite code
+	comp, err := company.GetCompanyByInviteCode(s, userIn.InviteCode)
+	if err != nil {
+		_ = s.Rollback()
+		return err
 	}
 
 	// Insert user
@@ -105,18 +95,11 @@ func RegisterUser(c *echo.Context) error {
 		return err
 	}
 
-	// Add user to company as staff only if invite code was provided
-	if userIn.InviteCode != "" {
-		comp, err := company.GetCompanyByInviteCode(s, userIn.InviteCode)
-		if err != nil {
-			_ = s.Rollback()
-			return err
-		}
-		err = company.AddStaffToCompany(s, comp.ID, newUser.ID, "staff")
-		if err != nil {
-			_ = s.Rollback()
-			return err
-		}
+	// Add user to company as staff
+	err = company.AddStaffToCompany(s, comp.ID, newUser.ID, "staff")
+	if err != nil {
+		_ = s.Rollback()
+		return err
 	}
 
 	// Create their initial project

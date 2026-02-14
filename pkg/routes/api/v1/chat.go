@@ -104,8 +104,6 @@ func SendMessage(c *echo.Context) error {
 		Timestamp: time.Now().Unix(),
 	}
 
-	log.Printf("[Chat] Adding user message for user %d: id=%s, type=%s", userID, userMsgID, userMessage.Type)
-
 	if err := chat_session.GetDefault().AddMessage(userID, userMessage); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to save message: %v", err))
 	}
@@ -226,8 +224,6 @@ func GetChatHistory(c *echo.Context) error {
 
 // processUserMessageAsync processes a user message asynchronously
 func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string, req *SendMessageRequest) {
-	log.Printf("[Chat] Processing message async for user %d: id=%s", userID, userMsgID)
-
 	routeName := ""
 	var routeParams map[string]interface{}
 	if req.PageInfo != nil {
@@ -237,13 +233,11 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 
 	agent, err := ai.GetAgent()
 	if err != nil {
-		log.Printf("[Chat] Failed to get agent: %v", err)
 		return
 	}
 
 	u, err := user.GetUserByID(db.NewSession(), userID)
 	if err != nil {
-		log.Printf("[Chat] Failed to get user: %v", err)
 		return
 	}
 
@@ -259,7 +253,6 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 
 	session, err := chat_session.GetDefault().GetOrCreateSession(userID)
 	if err != nil {
-		log.Printf("[Chat] Failed to get session: %v", err)
 		return
 	}
 
@@ -289,7 +282,6 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 			// Convert to proper OpenAI tool_calls format
 			// Skip if tool name is empty (old/corrupted data)
 			if msg.ToolName == "" {
-				log.Printf("[Chat] Skipping tool call message with empty name: id=%s", msg.ID)
 				continue
 			}
 
@@ -320,7 +312,6 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 
 	agentResponse, err := agent.ProcessMessage(ctx, agentCtx, req.Message)
 	if err != nil {
-		log.Printf("[Chat] Agent error: %v", err)
 		return
 	}
 
@@ -357,9 +348,7 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 			ToolInput: step.Input,
 			Timestamp: time.Now().Unix(),
 		}
-		log.Printf("[Chat] Saving tool call for user %d: tool=%s, input=%s", userID, step.Action, step.Input)
 		if err := chat_session.GetDefault().AddMessage(userID, toolCallMsg); err != nil {
-			log.Printf("[Chat] Failed to save tool call message: %v", err)
 		}
 
 		// Save tool result message with ToolCallID referencing the tool call
@@ -373,9 +362,7 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 			ToolCallID: toolCallID,
 			Timestamp:  time.Now().Unix(),
 		}
-		log.Printf("[Chat] Saving tool result for user %d: tool=%s", userID, step.Action)
 		if err := chat_session.GetDefault().AddMessage(userID, toolResultMsg); err != nil {
-			log.Printf("[Chat] Failed to save tool result message: %v", err)
 		}
 	}
 
@@ -391,8 +378,5 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 		Metadata:          metadata,
 	}
 
-	log.Printf("[Chat] Adding assistant message for user %d: id=%s, type=%s", userID, assistantMsgID, assistantMessage.Type)
-	if err := chat_session.GetDefault().AddMessage(userID, assistantMessage); err != nil {
-		log.Printf("[Chat] Failed to save assistant message: %v", err)
-	}
+	chat_session.GetDefault().AddMessage(userID, assistantMessage)
 }

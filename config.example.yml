@@ -11,6 +11,11 @@ cors:
   # 禁用 CORS（本地单机部署）
   enable: false
 
+auth:
+  login2:
+    # Login2 接口的授权key，留空则禁用该接口
+    # key: ""
+
 database:
   # 数据库类型
   type: sqlite

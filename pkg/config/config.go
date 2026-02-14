@@ -224,6 +224,8 @@ const (
 
 	PluginsEnabled Key = `plugins.enabled`
 	PluginsDir     Key = `plugins.dir`
+
+	AuthLogin2Key Key = `auth.login2.key`
 )
 
 var maxFileSizeInBytes uint64
@@ -365,6 +367,7 @@ func InitDefaultConfig() {
 	// Auth
 	AuthLocalEnabled.setDefault(true)
 	AuthOpenIDEnabled.setDefault(false)
+	AuthLogin2Key.setDefault("")
 
 	AuthLdapEnabled.setDefault(false)
 	AuthLdapHost.setDefault("localhost")

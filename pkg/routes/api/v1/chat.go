@@ -3,7 +3,6 @@ package v1
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 

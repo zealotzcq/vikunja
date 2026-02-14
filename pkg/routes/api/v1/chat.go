@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"code.vikunja.io/api/pkg/db"
@@ -282,6 +281,12 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 		case "tool_call":
 			// Tool call from assistant
 			// Convert to proper OpenAI tool_calls format
+			// Skip if tool name is empty (old/corrupted data)
+			if msg.ToolName == "" {
+				log.Printf("[Chat] Skipping tool call message with empty name: id=%s", msg.ID)
+				continue
+			}
+
 			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
 				Role:    msg.Role,
 				Content: msg.Content,
@@ -333,36 +338,20 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 
 	// Save tool calls and tool results to session
 	for _, step := range agentResponse.ExecutionSteps {
-		// Parse tool call from the thought (thought contains the tool call info)
-		// Step.Thought format: "{content}\nTOOL: tool_name\nINPUT: {json_params}"
+		// Use step.Action and step.Input directly (new structured format)
 		toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
-		var toolName string
-		var toolInput string
-		var contentLines []string
-
-		lines := strings.Split(step.Thought, "\n")
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "TOOL:") {
-				toolName = strings.TrimSpace(strings.TrimPrefix(line, "TOOL:"))
-			} else if strings.HasPrefix(line, "INPUT:") {
-				toolInput = strings.TrimSpace(strings.TrimPrefix(line, "INPUT:"))
-			} else if line != "" {
-				contentLines = append(contentLines, line)
-			}
-		}
 
 		// Save tool call message
 		toolCallMsg := chat_session.Message{
 			ID:        toolCallID,
 			Type:      "tool_call",
 			Role:      "assistant",
-			Content:   strings.Join(contentLines, "\n"),
-			ToolName:  toolName,
-			ToolInput: toolInput,
+			Content:   step.Thought,
+			ToolName:  step.Action,
+			ToolInput: step.Input,
 			Timestamp: time.Now().Unix(),
 		}
-		log.Printf("[Chat] Saving tool call for user %d: tool=%s, content=%s", userID, toolName, toolCallMsg.Content)
+		log.Printf("[Chat] Saving tool call for user %d: tool=%s, input=%s", userID, step.Action, step.Input)
 		if err := chat_session.GetDefault().AddMessage(userID, toolCallMsg); err != nil {
 			log.Printf("[Chat] Failed to save tool call message: %v", err)
 		}
@@ -373,16 +362,18 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 			ID:         toolResultMsgID,
 			Type:       "tool_result",
 			Role:       "tool",
-			ToolName:   toolName,
+			ToolName:   step.Action,
 			ToolOutput: step.Output,
 			ToolCallID: toolCallID,
 			Timestamp:  time.Now().Unix(),
 		}
-		log.Printf("[Chat] Saving tool result for user %d: tool=%s", userID, toolName)
+		log.Printf("[Chat] Saving tool result for user %d: tool=%s", userID, step.Action)
 		if err := chat_session.GetDefault().AddMessage(userID, toolResultMsg); err != nil {
 			log.Printf("[Chat] Failed to save tool result message: %v", err)
 		}
 	}
+
+	// Save assistant response message
 
 	assistantMessage := chat_session.Message{
 		ID:                assistantMsgID,

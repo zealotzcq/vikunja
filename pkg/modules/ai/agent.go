@@ -13,13 +13,28 @@ import (
 type LLMProvider interface {
 	Generate(ctx context.Context, prompt string) (string, error)
 	GenerateWithTools(ctx context.Context, prompt string, tools []map[string]interface{}) (string, error)
-	GenerateWithMessages(ctx context.Context, messages []Message, tools []map[string]interface{}) (string, string, error)
+	GenerateWithMessages(ctx context.Context, messages []Message, tools []map[string]interface{}) (*LLMProviderResponse, error)
 }
 
 // LLMResponse represents response from an LLM
 type LLMResponse struct {
 	Content      string `json:"content"`
 	FinishReason string `json:"finish_reason"`
+}
+
+// LLMProviderResponse represents a structured response from an LLM provider
+type LLMProviderResponse struct {
+	Content      string             `json:"content"`
+	FinishReason string             `json:"finish_reason"`
+	ToolCalls    []ProviderToolCall `json:"tool_calls,omitempty"`
+}
+
+// ProviderToolCall represents a structured tool call from the provider
+type ProviderToolCall struct {
+	ID        string                 `json:"id"`
+	Type      string                 `json:"type"`
+	Name      string                 `json:"name"`
+	Arguments map[string]interface{} `json:"arguments"`
 }
 
 // AgentContext holds the context for an agent execution
@@ -168,24 +183,17 @@ func (a *Agent) ProcessMessage(ctx context.Context, agentCtx *AgentContext, mess
 		}
 	}
 
-	response, err := a.runAgentLoop(ctx, agentCtx, message)
+	response, messages, err := a.runAgentLoop(ctx, agentCtx, message)
 	if err != nil {
 		return nil, fmt.Errorf("agent execution failed: %w", err)
 	}
 
-	agentCtx.MessageHistory = append(agentCtx.MessageHistory, Message{
-		Role:    "user",
-		Content: message,
-	})
-	agentCtx.MessageHistory = append(agentCtx.MessageHistory, Message{
-		Role:    "assistant",
-		Content: response.Content,
-	})
+	agentCtx.MessageHistory = append(agentCtx.MessageHistory, messages...)
 
 	return response, nil
 }
 
-func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMessage string) (*AgentResponse, error) {
+func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMessage string) (*AgentResponse, []Message, error) {
 	maxIterations := a.config.MaxIterations
 
 	messages := a.buildMessages(agentCtx)
@@ -196,116 +204,189 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 		Content: userMessage,
 	})
 
+	// Track which messages to save to history (excluding system prompt)
+	messagesToSave := make([]Message, 0)
+
 	for i := 0; i < maxIterations; i++ {
 		tools := a.toolManager.GetEnabledTools()
 		toolDefinitions := a.toolManager.GetToolDefinitions()
 
-		var llmResponse string
-		var finishReason string
+		var providerResponse *LLMProviderResponse
 		var err error
 
-		if len(tools) > 0 {
-			llmResponse, finishReason, err = a.llmProvider.GenerateWithMessages(ctx, messages, toolDefinitions)
-		} else {
+		if len(tools) == 0 {
 			prompt := messagesToPrompt(messages)
-			llmResponse, err = a.llmProvider.Generate(ctx, prompt)
-			finishReason = "stop"
-		}
-
-		if err != nil {
-			return nil, fmt.Errorf("LLM generation failed: %w", err)
-		}
-
-		// Check if LLM wants to stop
-		if finishReason == "stop" {
-			messages = append(messages, Message{
-				Role:    "assistant",
-				Content: llmResponse,
-			})
-
-			return &AgentResponse{
-				Content:        llmResponse,
-				NavigationInfo: agentCtx.NavigationInfo,
-				ShouldNavigate: agentCtx.ShouldNavigate,
-				ExecutionSteps: agentCtx.ExecutionSteps,
-				TokensUsed:     agentCtx.TokensUsed,
-			}, nil
-		}
-
-		// Parse tool call
-		toolCall, err := a.parseToolCall(llmResponse)
-		if err != nil {
-			continue
-		}
-
-		if toolCall == nil {
-			// No tool call but finish_reason is not stop, treat as response
-			messages = append(messages, Message{
-				Role:    "assistant",
-				Content: llmResponse,
-			})
-
-			return &AgentResponse{
-				Content:        llmResponse,
-				NavigationInfo: agentCtx.NavigationInfo,
-				ShouldNavigate: agentCtx.ShouldNavigate,
-				ExecutionSteps: agentCtx.ExecutionSteps,
-				TokensUsed:     agentCtx.TokensUsed,
-			}, nil
-		}
-
-		step := ExecutionStep{
-			StepNumber: i + 1,
-			Thought:    llmResponse,
-			Action:     toolCall.Name,
-			Input:      toolCall.InputJSON,
-		}
-
-		toolResult, err := a.toolManager.ExecuteTool(toolCall.Name, agentCtx, toolCall.Input)
-		if err != nil {
-			step.Output = fmt.Sprintf("Error: %s", err.Error())
+			llmResponse, genErr := a.llmProvider.Generate(ctx, prompt)
+			if genErr != nil {
+				return nil, nil, fmt.Errorf("LLM generation failed: %w", genErr)
+			}
+			providerResponse = &LLMProviderResponse{
+				Content:      llmResponse,
+				FinishReason: "stop",
+			}
 		} else {
-			step.Output = toolResult
+			if len(toolDefinitions) == 0 {
+				return nil, nil, fmt.Errorf("tools enabled but no tool definitions available")
+			}
+			providerResponse, err = a.llmProvider.GenerateWithMessages(ctx, messages, toolDefinitions)
 		}
 
-		agentCtx.ExecutionSteps = append(agentCtx.ExecutionSteps, step)
-
-		// Generate a unique tool call ID
-		toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
-
-		// Use is LLM's content from the tool call as assistant message content
-		assistantContent := toolCall.Content
-		if assistantContent == "" {
-			assistantContent = llmResponse
+		if err != nil {
+			return nil, nil, fmt.Errorf("LLM generation failed: %w", err)
 		}
 
-		messages = append(messages, Message{
-			Role:    "assistant",
-			Content: assistantContent,
-			ToolCalls: []ToolCallInfo{
-				{
-					ID:        toolCallID,
-					Type:      "function",
-					Name:      toolCall.Name,
-					Arguments: toolCall.InputJSON,
+		// Check if LLM wants to stop or has no tool calls
+		if providerResponse.FinishReason == "stop" || len(providerResponse.ToolCalls) == 0 {
+			assistantMsg := Message{
+				Role:    "assistant",
+				Content: providerResponse.Content,
+			}
+			messages = append(messages, assistantMsg)
+			messagesToSave = append(messagesToSave, assistantMsg)
+
+			return &AgentResponse{
+				Content:        providerResponse.Content,
+				NavigationInfo: agentCtx.NavigationInfo,
+				ShouldNavigate: agentCtx.ShouldNavigate,
+				ExecutionSteps: agentCtx.ExecutionSteps,
+				TokensUsed:     agentCtx.TokensUsed,
+			}, messagesToSave, nil
+		}
+
+		// Process tool calls
+		if len(providerResponse.ToolCalls) == 0 {
+			// No tool calls, treat as regular response
+			assistantMsg := Message{
+				Role:    "assistant",
+				Content: providerResponse.Content,
+			}
+			messages = append(messages, assistantMsg)
+			messagesToSave = append(messagesToSave, assistantMsg)
+
+			return &AgentResponse{
+				Content:        providerResponse.Content,
+				NavigationInfo: agentCtx.NavigationInfo,
+				ShouldNavigate: agentCtx.ShouldNavigate,
+				ExecutionSteps: agentCtx.ExecutionSteps,
+				TokensUsed:     agentCtx.TokensUsed,
+			}, messagesToSave, nil
+		}
+
+		// Process tool calls
+		hasValidToolCall := false
+		for _, toolCall := range providerResponse.ToolCalls {
+			if toolCall.Name == "" {
+				GetLLMLogger().LogExchange("agent", "", fmt.Sprintf("Warning: Skipping tool call with empty name, ID: %s, arguments: %v", toolCall.ID, toolCall.Arguments))
+				continue
+			}
+
+			hasValidToolCall = true
+
+			step := ExecutionStep{
+				StepNumber: i + 1,
+				Thought:    providerResponse.Content,
+				Action:     toolCall.Name,
+			}
+
+			inputJSON, _ := json.Marshal(toolCall.Arguments)
+			step.Input = string(inputJSON)
+
+			if len(toolCall.Arguments) == 0 {
+				GetLLMLogger().LogExchange("agent", "", fmt.Sprintf("Warning: Tool call '%s' has empty arguments", toolCall.Name))
+			}
+
+			executionResult, execErr := a.toolManager.ExecuteTool(toolCall.Name, agentCtx, toolCall.Arguments)
+			if execErr != nil {
+				step.Output = fmt.Sprintf("Error: %s", execErr.Error())
+			} else if executionResult != nil {
+				if executionResult.Error != "" {
+					step.Output = executionResult.Error
+				} else {
+					step.Output = executionResult.Result
+				}
+			}
+
+			agentCtx.ExecutionSteps = append(agentCtx.ExecutionSteps, step)
+
+			toolCallID := toolCall.ID
+			if toolCallID == "" {
+				toolCallID = fmt.Sprintf("call_%d", time.Now().UnixNano())
+			}
+
+			assistantMsg := Message{
+				Role:    "assistant",
+				Content: providerResponse.Content,
+				ToolCalls: []ToolCallInfo{
+					{
+						ID:   toolCallID,
+						Type: "function",
+						Name: toolCall.Name,
+						Arguments: func() string {
+							if argsJSON, err := json.Marshal(toolCall.Arguments); err == nil {
+								return string(argsJSON)
+							}
+							return "{}"
+						}(),
+					},
 				},
-			},
-		})
-		messages = append(messages, Message{
-			Role:       "tool",
-			ToolCallID: toolCallID,
-			Content:    step.Output,
-		})
+			}
+			messages = append(messages, assistantMsg)
+
+			toolResultMsg := Message{
+				Role:       "tool",
+				ToolCallID: toolCallID,
+				Content:    step.Output,
+			}
+			messages = append(messages, toolResultMsg)
+
+			messagesToSave = append(messagesToSave, assistantMsg, toolResultMsg)
+
+			if executionResult != nil && executionResult.StopCommand != nil {
+				metadata := executionResult.StopCommand.Metadata
+				if metadata == nil {
+					metadata = make(map[string]interface{})
+				}
+				metadata["execution_steps"] = agentCtx.ExecutionSteps
+				metadata["tokens_used"] = agentCtx.TokensUsed
+
+				return &AgentResponse{
+					Content:        executionResult.StopCommand.Response,
+					NavigationInfo: agentCtx.NavigationInfo,
+					ShouldNavigate: agentCtx.ShouldNavigate,
+					ExecutionSteps: agentCtx.ExecutionSteps,
+					TokensUsed:     agentCtx.TokensUsed,
+					Metadata:       metadata,
+				}, messagesToSave, nil
+			}
+		}
+
+		// If all tool calls were invalid, treat as regular response
+		if !hasValidToolCall {
+			assistantMsg := Message{
+				Role:    "assistant",
+				Content: providerResponse.Content,
+			}
+			messages = append(messages, assistantMsg)
+			messagesToSave = append(messagesToSave, assistantMsg)
+
+			return &AgentResponse{
+				Content:        providerResponse.Content,
+				NavigationInfo: agentCtx.NavigationInfo,
+				ShouldNavigate: agentCtx.ShouldNavigate,
+				ExecutionSteps: agentCtx.ExecutionSteps,
+				TokensUsed:     agentCtx.TokensUsed,
+			}, messagesToSave, nil
+		}
 
 		// Check if tool result indicates we should stop (e.g., navigation tool completed)
 		if agentCtx.ShouldNavigate {
 			return &AgentResponse{
-				Content:        toolResult,
+				Content:        "Navigation completed",
 				NavigationInfo: agentCtx.NavigationInfo,
 				ShouldNavigate: true,
 				ExecutionSteps: agentCtx.ExecutionSteps,
 				TokensUsed:     agentCtx.TokensUsed,
-			}, nil
+			}, messagesToSave, nil
 		}
 	}
 
@@ -313,7 +394,7 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 		Content:        "I apologize, but I couldn't complete your request. Please try again.",
 		ExecutionSteps: agentCtx.ExecutionSteps,
 		TokensUsed:     agentCtx.TokensUsed,
-	}, nil
+	}, messagesToSave, nil
 }
 
 func (a *Agent) buildPrompt(agentCtx *AgentContext, userMessage string, iteration int) string {
@@ -396,56 +477,6 @@ func messagesToPrompt(messages []Message) string {
 		sb.WriteString(fmt.Sprintf("%s: %s\n", msg.Role, msg.Content))
 	}
 	return sb.String()
-}
-
-type ToolCall struct {
-	Name      string
-	Input     map[string]interface{}
-	InputJSON string
-	Content   string
-}
-
-func (a *Agent) parseToolCall(response string) (*ToolCall, error) {
-	lines := strings.Split(response, "\n")
-
-	var toolName string
-	var inputLine string
-	var contentLines []string
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "TOOL:") {
-			toolName = strings.TrimSpace(strings.TrimPrefix(line, "TOOL:"))
-		} else if strings.HasPrefix(line, "INPUT:") {
-			inputLine = strings.TrimSpace(strings.TrimPrefix(line, "INPUT:"))
-		} else if line != "" {
-			contentLines = append(contentLines, line)
-		}
-	}
-
-	if toolName == "" {
-		return nil, nil
-	}
-
-	if inputLine == "" {
-		return &ToolCall{
-			Name:    toolName,
-			Input:   make(map[string]interface{}),
-			Content: strings.Join(contentLines, "\n"),
-		}, nil
-	}
-
-	var input map[string]interface{}
-	if err := json.Unmarshal([]byte(inputLine), &input); err != nil {
-		return nil, fmt.Errorf("failed to parse tool input: %w", err)
-	}
-
-	return &ToolCall{
-		Name:      toolName,
-		Input:     input,
-		InputJSON: inputLine,
-		Content:   strings.Join(contentLines, "\n"),
-	}, nil
 }
 
 // AgentResponse represents the agent's response

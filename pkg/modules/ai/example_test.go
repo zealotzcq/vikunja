@@ -16,8 +16,10 @@ func ExampleGetToolManager() {
 	tool := &ai.Tool{
 		Name:        "example_tool",
 		Description: "An example tool",
-		Execute: func(ctx *ai.AgentContext, params map[string]interface{}) (string, error) {
-			return "Example executed", nil
+		Execute: func(ctx *ai.AgentContext, params map[string]interface{}) (*ai.ToolExecutionResult, error) {
+			return &ai.ToolExecutionResult{
+				Result: "Example executed",
+			}, nil
 		},
 	}
 

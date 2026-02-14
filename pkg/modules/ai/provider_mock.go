@@ -104,9 +104,9 @@ func (p *MockLLMProvider) GenerateWithTools(ctx context.Context, prompt string, 
 	return p.Generate(ctx, prompt)
 }
 
-func (p *MockLLMProvider) GenerateWithMessages(ctx context.Context, messages []Message, tools []map[string]interface{}) (string, string, error) {
+func (p *MockLLMProvider) GenerateWithMessages(ctx context.Context, messages []Message, tools []map[string]interface{}) (*LLMProviderResponse, error) {
 	if len(messages) == 0 {
-		return "", "", fmt.Errorf("no messages provided")
+		return nil, fmt.Errorf("no messages provided")
 	}
 
 	var prompt strings.Builder
@@ -115,5 +115,12 @@ func (p *MockLLMProvider) GenerateWithMessages(ctx context.Context, messages []M
 	}
 
 	content, err := p.Generate(ctx, prompt.String())
-	return content, "stop", err
+	if err != nil {
+		return nil, err
+	}
+
+	return &LLMProviderResponse{
+		Content:      content,
+		FinishReason: "stop",
+	}, nil
 }

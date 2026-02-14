@@ -71,8 +71,10 @@ func TestToolManager(t *testing.T) {
 			Parameters: map[string]interface{}{
 				"type": "object",
 			},
-			Execute: func(ctx *AgentContext, params map[string]interface{}) (string, error) {
-				return "test result", nil
+			Execute: func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) {
+				return &ToolExecutionResult{
+					Result: "test result",
+				}, nil
 			},
 		}
 
@@ -96,12 +98,22 @@ func TestToolManager(t *testing.T) {
 			SessionData: make(map[string]interface{}),
 		}
 
-		_, err := tm.ExecuteTool("navigate", ctx, map[string]interface{}{
+		result, err := tm.ExecuteTool("navigate", ctx, map[string]interface{}{
 			"route_name": "test.route",
+			"content":    "Navigating to test route",
 		})
 
 		if err != nil {
 			t.Errorf("ExecuteTool() error = %v", err)
+		}
+
+		if result == nil {
+			t.Error("ExecuteTool() should return a result")
+			return
+		}
+
+		if result.StopCommand == nil {
+			t.Error("ExecuteTool() should set StopCommand for navigate tool")
 		}
 
 		if !ctx.ShouldNavigate {

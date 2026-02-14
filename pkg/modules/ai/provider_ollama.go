@@ -48,8 +48,11 @@ func (p *OllamaProvider) Generate(ctx context.Context, prompt string) (string, e
 		{Role: "user", Content: prompt},
 	}
 
-	content, _, err := p.makeRequest(ctx, messages)
-	return content, err
+	response, err := p.makeRequest(ctx, messages)
+	if err != nil {
+		return "", err
+	}
+	return response.Content, nil
 }
 
 func (p *OllamaProvider) GenerateWithTools(ctx context.Context, prompt string, tools []map[string]interface{}) (string, error) {
@@ -70,11 +73,14 @@ func (p *OllamaProvider) GenerateWithTools(ctx context.Context, prompt string, t
 		{Role: "user", Content: prompt},
 	}
 
-	content, _, err := p.makeRequest(ctx, messages)
-	return content, err
+	response, err := p.makeRequest(ctx, messages)
+	if err != nil {
+		return "", err
+	}
+	return response.Content, nil
 }
 
-func (p *OllamaProvider) GenerateWithMessages(ctx context.Context, messages []Message, tools []map[string]interface{}) (string, string, error) {
+func (p *OllamaProvider) GenerateWithMessages(ctx context.Context, messages []Message, tools []map[string]interface{}) (*LLMProviderResponse, error) {
 	ollamaMessages := make([]ollamaMessage, 0, len(messages))
 
 	for _, msg := range messages {
@@ -88,7 +94,7 @@ func (p *OllamaProvider) GenerateWithMessages(ctx context.Context, messages []Me
 	return p.makeRequest(ctx, ollamaMessages)
 }
 
-func (p *OllamaProvider) makeRequest(ctx context.Context, messages []ollamaMessage) (string, string, error) {
+func (p *OllamaProvider) makeRequest(ctx context.Context, messages []ollamaMessage) (*LLMProviderResponse, error) {
 	url := fmt.Sprintf("%s/api/chat", p.config.OllamaBaseURL)
 
 	reqBody := ollamaRequest{
@@ -103,12 +109,12 @@ func (p *OllamaProvider) makeRequest(ctx context.Context, messages []ollamaMessa
 
 	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to marshal request: %w", err)
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return "", "", fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -116,26 +122,29 @@ func (p *OllamaProvider) makeRequest(ctx context.Context, messages []ollamaMessa
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to make request: %w", err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to read response: %w", err)
+		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		GetLLMLogger().LogExchange("ollama", string(jsonBody), string(body))
-		return "", "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
 	GetLLMLogger().LogExchange("ollama", string(jsonBody), string(body))
 
 	var ollamaResp ollamaResponse
 	if err := json.Unmarshal(body, &ollamaResp); err != nil {
-		return "", "", fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	return ollamaResp.Message.Content, "stop", nil
+	return &LLMProviderResponse{
+		Content:      ollamaResp.Message.Content,
+		FinishReason: "stop",
+	}, nil
 }

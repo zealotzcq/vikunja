@@ -9,10 +9,10 @@ import (
 
 // Tool represents a function that the agent can call
 type Tool struct {
-	Name        string                                                                 `json:"name"`
-	Description string                                                                 `json:"description"`
-	Parameters  map[string]interface{}                                                 `json:"parameters"`
-	Execute     func(ctx *AgentContext, params map[string]interface{}) (string, error) `json:"-"`
+	Name        string                                                                               `json:"name"`
+	Description string                                                                               `json:"description"`
+	Parameters  map[string]interface{}                                                               `json:"parameters"`
+	Execute     func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) `json:"-"`
 }
 
 // ToolManager manages available tools
@@ -121,13 +121,15 @@ func (tm *ToolManager) GetEnabledTools() []*Tool {
 }
 
 // ExecuteTool executes a tool by name with given parameters
-func (tm *ToolManager) ExecuteTool(name string, ctx *AgentContext, params map[string]interface{}) (string, error) {
+func (tm *ToolManager) ExecuteTool(name string, ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) {
 	tm.mu.RLock()
 	tool, exists := tm.tools[name]
 	tm.mu.RUnlock()
 
 	if !exists {
-		return "", fmt.Errorf("tool '%s' not found", name)
+		return &ToolExecutionResult{
+			Error: fmt.Sprintf("tool '%s' not found", name),
+		}, fmt.Errorf("tool '%s' not found", name)
 	}
 
 	result, err := tool.Execute(ctx, params)
@@ -184,15 +186,19 @@ Usage examples:
 			},
 			"required": []string{"route_name", "content"},
 		},
-		Execute: func(ctx *AgentContext, params map[string]interface{}) (string, error) {
+		Execute: func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) {
 			routeName, ok := params["route_name"].(string)
 			if !ok {
-				return "", fmt.Errorf("route_name is required")
+				return &ToolExecutionResult{
+					Error: "route_name is required",
+				}, fmt.Errorf("route_name is required")
 			}
 
 			content, ok := params["content"].(string)
 			if !ok {
-				return "", fmt.Errorf("content is required")
+				return &ToolExecutionResult{
+					Error: "content is required",
+				}, fmt.Errorf("content is required")
 			}
 
 			var routeParams map[string]interface{}
@@ -206,7 +212,17 @@ Usage examples:
 			}
 			ctx.ShouldNavigate = true
 
-			return content, nil
+			return &ToolExecutionResult{
+				Result: content,
+				StopCommand: &ToolStopCommand{
+					Response: content,
+					Metadata: map[string]interface{}{
+						"navigation": true,
+						"route":      routeName,
+						"params":     routeParams,
+					},
+				},
+			}, nil
 		},
 	}
 
@@ -229,10 +245,12 @@ Usage examples:
 			"required":             []string{"name"},
 			"additionalProperties": false,
 		},
-		Execute: func(ctx *AgentContext, params map[string]interface{}) (string, error) {
+		Execute: func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) {
 			skillName, ok := params["name"].(string)
 			if !ok {
-				return "", fmt.Errorf("name is required")
+				return &ToolExecutionResult{
+					Error: "name is required",
+				}, fmt.Errorf("name is required")
 			}
 
 			skillContent, err := sm.LoadSkillContent(skillName)
@@ -245,7 +263,9 @@ Usage examples:
 					}
 					return names
 				}(), ", ")
-				return "", fmt.Errorf("skill '%s' not found. Available skills: %s", skillName, available)
+				return &ToolExecutionResult{
+					Error: fmt.Sprintf("skill '%s' not found. Available skills: %s", skillName, available),
+				}, fmt.Errorf("skill '%s' not found. Available skills: %s", skillName, available)
 			}
 
 			var sb strings.Builder
@@ -262,7 +282,9 @@ Usage examples:
 			}
 			sb.WriteString(strings.TrimSpace(skillContent.Content))
 
-			return sb.String(), nil
+			return &ToolExecutionResult{
+				Result: sb.String(),
+			}, nil
 		},
 	}
 
@@ -279,6 +301,20 @@ type ToolResponse struct {
 	Result string                 `json:"result"`
 	Error  string                 `json:"error,omitempty"`
 	Meta   map[string]interface{} `json:"meta,omitempty"`
+}
+
+// ToolExecutionResult represents the result of a tool execution
+type ToolExecutionResult struct {
+	Result      string                 `json:"result"`
+	Error       string                 `json:"error,omitempty"`
+	StopCommand *ToolStopCommand       `json:"stop_command,omitempty"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// ToolStopCommand represents a command to stop the agent loop and respond to user
+type ToolStopCommand struct {
+	Response string                 `json:"response"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // MarshalJSON implements json.Marshaler for Tool

@@ -214,6 +214,8 @@ type APIUserPassword struct {
 	Password string `json:"password" valid:"bcrypt_password" minLength:"8" maxLength:"72"`
 	// The user's email address
 	Email string `json:"email" valid:"email,length(0|250)" maxLength:"250"`
+	// The invite code to join a company (optional for local connections)
+	InviteCode string `json:"invite_code"`
 }
 
 // GetUserByID returns user by its ID

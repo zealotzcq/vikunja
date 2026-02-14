@@ -68,7 +68,11 @@
       "alreadyHaveAnAccount": "Already have an account?",
       "remember": "Stay logged in",
       "registrationDisabled": "Registration is disabled.",
-      "passwordResetTokenMissing": "Password reset token is missing."
+      "passwordResetTokenMissing": "Password reset token is missing.",
+      "inviteCode": "Invite Code",
+      "inviteCodePlaceholder": "Enter your invite code",
+      "inviteCodeRequired": "Invite code is required.",
+      "inviteCodeInvalid": "Invalid invite code."
     },
     "settings": {
       "title": "Settings",

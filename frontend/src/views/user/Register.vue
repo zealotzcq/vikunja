@@ -52,6 +52,18 @@
 				/>
 			</div>
 
+			<FormField
+				id="invite_code"
+				v-model="credentials.invite_code"
+				:label="$t('user.auth.inviteCode')"
+				name="invite_code"
+				:placeholder="$t('user.auth.inviteCodePlaceholder')"
+				required
+				type="text"
+				autocomplete="off"
+				@keyup.enter="submit"
+			/>
+
 			<XButton
 				id="register-submit"
 				:loading="isLoading"
@@ -119,6 +131,7 @@ const credentials = reactive({
 	username: '',
 	email: '',
 	password: '',
+	invite_code: '',
 })
 
 const isLoading = computed(() => authStore.isLoading)
@@ -158,6 +171,7 @@ const validateUsername = useDebounceFn(() => {
 const everythingValid = computed(() => {
 	return credentials.username !== '' &&
 		credentials.email !== '' &&
+		credentials.invite_code !== '' &&
 		validatePassword(credentials.password) === true &&
 		emailValid.value &&
 		usernameValid.value === true

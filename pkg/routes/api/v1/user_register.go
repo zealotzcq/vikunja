@@ -20,6 +20,7 @@ import (
 	"errors"
 	"net/http"
 
+	"code.vikunja.io/api/pkg/company"
 	"code.vikunja.io/api/pkg/config"
 	"code.vikunja.io/api/pkg/db"
 	"code.vikunja.io/api/pkg/models"
@@ -32,6 +33,12 @@ type UserRegister struct {
 	// The language of the new user. Must be a valid IETF BCP 47 language code and exist in Vikunja.
 	Language string `json:"language" valid:"language"`
 	user.APIUserPassword
+}
+
+// isLocalConnection checks if the request is from localhost
+func isLocalConnection(c *echo.Context) bool {
+	ip := c.RealIP()
+	return ip == "127.0.0.1" || ip == "::1" || ip == "localhost"
 }
 
 // RegisterUser is the register handler
@@ -69,7 +76,24 @@ func RegisterUser(c *echo.Context) error {
 	s := db.NewSession()
 	defer s.Close()
 
-	// Insert the user
+	// Skip invite code validation for local connections
+	if !isLocalConnection(c) {
+		// Validate invite code is required
+		if userIn.InviteCode == "" {
+			_ = s.Rollback()
+			return c.JSON(http.StatusBadRequest, models.Message{Message: "Invite code is required"})
+		}
+
+		// Validate invite code
+		comp, err := company.GetCompanyByInviteCode(s, userIn.InviteCode)
+		if err != nil {
+			_ = s.Rollback()
+			return err
+		}
+		_ = comp
+	}
+
+	// Insert user
 	newUser, err := user.CreateUser(s, &user.User{
 		Username: userIn.Username,
 		Password: userIn.Password,
@@ -79,6 +103,20 @@ func RegisterUser(c *echo.Context) error {
 	if err != nil {
 		_ = s.Rollback()
 		return err
+	}
+
+	// Add user to company as staff only if invite code was provided
+	if userIn.InviteCode != "" {
+		comp, err := company.GetCompanyByInviteCode(s, userIn.InviteCode)
+		if err != nil {
+			_ = s.Rollback()
+			return err
+		}
+		err = company.AddStaffToCompany(s, comp.ID, newUser.ID, "staff")
+		if err != nil {
+			_ = s.Rollback()
+			return err
+		}
 	}
 
 	// Create their initial project

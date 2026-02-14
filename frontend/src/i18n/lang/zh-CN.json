@@ -68,7 +68,11 @@
 			"alreadyHaveAnAccount": "已有账户？",
 			"remember": "保持登录状态",
 			"registrationDisabled": "已关闭注册。",
-			"passwordResetTokenMissing": "缺少密码重置令牌。"
+			"passwordResetTokenMissing": "缺少密码重置令牌。",
+			"inviteCode": "邀请码",
+			"inviteCodePlaceholder": "请输入邀请码",
+			"inviteCodeRequired": "必须填写邀请码。",
+			"inviteCodeInvalid": "邀请码无效。"
 		},
 		"settings": {
 			"title": "设置",

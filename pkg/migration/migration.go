@@ -20,6 +20,7 @@ import (
 	"os"
 	"sort"
 
+	"code.vikunja.io/api/pkg/company"
 	"code.vikunja.io/api/pkg/config"
 	"code.vikunja.io/api/pkg/db"
 	"code.vikunja.io/api/pkg/files"
@@ -269,5 +270,6 @@ func initSchema(tx *xorm.Engine) error {
 	schemeBeans = append(schemeBeans, migration.GetTables()...)
 	schemeBeans = append(schemeBeans, user.GetTables()...)
 	schemeBeans = append(schemeBeans, notifications.GetTables()...)
+	schemeBeans = append(schemeBeans, company.GetTables()...)
 	return tx.Sync2(schemeBeans...)
 }

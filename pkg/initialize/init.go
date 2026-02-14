@@ -19,6 +19,7 @@ package initialize
 import (
 	"time"
 
+	"code.vikunja.io/api/pkg/company"
 	"code.vikunja.io/api/pkg/config"
 	"code.vikunja.io/api/pkg/cron"
 	"code.vikunja.io/api/pkg/db"
@@ -65,6 +66,10 @@ func InitEngines() {
 		log.Fatal(err.Error())
 	}
 	err = files.SetEngine()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	err = company.SetEngine()
 	if err != nil {
 		log.Fatal(err.Error())
 	}

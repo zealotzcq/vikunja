@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"code.vikunja.io/api/pkg/company"
 	"code.vikunja.io/api/pkg/db"
 	"code.vikunja.io/api/pkg/models"
 	"code.vikunja.io/api/pkg/modules/ai"
@@ -18,19 +19,22 @@ import (
 	"github.com/labstack/echo/v5"
 )
 
-// Allowed usernames for chat assistant
-var allowedChatUsernames = map[string]bool{
-	"leader": true,
-	"王大牛":    true,
-}
-
 // isUserAllowedForChat checks if user is allowed to use the chat assistant
 func isUserAllowedForChat(a web.Auth) bool {
 	userObj, isUser := a.(*user.User)
 	if !isUser {
 		return false
 	}
-	return allowedChatUsernames[userObj.Username]
+
+	s := db.NewSession()
+	defer s.Close()
+
+	role := company.GetUserRole(s, userObj.ID)
+	if role == "" {
+		return false
+	}
+
+	return role == "creator" || role == "admin"
 }
 
 // SendMessageRequest represents a request to send a chat message

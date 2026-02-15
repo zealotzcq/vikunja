@@ -463,13 +463,8 @@ func (a *Agent) buildSystemPrompt(agentCtx *AgentContext) string {
 
 	if len(agentCtx.SubordinateStaff) > 0 {
 		sb.WriteString("\n- Subordinate Staff:\n")
-		for _, staff := range agentCtx.SubordinateStaff {
-			if staff.Name != "" {
-				sb.WriteString(fmt.Sprintf("  - %s (ID: %d, Username: %s, Project ID: %d)\n", staff.Name, staff.UserID, staff.Username, staff.ProjectID))
-			} else {
-				sb.WriteString(fmt.Sprintf("  - %s (ID: %d, Username: %s, Project ID: %d)\n", staff.Username, staff.UserID, staff.Username, staff.ProjectID))
-			}
-		}
+		staffJSON, _ := json.Marshal(agentCtx.SubordinateStaff)
+		sb.WriteString(fmt.Sprintf("  %s\n", string(staffJSON)))
 	}
 
 	sb.WriteString("\n")

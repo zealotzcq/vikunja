@@ -10,13 +10,13 @@
 </template>
 
 <script lang="ts" setup>
- import BaseButton from '@/components/base/BaseButton.vue'
- import Icon from '@/components/misc/Icon'
+import BaseButton from '@/components/base/BaseButton.vue'
+import Icon from '@/components/misc/Icon'
 
- import {useChatStore} from '@/stores/chat'
+import {useChatStore} from '@/stores/chat'
 
- const chatStore = useChatStore()
- </script>
+const chatStore = useChatStore()
+</script>
 
 <style lang="scss" scoped>
 .chat-assistant-trigger {

@@ -1,6 +1,10 @@
+export type MessageRole = 'user' | 'assistant' | 'tool'
+export type MessageType = 'user_input' | 'tool_call' | 'tool_result' | 'assistant_response' | 'question' | 'button_navigation'
+
 export interface IChatMessage {
 	id: string
-	role: 'user' | 'assistant'
+	type: MessageType
+	role: MessageRole
 	content: string
 	timestamp: number
 	navigationCommand?: {
@@ -15,6 +19,10 @@ export interface IChatMessage {
 	}
 	questionData?: string
 	questionAnswered?: boolean
+	toolName?: string
+	toolInput?: string
+	toolOutput?: string
+	toolCallID?: string
 }
 
 export interface INavigationCommand {

@@ -1,13 +1,13 @@
-	import {ref, watch} from 'vue'
-	import {defineStore, acceptHMRUpdate} from 'pinia'
-	import {useRouter} from 'vue-router'
+import {ref, watch} from 'vue'
+import {defineStore, acceptHMRUpdate} from 'pinia'
+import {useRouter} from 'vue-router'
 
-	import type {IChatMessage} from '@/modelTypes/IChatMessage'
-	import {saveChatHistory} from '@/composables/useChatHistory'
-	import ChatService from '@/services/chat'
-	import {useAuthStore} from '@/stores/auth'
-	import {useCompanyStore} from '@/stores/company'
-	import {getToken} from '@/helpers/auth'
+import type {IChatMessage} from '@/modelTypes/IChatMessage'
+import {saveChatHistory} from '@/composables/useChatHistory'
+import ChatService from '@/services/chat'
+import {useAuthStore} from '@/stores/auth'
+import {useCompanyStore} from '@/stores/company'
+import {getToken} from '@/helpers/auth'
 
 export const useChatStore = defineStore('chat', () => {
 	const authStore = useAuthStore()
@@ -147,12 +147,17 @@ export const useChatStore = defineStore('chat', () => {
 
 			const newMessages = response.messages.map(msg => ({
 				id: msg.id,
+				type: msg.type || (msg.role === 'user' ? 'user_input' : 'assistant_response'),
 				role: msg.role,
 				content: msg.content,
 				timestamp: msg.timestamp,
 				navigationCommand: msg.navigationCommand,
 				buttonNavigation: msg.buttonNavigation,
 				questionData: msg.questionData,
+				toolName: msg.toolName,
+				toolInput: msg.toolInput,
+				toolOutput: msg.toolOutput,
+				toolCallID: msg.toolCallID,
 			}))
 
 			messages.value = newMessages
@@ -161,7 +166,7 @@ export const useChatStore = defineStore('chat', () => {
 				const lastMessage = newMessages[newMessages.length - 1]!
 				lastMessageId.value = lastMessage.id
 
-				if (lastMessage.navigationCommand) {
+				if (lastMessage.type === 'assistant_response' && lastMessage.navigationCommand) {
 					console.log('[Chat] Executing navigation:', lastMessage.navigationCommand)
 					router.push({
 						name: lastMessage.navigationCommand.routeName,
@@ -173,7 +178,7 @@ export const useChatStore = defineStore('chat', () => {
 				}
 
 				const processed = getProcessedRefreshMessages()
-				if (lastMessage.buttonNavigation && !processed.has(lastMessage.id)) {
+				if (lastMessage.type === 'assistant_response' && lastMessage.buttonNavigation && !processed.has(lastMessage.id)) {
 					console.log('[Chat] New button navigation message received, reloading page')
 					addProcessedRefreshMessage(lastMessage.id)
 					window.location.reload()
@@ -240,6 +245,7 @@ export const useChatStore = defineStore('chat', () => {
 
 		const userMessage: IChatMessage = {
 			id: msgId,
+			type: 'user_input',
 			role: 'user',
 			content,
 			timestamp: Date.now(),
@@ -267,6 +273,12 @@ export const useChatStore = defineStore('chat', () => {
 				console.error('[Chat] Failed to send message:', err)
 			}
 		}
+	}
+
+	function addMessage(message: IChatMessage) {
+		messages.value.push(message)
+		lastMessageId.value = message.id
+		saveChatHistory(messages.value)
 	}
 
 	async function clearMessages() {
@@ -308,6 +320,7 @@ export const useChatStore = defineStore('chat', () => {
 		disconnectSSE,
 		executeButtonNavigation,
 		submitQuestionAnswer,
+		addMessage,
 	}
 })
 

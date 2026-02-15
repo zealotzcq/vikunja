@@ -1254,6 +1254,16 @@
 		"success": "成功",
 		"0001": "不允许这样操作"
 	},
+	"chatAssistant": {
+		"title": "AI 助手",
+		"placeholder": "请输入您的问题...",
+		"send": "发送",
+		"close": "关闭聊天",
+		"clear": "清空消息",
+		"selectedOption": "已选择：{option}",
+		"processing": "小助理正在处理...",
+		"processingTool": "正在使用 {tool}..."
+	},
 	"about": {
 		"title": "关于",
 		"version": "版本：{version}",

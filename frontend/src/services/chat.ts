@@ -34,7 +34,8 @@ export default class ChatService {
 		created_at: number
 		messages: Array<{
 			id: string
-			role: 'user' | 'assistant'
+			type?: string
+			role: 'user' | 'assistant' | 'tool'
 			content: string
 			timestamp: number
 			navigationCommand?: {
@@ -48,6 +49,10 @@ export default class ChatService {
 				label: string
 			}
 			questionData?: string
+			toolName?: string
+			toolInput?: string
+			toolOutput?: string
+			toolCallID?: string
 		}>
 		expires_at: number
 	}> {

@@ -50,7 +50,10 @@
 					</DropdownItem>
 				</template>
 			</Dropdown>
-			<h1 v-else class="company-title">
+			<h1
+				v-else
+				class="company-title"
+			>
 				{{ currentCompany.description }}
 			</h1>
 		</div>

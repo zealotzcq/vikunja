@@ -24,15 +24,24 @@
 						</BaseButton>
 					</div>
 				</header>
-				<div ref="messagesContainer" class="chat-messages">
+				<div
+					ref="messagesContainer"
+					class="chat-messages"
+				>
 					<div
-						v-for="msg in chatStore.messages"
+						v-for="msg in visibleMessages"
 						:key="msg.id"
-						:class="['message', msg.role]"
+						class="message"
+						:class="[msg.role]"
 					>
-						<div class="message-content">{{ msg.content }}</div>
+						<div class="message-content">
+							{{ msg.content }}
+						</div>
 
-						<div v-if="msg.buttonNavigation" class="button-navigation">
+						<div
+							v-if="msg.buttonNavigation"
+							class="button-navigation"
+						>
 							<BaseButton
 								class="nav-button"
 								@click="chatStore.executeButtonNavigation(msg.buttonNavigation.routeName, msg.buttonNavigation.params)"
@@ -41,22 +50,32 @@
 							</BaseButton>
 						</div>
 
-						<div v-if="msg.questionData && msg.id === lastMessageWithQuestion?.id" class="question-panel">
+						<div
+							v-if="msg.questionData && msg.id === lastMessageWithQuestion?.id"
+							class="question-panel"
+						>
 							<div
 								v-for="(question, qIndex) in parsedQuestions"
 								:key="qIndex"
 								class="question-item"
 							>
-								<div class="question-text">{{ question.question }}</div>
+								<div class="question-text">
+									{{ question.question }}
+								</div>
 								<div class="question-options">
 									<div
 										v-for="(option, oIndex) in question.options"
 										:key="oIndex"
 										class="question-option"
-										@click="handleQuestionOption(question, option)"
+										:class="[{disabled: answeredQuestionId}]"
+										@click="!answeredQuestionId && handleQuestionOption(question, option)"
 									>
-										<div class="option-label">{{ option.label }}</div>
-										<div class="option-description">{{ option.description }}</div>
+										<div class="option-label">
+											{{ option.label }}
+										</div>
+										<div class="option-description">
+											{{ option.description }}
+										</div>
 									</div>
 								</div>
 							</div>
@@ -64,9 +83,28 @@
 
 						<span class="message-time">{{ formatTime(msg.timestamp) }}</span>
 					</div>
+
+					<div
+						v-if="isProcessing"
+						class="message assistant loading-message"
+					>
+						<div class="message-content loading-content">
+							<div class="loading-dots">
+								<span class="dot" />
+								<span class="dot" />
+								<span class="dot" />
+							</div>
+							<div class="loading-text">
+								{{ processingText }}
+							</div>
+						</div>
+					</div>
 				</div>
 				<div class="chat-input">
-					<div v-if="chatStore.error" class="error-message">
+					<div
+						v-if="chatStore.error"
+						class="error-message"
+					>
 						{{ chatStore.error }}
 					</div>
 					<input
@@ -89,99 +127,166 @@
 </template>
 
 <script lang="ts" setup>
-  import {ref, watch, nextTick, onMounted, onUnmounted, computed} from 'vue'
-  import {useI18n} from 'vue-i18n'
-  import {useRouter} from 'vue-router'
+import {ref, watch, nextTick, onMounted, onUnmounted, computed} from 'vue'
+import {useI18n} from 'vue-i18n'
 
-  import BaseButton from '@/components/base/BaseButton.vue'
-  import Icon from '@/components/misc/Icon'
+import BaseButton from '@/components/base/BaseButton.vue'
+import Icon from '@/components/misc/Icon'
 
-  import {useChatStore} from '@/stores/chat'
-  import type {IQuestion} from '@/modelTypes/IChatMessage'
+import {useChatStore} from '@/stores/chat'
+import type {IQuestion, IQuestionOption} from '@/modelTypes/IChatMessage'
 
-  const {t} = useI18n({useScope: 'global'})
-  const chatStore = useChatStore()
-  const router = useRouter()
+const {t} = useI18n({useScope: 'global'})
+const chatStore = useChatStore()
 
-  const userInput = ref('')
-  const messagesContainer = ref<HTMLElement | null>(null)
+const userInput = ref('')
+const messagesContainer = ref<HTMLElement | null>(null)
+const answeredQuestionId = ref<string | null>(null)
+const isProcessing = ref(false)
+const processingText = ref('')
 
-  const lastMessageWithQuestion = computed(() => {
-		return chatStore.messages.find(msg => msg.questionData)
-	})
+const lastMessageWithQuestion = computed(() => {
+	return chatStore.messages.find(msg => msg.questionData)
+})
 
-	const parsedQuestions = computed<IQuestion[]>(() => {
-		if (!lastMessageWithQuestion.value?.questionData) {
-			return []
-		}
-		try {
-			return JSON.parse(lastMessageWithQuestion.value.questionData)
-		} catch (e) {
-			console.error('[Chat] Failed to parse question data:', e)
-			return []
-		}
-	})
+const visibleMessages = computed(() => {
+	return chatStore.messages.filter(msg => 
+		msg.type === 'user_input' || 
+		msg.type === 'assistant_response' || 
+		msg.type === 'question' ||
+		msg.type === 'button_navigation',
+	)
+})
 
-  onMounted(() => {
+const parsedQuestions = computed<IQuestion[]>(() => {
+	if (!lastMessageWithQuestion.value?.questionData) {
+		return []
+	}
+	try {
+		return JSON.parse(lastMessageWithQuestion.value.questionData)
+	} catch (e) {
+		console.error('[Chat] Failed to parse question data:', e)
+		return []
+	}
+})
+
+onMounted(() => {
 	chatStore.loadChatHistory()
 	detectMobile()
 	scrollToBottom()
-  })
+})
 
-  onUnmounted(() => {
+onUnmounted(() => {
 	chatStore.disconnectSSE()
-  })
+})
 
-  function detectMobile() {
+function detectMobile() {
 	const isMobileDevice = typeof window !== 'undefined' && window.innerWidth < 768
 	chatStore.setMobile(isMobileDevice)
-  }
+}
 
-  function sendMessage() {
+function sendMessage() {
 	if (userInput.value.trim() === '') {
 		return
 	}
 	chatStore.sendMessage(userInput.value)
 	userInput.value = ''
-  }
+}
 
-  function clearMessages() {
+function clearMessages() {
 	chatStore.clearMessages()
-  }
+}
 
-  async function handleQuestionOption(question: IQuestion, option: any) {
-		const answer = option.label
-		await chatStore.submitQuestionAnswer(answer)
-  }
+async function handleQuestionOption(question: IQuestion, option: IQuestionOption) {
+	const answer = option.label
+	answeredQuestionId.value = lastMessageWithQuestion.value?.id || null
 
-  function scrollToBottom() {
+	const userMessageText = t('chatAssistant.selectedOption', {option: answer})
+	chatStore.addMessage({
+		id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+		role: 'user',
+		content: userMessageText,
+		timestamp: Date.now(),
+	})
+
+	await chatStore.submitQuestionAnswer(answer)
+}
+
+function scrollToBottom() {
 	nextTick(() => {
 		if (messagesContainer.value) {
 			messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
 		}
 	})
-  }
+}
 
-  function formatTime(timestamp: number): string {
+function formatTime(timestamp: number): string {
 	const date = new Date(timestamp)
 	const hours = date.getHours().toString().padStart(2, '0')
 	const minutes = date.getMinutes().toString().padStart(2, '0')
 	return `${hours}:${minutes}`
-  }
+}
 
-  watch(
-	() => chatStore.messages.length,
+watch(
+	() => visibleMessages.value.length,
 	() => {
 		scrollToBottom()
 	},
-  )
+)
 
-  watch(
+watch(
 	() => chatStore.isOpen,
 	() => {
 		scrollToBottom()
 	},
-  )
+)
+
+const messageIdsRef = ref<string[]>([])
+const isHistoryLoaded = ref(false)
+
+watch(
+	chatStore.messages,
+	(newMessages, oldMessages) => {
+		if (!isHistoryLoaded.value && newMessages.length > 0) {
+			messageIdsRef.value = newMessages.map(msg => msg.id)
+			isHistoryLoaded.value = true
+			return
+		}
+
+		if (newMessages.length === 0) {
+			isProcessing.value = false
+			processingText.value = ''
+			messageIdsRef.value = []
+			isHistoryLoaded.value = false
+			return
+		}
+
+		const lastMessage = newMessages[newMessages.length - 1]
+		if (!lastMessage) return
+
+		const isNewMessage = !messageIdsRef.value.includes(lastMessage.id)
+		if (!isNewMessage) return
+
+		messageIdsRef.value = [...messageIdsRef.value, lastMessage.id]
+
+		if (lastMessage.type === 'tool_call') {
+			const toolName = lastMessage.toolName || lastMessage.content
+			processingText.value = t('chatAssistant.processingTool', {tool: toolName})
+			isProcessing.value = true
+		} else if (lastMessage.type === 'tool_result') {
+			if (processingText.value.includes('使用')) {
+				processingText.value = t('chatAssistant.processing')
+			}
+		} else if (lastMessage.type === 'assistant_response') {
+			isProcessing.value = false
+			processingText.value = ''
+		} else if (lastMessage.type === 'user_input' && !isProcessing.value) {
+			processingText.value = t('chatAssistant.processing')
+			isProcessing.value = true
+		}
+	},
+	{deep: true},
+)
 </script>
 
 <style lang="scss" scoped>
@@ -324,6 +429,45 @@
 	}
 }
 
+.loading-message {
+	.loading-content {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.75rem 1rem;
+		background: var(--grey-100);
+		border-radius: 1rem;
+		border-start-start-radius: 0.25rem;
+
+		.loading-dots {
+			display: flex;
+			gap: 0.25rem;
+
+			.dot {
+				inline-size: 0.375rem;
+				block-size: 0.375rem;
+				background: var(--primary);
+				border-radius: 50%;
+				animation: bounce 1.4s infinite ease-in-out both;
+
+				&:nth-child(1) {
+					animation-delay: -0.32s;
+				}
+
+				&:nth-child(2) {
+					animation-delay: -0.16s;
+				}
+			}
+		}
+
+		.loading-text {
+			font-size: 0.875rem;
+			color: var(--grey-700);
+			animation: pulse 1.5s ease-in-out infinite;
+		}
+	}
+}
+
 .button-navigation {
 	margin-block-start: 0.5rem;
 }
@@ -379,13 +523,19 @@
 	cursor: pointer;
 	transition: all 0.2s;
 
-	&:hover {
+	&:hover:not(.disabled) {
 		background: var(--grey-50);
 		border-color: var(--primary);
 	}
 
-	&:active {
+	&:active:not(.disabled) {
 		transform: scale(0.98);
+	}
+
+	&.disabled {
+		cursor: not-allowed;
+		opacity: 0.6;
+		background: var(--grey-100);
 	}
 }
 
@@ -414,9 +564,13 @@
 	background: var(--grey-800);
 	border-color: var(--grey-600);
 
-	&:hover {
+	&:hover:not(.disabled) {
 		background: var(--grey-700);
 		border-color: var(--primary);
+	}
+
+	&.disabled {
+		background: var(--grey-750);
 	}
 
 	.option-label {
@@ -518,6 +672,29 @@
 				border-color: var(--primary);
 			}
 		}
+	}
+}
+
+@keyframes bounce {
+	0%,
+	80%,
+	100% {
+		transform: scale(0);
+	}
+
+	40% {
+		transform: scale(1);
+	}
+}
+
+@keyframes pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+
+	50% {
+		opacity: 0.6;
 	}
 }
 </style>

@@ -1221,7 +1221,10 @@
     "placeholder": "Ask me anything...",
     "send": "Send",
     "close": "Close chat",
-    "clear": "Clear messages"
+    "clear": "Clear messages",
+    "selectedOption": "Selected: {option}",
+    "processing": "Assistant is processing...",
+    "processingTool": "Using {tool}..."
   },
   "date": {
     "altFormatLong": "j M Y, H:i",

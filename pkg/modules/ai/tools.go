@@ -614,9 +614,7 @@ Example usage:
 				EntityID:   task.ID,
 			}
 			if err := subscription.Create(s, authUser); err != nil {
-				return &ToolExecutionResult{
-					Error: fmt.Sprintf("Failed to create subscription: %v", err),
-				}, fmt.Errorf("failed to create subscription: %w", err)
+				task.IsFavorite = false
 			}
 
 			displayName := targetStaff.Name

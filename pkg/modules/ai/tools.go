@@ -472,15 +472,14 @@ Task properties:
 - IsFavorite: true (favorited by default)
 - Subscription: Subscribed to task notifications
 
-Supported time expressions (fill in the time_expression parameter):
+Supported time expressions (fill in the time_expression parameter in English):
 - Relative dates: "today", "tomorrow", "yesterday", "今天", "明天", "昨天"
 - Relative times: "in 2 hours", "30 minutes later", "after 3 days", "2小时后", "30分钟后"
 - Time periods: "next week", "this month", "last year", "下周", "本月", "明年"
 - Weekdays: "next Monday", "last Friday", "下周一", "上周五", "周五"
 - Absolute dates: "2024-12-25", "2024年12月25日", "12月25日"
 - Combinations: "tomorrow at 3pm", "下周一上午9点", "next Friday 5pm"
-Important: 使用英文关键词（如tomorrow、next Monday等）
-Important:保持时间表达式的简洁性
+Important: 输出日期表达式的时候,使用英文关键词(如tomorrow、next Monday等)
 
 Example usage:
 - "让小王马上写报告" -> HIGH priority, no time_expr, due in 1 day

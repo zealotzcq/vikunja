@@ -50,9 +50,7 @@ export default class ChatService {
 			throw new Error('No authentication token available')
 		}
 
-		const response = await this.http.get('/chat/history', {
-			company_id: companyID,
-		})
+		const response = await this.http.get(`/chat/history?company_id=${companyID}`)
 		return response.data
 	}
 
@@ -61,9 +59,7 @@ export default class ChatService {
 		if (!token) {
 			return
 		}
-		await this.http.delete('/chat/session', {
-			company_id: companyID,
-		})
+		await this.http.delete(`/chat/session?company_id=${companyID}`)
 	}
 
 	async submitQuestionAnswer(

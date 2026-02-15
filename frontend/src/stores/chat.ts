@@ -31,9 +31,14 @@ export const useChatStore = defineStore('chat', () => {
 		}
 	}
 
-	watch(() => companyStore.currentCompanyId, () => {
-		if (authStore.authUser && companyStore.currentCompanyId) {
+	watch(() => companyStore.currentCompanyId, (newCompanyId) => {
+		console.log('[Chat] currentCompanyId changed:', newCompanyId, 'authUser:', authStore.authUser)
+		if (authStore.authUser && newCompanyId) {
 			loadChatHistory()
+			if (isOpen.value) {
+				disconnectSSE()
+				connectSSE()
+			}
 		} else {
 			isAvailable.value = false
 		}
@@ -50,7 +55,12 @@ export const useChatStore = defineStore('chat', () => {
 			return
 		}
 
-		const streamUrl = `${window.API_URL}/chat/stream?token=${encodeURIComponent(token)}`
+		if (!companyStore.currentCompanyId) {
+			console.log('[Chat] No company ID available, skipping SSE connection')
+			return
+		}
+
+		const streamUrl = `${window.API_URL}/chat/stream?token=${encodeURIComponent(token)}&company_id=${companyStore.currentCompanyId}`
 		console.log('[Chat] Connecting to SSE at:', streamUrl)
 
 		eventSource = new EventSource(streamUrl)
@@ -94,8 +104,10 @@ export const useChatStore = defineStore('chat', () => {
 		if (!authStore.authUser) {
 			return
 		}
+		console.log('[Chat] Loading chat history, currentCompanyId:', companyStore.currentCompanyId, 'companies:', companyStore.companies)
 		if (!companyStore.currentCompanyId) {
 			console.log('[Chat] No company ID available, skipping load')
+			isAvailable.value = false
 			return
 		}
 		isLoading.value = true

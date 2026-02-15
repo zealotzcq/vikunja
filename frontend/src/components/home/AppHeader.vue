@@ -43,7 +43,7 @@
 				<DropdownItem
 					v-for="company in companyStore.companies"
 					:key="company.id"
-					@click="companyStore.setCurrentCompany(company.id)"
+					@click="handleCompanySwitch(company.id)"
 				>
 					{{ company.description }}
 				</DropdownItem>
@@ -196,6 +196,10 @@ const menuActive = computed(() => baseStore.menuActive)
 
 const imprintUrl = computed(() => configStore.legal.imprintUrl)
 const privacyPolicyUrl = computed(() => configStore.legal.privacyPolicyUrl)
+
+function handleCompanySwitch(companyId: number) {
+	companyStore.setCurrentCompany(companyId)
+}
 </script>
 
 <style lang="scss" scoped>

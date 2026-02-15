@@ -31,10 +31,15 @@ export const useChatStore = defineStore('chat', () => {
 		}
 	}
 
-	watch(() => companyStore.currentCompanyId, (newCompanyId) => {
+	watch(() => companyStore.currentCompanyId, async (newCompanyId) => {
 		console.log('[Chat] currentCompanyId changed:', newCompanyId, 'authUser:', authStore.authUser)
 		if (authStore.authUser && newCompanyId) {
-			loadChatHistory()
+			await loadChatHistory()
+			if (!isAvailable.value && isOpen.value) {
+				console.log('[Chat] User not allowed in this company, closing chat panel')
+				isOpen.value = false
+				return
+			}
 			if (isOpen.value) {
 				disconnectSSE()
 				connectSSE()

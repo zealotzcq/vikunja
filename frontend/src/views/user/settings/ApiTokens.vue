@@ -135,7 +135,7 @@ async function createToken() {
 	newToken.value.permissions = {}
 	Object.entries(newTokenPermissions.value).forEach(([key, ps]) => {
 		const all = Object.entries(ps)
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars
+			 
 			.filter(([_, v]) => v)
 			.map(p => p[0])
 		if (all.length > 0) {

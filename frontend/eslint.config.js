@@ -7,16 +7,25 @@ import { dirname } from 'node:path'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 export default [
+	{
+		ignores: [
+			'**/*.test.ts',
+			'dist/**',
+			'dist-dev/**',
+			'node_modules/**',
+			'tailwind.config.js',
+			'scripts/**/*.mjs',
+		],
+		rules: {
+			'no-empty-pattern': 'off',
+		},
+	},
 	js.configs.recommended,
 	...pluginVue.configs['flat/recommended'],
 	...vueTsEslintConfig(),
 	{
-		ignores: [
-			'**/*.test.ts',
-		],
-	},
-	{
 		rules: {
+			'no-empty-pattern': 'off',
 			'quotes': ['error', 'single'],
 			'comma-dangle': ['error', 'always-multiline'],
 			'semi': ['error', 'never'],
@@ -57,7 +66,7 @@ export default [
 				'error',
 				{
 					// 'args': 'all',
-					// 'argsIgnorePattern': '^_',
+					'argsIgnorePattern': '^_',
 					'caughtErrors': 'all',
 					'caughtErrorsIgnorePattern': '^_',
 					// 'destructuredArrayIgnorePattern': '^_',

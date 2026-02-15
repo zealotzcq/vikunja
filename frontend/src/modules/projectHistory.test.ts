@@ -18,7 +18,7 @@ test('return a saved history', () => {
 test('store project in history', () => {
 	let saved = {}
 	vi.spyOn(localStorage, 'getItem').mockImplementation(() => null)
-	vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, projects: string) => {
+	vi.spyOn(localStorage, 'setItem').mockImplementation((_key: string, projects: string) => {
 		saved = projects
 	})
 
@@ -29,7 +29,7 @@ test('store project in history', () => {
 test('store only the last 6 projects in history', () => {
 	let saved: string | null = null
 	vi.spyOn(localStorage, 'getItem').mockImplementation(() => saved)
-	vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, projects: string) => {
+	vi.spyOn(localStorage, 'setItem').mockImplementation((_key: string, projects: string) => {
 		saved = projects
 	})
 
@@ -46,7 +46,7 @@ test('store only the last 6 projects in history', () => {
 test('don\'t store the same project twice', () => {
 	let saved: string | null = null
 	vi.spyOn(localStorage, 'getItem').mockImplementation(() => saved)
-	vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, projects: string) => {
+	vi.spyOn(localStorage, 'setItem').mockImplementation((_key: string, projects: string) => {
 		saved = projects
 	})
 
@@ -58,7 +58,7 @@ test('don\'t store the same project twice', () => {
 test('move a project to the beginning when storing it multiple times', () => {
 	let saved: string | null = null
 	vi.spyOn(localStorage, 'getItem').mockImplementation(() => saved)
-	vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, projects: string) => {
+	vi.spyOn(localStorage, 'setItem').mockImplementation((_key: string, projects: string) => {
 		saved = projects
 	})
 
@@ -71,10 +71,10 @@ test('move a project to the beginning when storing it multiple times', () => {
 test('remove project from history', () => {
 	let saved: string | null = '[{"id": 1}]'
 	vi.spyOn(localStorage, 'getItem').mockImplementation(() => saved)
-	vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, projects: string) => {
+	vi.spyOn(localStorage, 'setItem').mockImplementation((_key: string, projects: string) => {
 		saved = projects
 	})
-	vi.spyOn(localStorage, 'removeItem').mockImplementation((key: string) => {
+	vi.spyOn(localStorage, 'removeItem').mockImplementation((_key: string) => {
 		saved = null
 	})
 

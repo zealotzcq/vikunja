@@ -26,7 +26,7 @@ const PREFIXED_SCSS_STYLES = `@use "sass:math";
 /*
 ** Configure sentry plugin
 */
-// @ts-ignore
+// @ts-expect-error ViteSentryPluginOptions type might not match the return type
 function getSentryConfig(env: ImportMetaEnv): ViteSentryPluginOptions {
 	return {
 		skipEnvironmentCheck: true,
@@ -111,7 +111,7 @@ function getBuildConfig(env: Record<string, string>) {
 					postcssPresetEnv({
 						features: {
 							'logical-properties-and-values': false,
-						}
+						},
 					}),
 				],
 			},

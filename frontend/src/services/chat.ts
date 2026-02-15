@@ -7,7 +7,7 @@ export default class ChatService {
 	async sendMessage(
 		message: string,
 		pageRoute: string,
-		pageParams: Record<string, any> = {},
+		pageParams: Record<string, unknown> = {},
 		messageID?: string,
 		companyID: number | undefined = undefined,
 	): Promise<void> {
@@ -40,12 +40,12 @@ export default class ChatService {
 			timestamp: number
 			navigationCommand?: {
 				routeName: string
-				params?: Record<string, any>
+				params?: Record<string, unknown>
 				label: string
 			}
 			buttonNavigation?: {
 				routeName: string
-				params?: Record<string, any>
+				params?: Record<string, unknown>
 				label: string
 			}
 			questionData?: string

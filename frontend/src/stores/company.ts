@@ -40,8 +40,9 @@ export const useCompanyStore = defineStore('company', () => {
 					currentCompanyId.value = companies.value[0].id
 				}
 			}
-		} catch (err: any) {
-			error.value = err?.message || 'Failed to load companies'
+		} catch (err) {
+			const errObj = err as {message?: string}
+			error.value = errObj?.message || 'Failed to load companies'
 			console.error('[Company] Failed to load companies:', err)
 		} finally {
 			isLoading.value = false
@@ -51,7 +52,7 @@ export const useCompanyStore = defineStore('company', () => {
 	async function loadRelationsAsSubordinate() {
 		try {
 			relations.value = await companyService.getRelationsAsSubordinate()
-		} catch (err: any) {
+		} catch (err) {
 			console.error('[Company] Failed to load relations:', err)
 		}
 	}

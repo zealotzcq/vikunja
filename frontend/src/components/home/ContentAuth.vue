@@ -10,15 +10,12 @@
 		<div
 			class="app-container"
 			:class="{'has-background': background || blurHash}"
-			:style="{'background-image': blurHash && `url(${blurHash})`}"
+			:style="blurHash ? {'background-image': `url(${blurHash})`} : undefined"
 		>
 			<div
 				:class="{'is-visible': background}"
 				class="app-container-background background-fade-in d-print-none"
-				:style="{
-					'background-image': background && `url(${background})`,
-					'filter': backgroundBrightness && `brightness(${backgroundBrightness}%)`
-				}"
+				:style="background ? {'background-image': `url(${background})`} : backgroundBrightness ? {'filter': `brightness(${backgroundBrightness}%)`} : undefined"
 			/>
 			<Navigation class="d-print-none" />
 			<main
@@ -74,7 +71,7 @@
 </template>
 
 <script lang="ts" setup>
-import {watch, computed, onMounted} from 'vue'
+import {watch, computed} from 'vue'
 import {useRoute} from 'vue-router'
 
 import Navigation from '@/components/home/Navigation.vue'
@@ -86,7 +83,6 @@ import {useBaseStore} from '@/stores/base'
 import {useLabelStore} from '@/stores/labels'
 import {useProjectStore} from '@/stores/projects'
 import {useChatStore} from '@/stores/chat'
-import {useCompanyStore} from '@/stores/company'
 
 import {useRouteWithModal} from '@/composables/useRouteWithModal'
 import {useRenewTokenOnFocus} from '@/composables/useRenewTokenOnFocus'
@@ -95,7 +91,6 @@ import {useAuthStore} from '@/stores/auth'
 
 const authStore = useAuthStore()
 const chatStore = useChatStore()
-const companyStore = useCompanyStore()
 const baseStore = useBaseStore()
 
 watch(() => authStore.authUser, (user) => {

@@ -24,12 +24,12 @@ function setupStore() {
 }
 
 describe('filter labels', () => {
-  beforeEach(() => {
-    // creates a fresh pinia and make it active so it's automatically picked
-    // up by any useStore() call without having to pass it to it:
-    // `useStore(pinia)`
-    setActivePinia(createPinia())
-  })
+	beforeEach(() => {
+		// creates a fresh pinia and make it active so it's automatically picked
+		// up by any useStore() call without having to pass it to it:
+		// `useStore(pinia)`
+		setActivePinia(createPinia())
+	})
 
 	it('should return an empty array for an empty query', () => {
 		const store = setupStore()

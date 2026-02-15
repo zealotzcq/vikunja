@@ -1,6 +1,5 @@
 import {test, expect} from '../../support/fixtures'
 import {ProjectFactory} from '../../factories/project'
-import {seed} from '../../support/seed'
 import {TaskFactory} from '../../factories/task'
 import {BucketFactory} from '../../factories/bucket'
 import {updateUserSettings} from '../../support/updateUserSettings'
@@ -62,7 +61,7 @@ test.describe('Home Page Task Overview', () => {
 	})
 
 	test('Should show a new task with a very soon due date at the top', async ({authenticatedPage: page, apiContext}) => {
-		const {tasks, project} = await seedTasks(apiContext, 49)
+		const {project} = await seedTasks(apiContext, 49)
 		const newTaskTitle = 'New Task'
 
 		await page.goto('/')

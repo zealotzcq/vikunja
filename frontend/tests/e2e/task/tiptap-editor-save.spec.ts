@@ -3,7 +3,7 @@ import {TaskFactory} from '../../factories/task'
 import {ProjectFactory} from '../../factories/project'
 
 test.describe('TipTap Editor Save', () => {
-	test.beforeEach(async ({authenticatedPage: page}) => {
+	test.beforeEach(async () => {
 		await ProjectFactory.create(1)
 		await TaskFactory.truncate()
 	})
@@ -68,11 +68,11 @@ test.describe('TipTap Editor Save', () => {
 		const insertBeforeErrors = [
 			...pageErrors.filter(e =>
 				e.message.includes('insertBefore') ||
-				e.message.includes("Cannot read properties of null")
+				e.message.includes('Cannot read properties of null'),
 			),
 			...consoleErrors.filter(msg =>
 				msg.includes('insertBefore') ||
-				msg.includes("Cannot read properties of null")
+				msg.includes('Cannot read properties of null'),
 			),
 		]
 
@@ -144,11 +144,11 @@ test.describe('TipTap Editor Save', () => {
 			const domErrors = [
 				...pageErrors.filter(e =>
 					e.message.includes('insertBefore') ||
-					e.message.includes("Cannot read properties of null")
+					e.message.includes('Cannot read properties of null'),
 				),
 				...consoleErrors.filter(msg =>
 					msg.includes('insertBefore') ||
-					msg.includes("Cannot read properties of null")
+					msg.includes('Cannot read properties of null'),
 				),
 			]
 

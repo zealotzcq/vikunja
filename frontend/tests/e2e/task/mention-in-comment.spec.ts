@@ -5,7 +5,7 @@ import {TaskCommentFactory} from '../../factories/task_comment'
 import {createDefaultViews} from '../project/prepareProjects'
 
 test.describe('Mention in task comment', () => {
-	test.beforeEach(async ({authenticatedPage: page}) => {
+	test.beforeEach(async () => {
 		await ProjectFactory.create(1)
 		await createDefaultViews(1)
 		await TaskFactory.create(1, {id: 1})

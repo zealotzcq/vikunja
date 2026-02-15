@@ -9,12 +9,12 @@ export interface IChatMessage {
 	timestamp: number
 	navigationCommand?: {
 		routeName: string
-		params?: Record<string, any>
+		params?: Record<string, unknown>
 		label: string
 	}
 	buttonNavigation?: {
 		routeName: string
-		params?: Record<string, any>
+		params?: Record<string, unknown>
 		label: string
 	}
 	questionData?: string
@@ -27,7 +27,7 @@ export interface IChatMessage {
 
 export interface INavigationCommand {
 	routeName: string
-	params?: Record<string, any>
+	params?: Record<string, unknown>
 	label: string
 }
 

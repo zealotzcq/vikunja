@@ -130,7 +130,7 @@ describe('FormField', () => {
 
 		const wrapper = mount({
 			components: {FormField},
-			template: `<FormField @keyup.enter="onSubmit" />`,
+			template: '<FormField @keyup.enter="onSubmit" />',
 			setup() {
 				return {onSubmit}
 			},

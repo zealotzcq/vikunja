@@ -41,16 +41,6 @@ interface Task {
 	index: number;
 }
 
-interface User {
-	id: number;
-	username: string;
-}
-
-interface Label {
-	id: number;
-	title: string;
-}
-
 interface Bucket {
 	id: number;
 	project_view_id: number;
@@ -84,7 +74,7 @@ test.describe('Task', () => {
 	let projects: Project[]
 	let buckets: Bucket[]
 
-	test.beforeEach(async ({authenticatedPage: page}) => {
+	test.beforeEach(async () => {
 		projects = await ProjectFactory.create(1) as Project[]
 		const views = await createDefaultViews(projects[0].id)
 		buckets = await BucketFactory.create(1, {
@@ -185,14 +175,14 @@ test.describe('Task', () => {
 	})
 
 	test.describe('Task Detail View', () => {
-		test.beforeEach(async ({authenticatedPage: page}) => {
+		test.beforeEach(async () => {
 			await TaskCommentFactory.truncate()
 			await LabelTaskFactory.truncate()
 			await TaskAttachmentFactory.truncate()
 		})
 
 		test('provides back navigation to the project in the list view', async ({authenticatedPage: page}) => {
-			const tasks = await TaskFactory.create(1)
+			await TaskFactory.create(1)
 			const loadTasksPromise = page.waitForResponse(response =>
 				response.url().includes('/projects/1/views/') && response.url().includes('/tasks'),
 			)
@@ -205,7 +195,7 @@ test.describe('Task', () => {
 		})
 
 		test('provides back navigation to the project in the table view', async ({authenticatedPage: page}) => {
-			const tasks = await TaskFactory.create(1)
+			await TaskFactory.create(1)
 			const loadTasksPromise = page.waitForResponse(response =>
 				response.url().includes('/projects/1/views/') && response.url().includes('/tasks'),
 			)
@@ -889,7 +879,6 @@ test.describe('Task', () => {
 				id: 1,
 				project_id: projects[0].id,
 			})
-			const labels = await LabelFactory.create(1)
 			await LabelTaskFactory.truncate()
 			await TaskBucketFactory.create(1, {
 				task_id: tasks[0].id,

@@ -3,14 +3,16 @@ import {TaskFactory} from '../../factories/task'
 import {ProjectFactory} from '../../factories/project'
 import {createProjects} from './prepareProjects'
 
+type ProjectWithViews = ProjectFactory & { views?: unknown[] }
+
 test.describe('Projects', () => {
 	test.use({
 		// Use authenticated page for all tests
 	})
 
-	let projects: any[]
+	let projects: ProjectWithViews[]
 
-	test.beforeEach(async ({authenticatedPage}) => {
+	test.beforeEach(async () => {
 		projects = await createProjects()
 	})
 

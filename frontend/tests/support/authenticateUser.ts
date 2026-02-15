@@ -1,12 +1,12 @@
 import type {Page, APIRequestContext} from '@playwright/test'
-import {UserFactory} from '../factories/user'
+import {UserFactory, type UserAttributes} from '../factories/user'
 import {TEST_PASSWORD} from './constants'
 
 /**
  * This authenticates a user and puts the token in local storage which allows us to perform authenticated requests.
  * Returns the user and token for use in tests that need to make authenticated API calls.
  */
-export async function login(page: Page | null, apiContext: APIRequestContext, user?: any) {
+export async function login(page: Page | null, apiContext: APIRequestContext, user?: UserAttributes) {
 	if (!user) {
 		throw new Error('Needs user')
 	}

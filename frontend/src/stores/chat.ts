@@ -188,11 +188,12 @@ export const useChatStore = defineStore('chat', () => {
 			if (isMobile.value && isOpen.value === false) {
 				isOpen.value = true
 			}
-		} catch (err: any) {
+		} catch (err) {
+			const errObj = err as {response?: {status: number}}
 			console.error('[Chat] Failed to load chat history:', err)
-			if (err?.response?.status === 403) {
+			if (errObj?.response?.status === 403) {
 				isAvailable.value = false
-			} else if (err?.response?.status === 401) {
+			} else if (errObj?.response?.status === 401) {
 				error.value = '请先登录以使用聊天助手'
 			} else {
 				console.error('[Chat] Failed to load chat history:', err)
@@ -202,7 +203,7 @@ export const useChatStore = defineStore('chat', () => {
 		}
 	}
 
-	async function executeButtonNavigation(routeName: string, params?: Record<string, any>) {
+	async function executeButtonNavigation(routeName: string, params?: Record<string, unknown>) {
 		console.log('[Chat] Executing button navigation:', {routeName, params})
 		router.push({
 			name: routeName,
@@ -222,10 +223,11 @@ export const useChatStore = defineStore('chat', () => {
 
 		try {
 			await chatService.submitQuestionAnswer(answer, companyStore.currentCompanyId || undefined)
-		} catch (err: any) {
-			if (err?.response?.status === 401) {
+		} catch (err) {
+			const errObj = err as {response?: {status: number}; message?: string}
+			if (errObj?.response?.status === 401) {
 				error.value = '请先登录以使用聊天助手'
-			} else if (err?.message === 'No authentication token available') {
+			} else if (errObj?.message === 'No authentication token available') {
 				error.value = '请先登录以使用聊天助手'
 			} else {
 				error.value = '提交答案失败，请稍后重试'
@@ -263,10 +265,11 @@ export const useChatStore = defineStore('chat', () => {
 				msgId,
 				companyStore.currentCompanyId || undefined,
 			)
-		} catch (err: any) {
-			if (err?.response?.status === 401) {
+		} catch (err) {
+			const errObj = err as {response?: {status: number}; message?: string}
+			if (errObj?.response?.status === 401) {
 				error.value = '请先登录以使用聊天助手'
-			} else if (err?.message === 'No authentication token available') {
+			} else if (errObj?.message === 'No authentication token available') {
 				error.value = '请先登录以使用聊天助手'
 			} else {
 				error.value = '发送消息失败，请稍后重试'

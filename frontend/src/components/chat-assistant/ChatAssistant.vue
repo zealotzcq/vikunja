@@ -202,12 +202,13 @@ async function handleQuestionOption(question: IQuestion, option: IQuestionOption
 	answeredQuestionId.value = lastMessageWithQuestion.value?.id || null
 
 	const userMessageText = t('chatAssistant.selectedOption', {option: answer})
-	chatStore.addMessage({
-		id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-		role: 'user',
-		content: userMessageText,
-		timestamp: Date.now(),
-	})
+		chatStore.addMessage({
+			id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+			type: 'user_input',
+			role: 'user',
+			content: userMessageText,
+			timestamp: Date.now(),
+		})
 
 	await chatStore.submitQuestionAnswer(answer)
 }
@@ -246,7 +247,7 @@ const isHistoryLoaded = ref(false)
 
 watch(
 	chatStore.messages,
-	(newMessages, oldMessages) => {
+	(newMessages) => {
 		if (!isHistoryLoaded.value && newMessages.length > 0) {
 			messageIdsRef.value = newMessages.map(msg => msg.id)
 			isHistoryLoaded.value = true
@@ -300,11 +301,11 @@ watch(
 	z-index: 3000;
 
 	@media screen and (max-width: $tablet) {
-		inset: auto 0 0 0;
-		height: 75dvh;
+		inset: auto 0 0;
+		block-size: 75dvh;
 		border-radius: 0;
 		border-inline-start: none;
-		border-top: none;
+		border-block-start: none;
 		transform: translateY(0);
 		transition: transform 0.3s ease;
 	}
@@ -594,10 +595,10 @@ watch(
 .error-message {
 	inline-size: 100%;
 	padding: 0.5rem;
-	background: #fee;
-	border: 1px solid #fcc;
+	background: #ffeeee;
+	border: 1px solid #ffcccc;
 	border-radius: 0.375rem;
-	color: #c33;
+	color: #cc3333;
 	font-size: 0.875rem;
 	margin-block-end: 0.5rem;
 }
@@ -639,7 +640,7 @@ watch(
 .dark .chat-assistant-panel {
 	background: var(--grey-900);
 	border-inline-start-color: var(--grey-700);
-	border-top-color: var(--grey-700);
+	border-block-start-color: var(--grey-700);
 
 	.chat-header {
 		border-block-end-color: var(--grey-700);
@@ -661,7 +662,7 @@ watch(
 	}
 
 	.chat-input {
-		border-block-top-color: var(--grey-700);
+		border-block-start-color: var(--grey-700);
 
 		.input {
 			background: var(--grey-800);

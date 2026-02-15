@@ -37,7 +37,7 @@ async function login(page: Page): Promise<void> {
 }
 
 test.describe('Login', () => {
-	test.beforeEach(async ({page, apiContext}) => {
+	test.beforeEach(async ({page}) => {
 		await UserFactory.create(1, {username: credentials.username})
 		await page.clock.setFixedTime(new Date(1625656161057)) // 13:00
 	})

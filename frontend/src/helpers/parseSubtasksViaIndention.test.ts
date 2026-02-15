@@ -109,7 +109,7 @@ task two`, PrefixMode.Default)
 	})
 	it('Should add the list of the parent task as list for all sub tasks', () => {
 		const tasks = parseSubtasksViaIndention(
-`parent task +list
+			`parent task +list
   sub task 1
   sub task 2`, PrefixMode.Default)
 		
@@ -120,7 +120,7 @@ task two`, PrefixMode.Default)
 	})
 	it('Should clean the indention if there is indention on the first line', () => {
 		const tasks = parseSubtasksViaIndention(
-`  parent task
+			`  parent task
   sub task one
     sub task two`, PrefixMode.Default)
 

@@ -29,7 +29,7 @@ function getFilterInput(page) {
 }
 
 test.describe('Filter Autocomplete', () => {
-	test.beforeEach(async ({authenticatedPage, currentUser}) => {
+	test.beforeEach(async ({currentUser}) => {
 		// authenticatedPage fixture triggers apiContext which sets up Factory.request
 		await ProjectFactory.truncate()
 		await TaskFactory.truncate()

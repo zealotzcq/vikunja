@@ -31,7 +31,7 @@ describe('shouldShowTaskInListView', () => {
 	})
 
 	it('should show subtasks when parent is in a different project', () => {
-		const parentTask: Partial<ITask> = {
+		const _parentTask: Partial<ITask> = {
 			id: 1,
 			title: 'Parent Task in Project A',
 			projectId: 100,

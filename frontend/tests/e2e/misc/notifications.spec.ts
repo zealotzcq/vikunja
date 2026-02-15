@@ -7,8 +7,8 @@ test.describe('Duplicate Notifications', () => {
 
 		// Trigger the same notification twice via the Vue app using $notify directly
 		await page.evaluate(() => {
-			const app = document.getElementById('app')
-			const vueApp = (app as any).__vue_app__
+			const app = document.getElementById('app') as unknown as { __vue_app__: { config: { globalProperties: { $notify: (notification: unknown) => void } } } }
+			const vueApp = app.__vue_app__
 			vueApp.config.globalProperties.$notify({
 				type: 'success',
 				title: 'Test',

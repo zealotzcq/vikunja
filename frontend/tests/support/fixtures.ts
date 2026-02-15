@@ -1,11 +1,12 @@
 import {test as base, type APIRequestContext, type Page} from '@playwright/test'
 import {Factory} from './factory'
 import {login, createFakeUser} from './authenticateUser'
+import type {UserAttributes} from '../factories/user'
 
 export const test = base.extend<{
 	apiContext: APIRequestContext;
 	authenticatedPage: Page;
-	currentUser: any;
+	currentUser: UserAttributes;
 	userToken: string;
 }>({
 	apiContext: async ({playwright}, use) => {
@@ -19,7 +20,8 @@ export const test = base.extend<{
 		await apiContext.dispose()
 	},
 
-	currentUser: async ({apiContext}, use) => {
+	currentUser: async ({}, use) => {
+		 
 		const user = await createFakeUser()
 		await use(user)
 	},
@@ -30,7 +32,7 @@ export const test = base.extend<{
 	},
 
 	authenticatedPage: async ({page, apiContext, currentUser}, use) => {
-		const {token} = await login(page, apiContext, currentUser)
+		await login(page, apiContext, currentUser)
 		await use(page)
 	},
 })

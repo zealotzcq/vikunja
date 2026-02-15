@@ -34,3 +34,27 @@ func GetUserCompanies(c *echo.Context) error {
 
 	return c.JSON(http.StatusOK, companies)
 }
+
+// GetUserRelationsAsSubordinate retrieves all company relations where the user is a subordinate
+func GetUserRelationsAsSubordinate(c *echo.Context) error {
+	a, err := auth.GetAuthFromClaims(c)
+	if err != nil {
+		return err
+	}
+
+	if _, is := a.(*models.LinkSharing); is {
+		return echo.ErrForbidden
+	}
+
+	userID := a.GetID()
+
+	s := db.NewSession()
+	defer s.Close()
+
+	relations, err := company.GetUserRelationsAsSubordinate(s, userID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	return c.JSON(http.StatusOK, relations)
+}

@@ -465,9 +465,9 @@ func (a *Agent) buildSystemPrompt(agentCtx *AgentContext) string {
 		sb.WriteString("\n- Subordinate Staff:\n")
 		for _, staff := range agentCtx.SubordinateStaff {
 			if staff.Name != "" {
-				sb.WriteString(fmt.Sprintf("  - %s (ID: %d, Username: %s)\n", staff.Name, staff.UserID, staff.Username))
+				sb.WriteString(fmt.Sprintf("  - %s (ID: %d, Username: %s, Project ID: %d)\n", staff.Name, staff.UserID, staff.Username, staff.ProjectID))
 			} else {
-				sb.WriteString(fmt.Sprintf("  - %s (ID: %d, Username: %s)\n", staff.Username, staff.UserID, staff.Username))
+				sb.WriteString(fmt.Sprintf("  - %s (ID: %d, Username: %s, Project ID: %d)\n", staff.Username, staff.UserID, staff.Username, staff.ProjectID))
 			}
 		}
 	}

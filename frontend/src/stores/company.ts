@@ -2,12 +2,14 @@ import {ref, computed} from 'vue'
 import {defineStore, acceptHMRUpdate} from 'pinia'
 import CompanyService from '@/services/company'
 import type {ICompany} from '@/modelTypes/ICompany'
+import type {ICompanyRelation} from '@/services/company'
 
 export const useCompanyStore = defineStore('company', () => {
 	const companies = ref<ICompany[]>([])
 	const currentCompanyId = ref<number | null>(null)
 	const isLoading = ref(false)
 	const error = ref<string | null>(null)
+	const relations = ref<ICompanyRelation[]>([])
 
 	const companyService = new CompanyService()
 
@@ -46,6 +48,14 @@ export const useCompanyStore = defineStore('company', () => {
 		}
 	}
 
+	async function loadRelationsAsSubordinate() {
+		try {
+			relations.value = await companyService.getRelationsAsSubordinate()
+		} catch (err: any) {
+			console.error('[Company] Failed to load relations:', err)
+		}
+	}
+
 	function setCurrentCompany(companyId: number) {
 		currentCompanyId.value = companyId
 		localStorage.setItem('vikunja-current-company-id', String(companyId))
@@ -57,7 +67,9 @@ export const useCompanyStore = defineStore('company', () => {
 		currentCompany,
 		isLoading,
 		error,
+		relations,
 		loadCompanies,
+		loadRelationsAsSubordinate,
 		setCurrentCompany,
 	}
 })

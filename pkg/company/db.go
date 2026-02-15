@@ -163,3 +163,61 @@ func (e ErrInvalidInviteCode) HTTPError() string {
 func (e ErrInvalidInviteCode) HTTPCode() int {
 	return 400
 }
+
+type CompanyRelationWithSuperior struct {
+	ID                int64  `json:"id"`
+	CompanyID         int64  `json:"company_id"`
+	SuperiorUserID    int64  `json:"superior_user_id"`
+	SubordinateUserID int64  `json:"subordinate_user_id"`
+	ProjectID         int64  `json:"project_id"`
+	Created           int64  `json:"created"`
+	Updated           int64  `json:"updated"`
+	SuperiorUsername  string `json:"superior_username"`
+}
+
+func GetUserRelationsAsSubordinate(s *xorm.Session, userID int64) ([]*CompanyRelationWithSuperior, error) {
+	var relations []*CompanyRelation
+	err := s.Where("subordinate_user_id = ?", userID).Find(&relations)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(relations) == 0 {
+		return []*CompanyRelationWithSuperior{}, nil
+	}
+
+	var superiorUserIDs []int64
+	for _, rel := range relations {
+		superiorUserIDs = append(superiorUserIDs, rel.SuperiorUserID)
+	}
+
+	var users []struct {
+		ID       int64
+		Username string
+	}
+	err = s.Table("users").In("id", superiorUserIDs).Find(&users)
+	if err != nil {
+		return nil, err
+	}
+
+	usernameMap := make(map[int64]string)
+	for _, user := range users {
+		usernameMap[user.ID] = user.Username
+	}
+
+	var result []*CompanyRelationWithSuperior
+	for _, rel := range relations {
+		result = append(result, &CompanyRelationWithSuperior{
+			ID:                rel.ID,
+			CompanyID:         rel.CompanyID,
+			SuperiorUserID:    rel.SuperiorUserID,
+			SubordinateUserID: rel.SubordinateUserID,
+			ProjectID:         rel.ProjectID,
+			Created:           rel.Created,
+			Updated:           rel.Updated,
+			SuperiorUsername:  usernameMap[rel.SuperiorUserID],
+		})
+	}
+
+	return result, nil
+}

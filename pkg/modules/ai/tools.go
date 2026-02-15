@@ -5,6 +5,12 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
+
+	"code.vikunja.io/api/pkg/db"
+	"code.vikunja.io/api/pkg/models"
+	"code.vikunja.io/api/pkg/modules/chat_session"
+	"code.vikunja.io/api/pkg/user"
 )
 
 // Tool represents a function that the agent can call
@@ -384,6 +390,238 @@ Usage examples:
 
 	if err := tm.RegisterTool(skillTool); err != nil {
 		return fmt.Errorf("failed to register skill tool: %w", err)
+	}
+
+	assignTaskTool := &Tool{
+		Name: "assign_task",
+		Description: `Assign a task to a subordinate staff member. Use this when the user wants to assign work or a task to someone.
+
+The system context contains subordinate staff information including:
+- User ID, Username, Name, and Project ID for each subordinate
+
+Priority determination (based on user's tone/phrasing):
+- HIGH priority: When user says "马上", "立即", "尽快", "urgent", "immediately", etc.
+- MEDIUM priority (default): Normal tone without urgency indicators
+- LOW priority: When user says "有空", "有时间", "不急", "when convenient", "no rush", etc.
+
+Due date calculation:
+- HIGH priority: 1 day from now
+- MEDIUM priority: 3 days from now
+- LOW priority: 7 days from now
+
+Task properties:
+- Start date: Now (current time)
+- IsFavorite: true (favorited by default)
+- Subscription: Subscribed to task notifications
+
+If you cannot uniquely identify which staff member the user is referring to (e.g., multiple staff have similar names), use the 'question' tool to ask the user to clarify.
+
+Example usage:
+- "让小王马上写报告" -> HIGH priority, due in 1 day
+- "叫李四有空的时候整理文档" -> LOW priority, due in 7 days
+- "给张三安排个任务" -> MEDIUM priority, due in 3 days`,
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"user_identifier": map[string]interface{}{
+					"type":        "string",
+					"description": "The name or identifier of the subordinate staff member to assign the task to. Must match a subordinate in the context.",
+				},
+				"task_title": map[string]interface{}{
+					"type":        "string",
+					"description": "The title or description of the task to assign",
+				},
+				"priority": map[string]interface{}{
+					"type":        "string",
+					"description": "Priority level: 'high', 'medium', or 'low'. Default is 'medium' if not specified.",
+					"enum":        []string{"high", "medium", "low"},
+				},
+			},
+			"required": []string{"user_identifier", "task_title"},
+		},
+		Execute: func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) {
+			userIdentifier, ok := params["user_identifier"].(string)
+			if !ok || userIdentifier == "" {
+				return &ToolExecutionResult{
+					Error: "user_identifier is required",
+				}, fmt.Errorf("user_identifier is required")
+			}
+
+			taskTitle, ok := params["task_title"].(string)
+			if !ok || taskTitle == "" {
+				return &ToolExecutionResult{
+					Error: "task_title is required",
+				}, fmt.Errorf("task_title is required")
+			}
+
+			priority := "medium"
+			if p, ok := params["priority"].(string); ok {
+				priority = p
+			}
+
+			var priorityValue int64
+			var daysToAdd int
+
+			switch strings.ToLower(priority) {
+			case "high":
+				priorityValue = 6
+				daysToAdd = 1
+			case "low":
+				priorityValue = 3
+				daysToAdd = 7
+			default:
+				priorityValue = 4
+				daysToAdd = 3
+			}
+
+			var targetStaff *chat_session.SubordinateStaffInfo
+			var matchingStaff []*chat_session.SubordinateStaffInfo
+
+			for _, staff := range ctx.SubordinateStaff {
+				staffName := staff.Name
+				if staffName == "" {
+					staffName = staff.Username
+				}
+
+				if strings.Contains(strings.ToLower(staffName), strings.ToLower(userIdentifier)) ||
+					strings.Contains(strings.ToLower(staff.Username), strings.ToLower(userIdentifier)) {
+					matchingStaff = append(matchingStaff, &staff)
+				}
+			}
+
+			if len(matchingStaff) == 0 {
+				return &ToolExecutionResult{
+					Error: fmt.Sprintf("No staff found matching '%s'", userIdentifier),
+				}, fmt.Errorf("no staff found matching '%s'", userIdentifier)
+			}
+
+			if len(matchingStaff) > 1 {
+				var options []interface{}
+				for _, staff := range matchingStaff {
+					displayName := staff.Name
+					if displayName == "" {
+						displayName = staff.Username
+					}
+					options = append(options, map[string]interface{}{
+						"label":       displayName,
+						"description": fmt.Sprintf("Username: %s", staff.Username),
+					})
+				}
+
+				questionsData := map[string]interface{}{
+					"questions": []map[string]interface{}{
+						{
+							"question": fmt.Sprintf("'%s' 匹配到多人，请选择具体的人员：", userIdentifier),
+							"header":   "选择人员",
+							"options":  options,
+							"multiple": false,
+						},
+					},
+				}
+
+				questionsJSON, err := json.Marshal(questionsData)
+				if err != nil {
+					return &ToolExecutionResult{
+						Error: fmt.Sprintf("failed to marshal questions: %v", err),
+					}, fmt.Errorf("failed to marshal questions: %w", err)
+				}
+
+				ctx.QuestionData = string(questionsJSON)
+				ctx.WaitingForAnswer = true
+
+				staffIDs := make([]int64, len(matchingStaff))
+				for i, staff := range matchingStaff {
+					staffIDs[i] = staff.UserID
+				}
+
+				return &ToolExecutionResult{
+					Error: "Multiple matching staff found, asking user to clarify",
+					StopCommand: &ToolStopCommand{
+						Response: fmt.Sprintf("'%s' 匹配到多人，请选择具体的人员", userIdentifier),
+						Metadata: map[string]interface{}{
+							"question":   true,
+							"candidates": staffIDs,
+						},
+					},
+				}, nil
+			}
+
+			targetStaff = matchingStaff[0]
+
+			if targetStaff.ProjectID <= 0 {
+				return &ToolExecutionResult{
+					Error: fmt.Sprintf("Staff member %s does not have an associated project", targetStaff.Username),
+				}, fmt.Errorf("staff member %s does not have an associated project", targetStaff.Username)
+			}
+
+			s := db.NewSession()
+			if s == nil {
+				return &ToolExecutionResult{
+					Error: "Failed to create database session",
+				}, fmt.Errorf("failed to create database session")
+			}
+			defer s.Close()
+
+			authUser := &user.User{
+				ID: ctx.UserID,
+			}
+
+			now := time.Now()
+			dueDate := now.AddDate(0, 0, daysToAdd)
+
+			task := &models.Task{
+				Title:      taskTitle,
+				ProjectID:  targetStaff.ProjectID,
+				StartDate:  now,
+				DueDate:    dueDate,
+				Priority:   priorityValue,
+				IsFavorite: true,
+				Assignees:  []*user.User{{ID: targetStaff.UserID}},
+			}
+
+			err := task.Create(s, authUser)
+			if err != nil {
+				return &ToolExecutionResult{
+					Error: fmt.Sprintf("Failed to create task: %v", err),
+				}, fmt.Errorf("failed to create task: %w", err)
+			}
+
+			subscription := &models.Subscription{
+				EntityType: models.SubscriptionEntityTask,
+				EntityID:   task.ID,
+			}
+			if err := subscription.Create(s, authUser); err != nil {
+				return &ToolExecutionResult{
+					Error: fmt.Sprintf("Failed to create subscription: %v", err),
+				}, fmt.Errorf("failed to create subscription: %w", err)
+			}
+
+			displayName := targetStaff.Name
+			if displayName == "" {
+				displayName = targetStaff.Username
+			}
+
+			response := fmt.Sprintf("已成功为 %s 分配任务：%s\n", displayName, taskTitle)
+			response += fmt.Sprintf("- 优先级：%s\n", map[string]string{"high": "高", "medium": "中", "low": "低"}[priority])
+			response += fmt.Sprintf("- 截止日期：%s\n", dueDate.Format("2006-01-02"))
+			response += "- 已收藏\n"
+			response += "- 已订阅通知"
+
+			return &ToolExecutionResult{
+				Result: response,
+				Metadata: map[string]interface{}{
+					"task_id":     task.ID,
+					"assigned_to": targetStaff.UserID,
+					"project_id":  targetStaff.ProjectID,
+					"priority":    priority,
+					"due_date":    dueDate.Format(time.RFC3339),
+				},
+			}, nil
+		},
+	}
+
+	if err := tm.RegisterTool(assignTaskTool); err != nil {
+		return fmt.Errorf("failed to register assign_task tool: %w", err)
 	}
 
 	return nil

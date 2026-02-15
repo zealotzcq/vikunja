@@ -73,12 +73,13 @@ def check_user_exists(username, db_path=DEFAULT_DB_PATH):
         conn.close()
 
 
-def add_user_to_company(username, email, company_id, role, api_url=DEFAULT_API_URL, db_path=DEFAULT_DB_PATH):
+def add_user_to_company(username, email, nickname, company_id, role, api_url=DEFAULT_API_URL, db_path=DEFAULT_DB_PATH):
     """将用户加入公司（业务层接口）
 
     参数:
         username: 用户名
         email: 邮箱
+        nickname: 昵称
         company_id: 公司ID
         role: 角色
         api_url: API URL (默认使用本地API)
@@ -155,7 +156,7 @@ def add_user_to_company(username, email, company_id, role, api_url=DEFAULT_API_U
             settings_data = {}
 
         # 更新设置
-        settings_data['name'] = username
+        settings_data['name'] = nickname
         settings_data['discoverable_by_name'] = True
         settings_data['discoverable_by_email'] = True
         settings_data['language'] = 'zh-CN'
@@ -163,7 +164,7 @@ def add_user_to_company(username, email, company_id, role, api_url=DEFAULT_API_U
         # 提交更新
         settings_result = update_user_settings_with_all_fields(api_url, token, settings_data)
         if settings_result:
-            print(f'用户设置更新成功: 语言=zh-CN, 查找权限已启用')
+            print(f'用户设置更新成功: 昵称={nickname}, 语言=zh-CN, 查找权限已启用')
         else:
             print(f'警告: 用户设置更新失败，但不影响加入公司')
     except Exception as e:
@@ -187,6 +188,7 @@ def main():
     parser = argparse.ArgumentParser(description='将用户加入公司的业务层工具')
     parser.add_argument('username', type=str, help='用户名')
     parser.add_argument('email', type=str, help='邮箱')
+    parser.add_argument('nickname', type=str, help='昵称')
     parser.add_argument('company_id', type=int, help='公司ID')
     parser.add_argument('role', type=str, help='角色 (creator/admin/staff)')
     parser.add_argument('-a', '--api', type=str, default=DEFAULT_API_URL,
@@ -199,6 +201,7 @@ def main():
     result = add_user_to_company(
         username=args.username,
         email=args.email,
+        nickname=args.nickname,
         company_id=args.company_id,
         role=args.role,
         api_url=args.api,

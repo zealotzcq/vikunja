@@ -180,6 +180,7 @@ const configStore = useConfigStore()
 onMounted(() => {
 	if (authStore.authUser) {
 		companyStore.loadCompanies()
+		companyStore.loadRelationsAsSubordinate()
 	}
 })
 

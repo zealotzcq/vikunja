@@ -19,9 +19,10 @@ const (
 
 // SubordinateStaffInfo represents information about a subordinate staff member
 type SubordinateStaffInfo struct {
-	UserID   int64  `json:"user_id"`
-	Username string `json:"username"`
-	Name     string `json:"name"`
+	UserID    int64  `json:"user_id"`
+	Username  string `json:"username"`
+	Name      string `json:"name"`
+	ProjectID int64  `json:"project_id"`
 }
 
 // ChatSession represents a chat session in memory
@@ -149,12 +150,18 @@ func getSubordinateStaff(userID, companyID int64) (result []SubordinateStaffInfo
 		return []SubordinateStaffInfo{}, nil
 	}
 
+	projectIDMap := make(map[int64]int64)
+	for _, rel := range relations {
+		projectIDMap[rel.SubordinateUserID] = rel.ProjectID
+	}
+
 	staffInfo := make([]SubordinateStaffInfo, 0, len(users))
 	for _, u := range users {
 		staffInfo = append(staffInfo, SubordinateStaffInfo{
-			UserID:   u.ID,
-			Username: u.Username,
-			Name:     u.Name,
+			UserID:    u.ID,
+			Username:  u.Username,
+			Name:      u.Name,
+			ProjectID: projectIDMap[u.ID],
 		})
 	}
 

@@ -23,6 +23,7 @@ export const useChatStore = defineStore('chat', () => {
 
 	const chatService = new ChatService()
 	let eventSource: EventSource | null = null
+	const processedRefreshMessages = new Set<string>()
 
 	function setMobile(value: boolean) {
 		isMobile.value = value
@@ -151,6 +152,12 @@ export const useChatStore = defineStore('chat', () => {
 						isOpen.value = false
 					}
 				}
+
+				if (lastMessage.buttonNavigation && !processedRefreshMessages.has(lastMessage.id)) {
+					console.log('[Chat] New button navigation message received, reloading page')
+					processedRefreshMessages.add(lastMessage.id)
+					window.location.reload()
+				}
 			}
 
 			if (isMobile.value && isOpen.value === false) {
@@ -246,6 +253,7 @@ export const useChatStore = defineStore('chat', () => {
 		error.value = null
 		messages.value = []
 		lastMessageId.value = ''
+		processedRefreshMessages.clear()
 		await chatService.clearSession(companyStore.currentCompanyId || undefined)
 		localStorage.removeItem('vikunja-chat-history')
 	}

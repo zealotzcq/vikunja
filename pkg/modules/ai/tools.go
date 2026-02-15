@@ -336,7 +336,7 @@ Example usage:
 			}
 
 			return &ToolExecutionResult{
-				Result: "Navigation button shown",
+				Result: "好的",
 			}, nil
 		},
 	}

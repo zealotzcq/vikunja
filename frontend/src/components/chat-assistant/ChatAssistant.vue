@@ -151,6 +151,16 @@ const answeredQuestionId = ref<string | null>(null)
 const isProcessing = ref(false)
 const processingText = ref('')
 
+watch(
+	() => chatStore.hasPendingResponse,
+	(pending) => {
+		if (!pending) {
+			isProcessing.value = false
+			processingText.value = ''
+		}
+	},
+)
+
 const lastMessageWithQuestion = computed(() => {
 	return chatStore.messages.find(msg => msg.questionData)
 })
@@ -264,17 +274,23 @@ const isHistoryLoaded = ref(false)
 watch(
 	chatStore.messages,
 	(newMessages) => {
-		if (!isHistoryLoaded.value && newMessages.length > 0) {
-			messageIdsRef.value = newMessages.map(msg => msg.id)
-			isHistoryLoaded.value = true
-			return
-		}
-
 		if (newMessages.length === 0) {
 			isProcessing.value = false
 			processingText.value = ''
 			messageIdsRef.value = []
 			isHistoryLoaded.value = false
+			return
+		}
+
+		if (messageIdsRef.value.length === 0 && newMessages.length > 0) {
+			messageIdsRef.value = newMessages.map(msg => msg.id)
+			isHistoryLoaded.value = true
+
+			const lastMessage = newMessages[newMessages.length - 1]
+			if (lastMessage && (lastMessage.type === 'assistant_response' || lastMessage.type === 'question' || lastMessage.type === 'button_navigation')) {
+				isProcessing.value = false
+				processingText.value = ''
+			}
 			return
 		}
 
@@ -290,10 +306,6 @@ watch(
 			const toolName = lastMessage.toolName || lastMessage.content
 			processingText.value = t('chatAssistant.processingTool', {tool: toolName})
 			isProcessing.value = true
-		} else if (lastMessage.type === 'tool_result') {
-			if (processingText.value.includes('使用')) {
-				processingText.value = t('chatAssistant.processing')
-			}
 		} else if (lastMessage.type === 'assistant_response' || lastMessage.type === 'question' || lastMessage.type === 'button_navigation') {
 			isProcessing.value = false
 			processingText.value = ''

@@ -1256,7 +1256,7 @@
 	},
 	"chatAssistant": {
 		"title": "AI 助手",
-		"placeholder": "请输入您的问题...",
+		"placeholder": "让小李马上写计划...",
 		"send": "发送",
 		"close": "关闭聊天",
 		"clear": "清空消息",

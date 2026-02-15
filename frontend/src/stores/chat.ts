@@ -20,6 +20,7 @@ export const useChatStore = defineStore('chat', () => {
 	const isLoading = ref(false)
 	const error = ref<string | null>(null)
 	const lastMessageId = ref<string>('')
+	const hasPendingResponse = ref(false)
 
 	const chatService = new ChatService()
 	let eventSource: EventSource | null = null
@@ -52,13 +53,11 @@ export const useChatStore = defineStore('chat', () => {
 	}
 
 	watch(() => companyStore.currentCompanyId, async (newCompanyId) => {
-		console.log('[Chat] currentCompanyId changed:', newCompanyId, 'authUser:', authStore.authUser)
 		if (authStore.authUser && newCompanyId) {
 			messages.value = []
 			lastMessageId.value = ''
 			await loadChatHistory()
 			if (!isAvailable.value && isOpen.value) {
-				console.log('[Chat] User not allowed in this company, closing chat panel')
 				isOpen.value = false
 				return
 			}
@@ -78,27 +77,22 @@ export const useChatStore = defineStore('chat', () => {
 
 		const token = getToken()
 		if (!token) {
-			console.log('[Chat] No token available, skipping SSE connection')
 			return
 		}
 
 		if (!companyStore.currentCompanyId) {
-			console.log('[Chat] No company ID available, skipping SSE connection')
 			return
 		}
 
 		const streamUrl = `${window.API_URL}/chat/stream?token=${encodeURIComponent(token)}&company_id=${companyStore.currentCompanyId}`
-		console.log('[Chat] Connecting to SSE at:', streamUrl)
 
 		eventSource = new EventSource(streamUrl)
 
 		eventSource.onmessage = (event) => {
 			try {
 				const update = JSON.parse(event.data)
-				console.log('[Chat] SSE update:', update)
 
 				if (update.message_type === 'frontend_needed' && update.last_message_id !== lastMessageId.value) {
-					console.log('[Chat] New message available, fetching history...')
 					loadChatHistory()
 				}
 			} catch (err) {
@@ -113,14 +107,12 @@ export const useChatStore = defineStore('chat', () => {
 		}
 
 		eventSource.onopen = () => {
-			console.log('[Chat] SSE connected')
 			error.value = null
 		}
 	}
 
 	function disconnectSSE() {
 		if (eventSource) {
-			console.log('[Chat] Disconnecting SSE...')
 			eventSource.close()
 			eventSource = null
 		}
@@ -131,18 +123,14 @@ export const useChatStore = defineStore('chat', () => {
 		if (!authStore.authUser) {
 			return
 		}
-		console.log('[Chat] Loading chat history, currentCompanyId:', companyStore.currentCompanyId, 'companies:', companyStore.companies)
 		if (!companyStore.currentCompanyId) {
-			console.log('[Chat] No company ID available, skipping load')
 			isAvailable.value = false
 			return
 		}
 		isLoading.value = true
 		error.value = null
 		try {
-			console.log('[Chat] Loading chat history for company:', companyStore.currentCompanyId)
 			const response = await chatService.getHistory(companyStore.currentCompanyId)
-			console.log('[Chat] Chat history loaded:', response)
 			isAvailable.value = true
 
 			const newMessages = response.messages.map(msg => ({
@@ -166,8 +154,11 @@ export const useChatStore = defineStore('chat', () => {
 				const lastMessage = newMessages[newMessages.length - 1]!
 				lastMessageId.value = lastMessage.id
 
+				if (hasPendingResponse.value && (lastMessage.type === 'assistant_response' || lastMessage.type === 'question' || lastMessage.type === 'button_navigation')) {
+					hasPendingResponse.value = false
+				}
+
 				if (lastMessage.type === 'assistant_response' && lastMessage.navigationCommand) {
-					console.log('[Chat] Executing navigation:', lastMessage.navigationCommand)
 					router.push({
 						name: lastMessage.navigationCommand.routeName,
 						params: lastMessage.navigationCommand.params,
@@ -178,10 +169,22 @@ export const useChatStore = defineStore('chat', () => {
 				}
 
 				const processed = getProcessedRefreshMessages()
-				if (lastMessage.type === 'assistant_response' && lastMessage.buttonNavigation && !processed.has(lastMessage.id)) {
-					console.log('[Chat] New button navigation message received, reloading current route')
-					addProcessedRefreshMessage(lastMessage.id)
-					router.push(router.currentRoute.value)
+
+				const isButtonType = lastMessage.type === 'button_navigation' || (lastMessage.type === 'assistant_response' && lastMessage.buttonNavigation)
+
+				if (isButtonType && lastMessage.buttonNavigation && !processed.has(lastMessage.id)) {
+					const shouldAutoNavigate = !lastMessage.buttonNavigation.routeName.startsWith('task.detail')
+
+					if (shouldAutoNavigate) {
+						addProcessedRefreshMessage(lastMessage.id)
+						router.push({
+							name: lastMessage.buttonNavigation.routeName,
+							params: lastMessage.buttonNavigation.params,
+						})
+						if (isMobile.value) {
+							isOpen.value = false
+						}
+					}
 				}
 			}
 
@@ -204,7 +207,6 @@ export const useChatStore = defineStore('chat', () => {
 	}
 
 	async function executeButtonNavigation(routeName: string, params?: Record<string, unknown>) {
-		console.log('[Chat] Executing button navigation:', {routeName, params})
 		router.push({
 			name: routeName,
 			params: params,
@@ -255,6 +257,7 @@ export const useChatStore = defineStore('chat', () => {
 		messages.value.push(userMessage)
 		lastMessageId.value = msgId
 		saveChatHistory(messages.value)
+		hasPendingResponse.value = true
 
 		try {
 			const route = router.currentRoute.value
@@ -275,6 +278,7 @@ export const useChatStore = defineStore('chat', () => {
 				error.value = '发送消息失败，请稍后重试'
 				console.error('[Chat] Failed to send message:', err)
 			}
+			hasPendingResponse.value = false
 		}
 	}
 
@@ -314,6 +318,7 @@ export const useChatStore = defineStore('chat', () => {
 		messages,
 		isLoading,
 		error,
+		hasPendingResponse,
 		sendMessage,
 		clearMessages,
 		toggleOpen,

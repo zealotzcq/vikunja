@@ -424,7 +424,7 @@ example 4: 如果员工有多个姓李，昵称一个叫李工,另一个叫李�
 - 可以适当放宽同音字的标准
 example 1: 如果员工的名字或者昵称是忻忻，并且其他员工没有近似的读音，那么欣欣，心心之类的也应该视作命中这个员工
 - if you cannot uniquely identify which staff member the user is referring to (e.g., multiple staff have similar names), use the 'question' tool to ask the user to clarify.
-
+- 当存在多个可能候选时，使用'question'工具进行 clarification,不要用语言询问，使用'question'工具
 
 Example usage:
 - "让小王马上写报告" -> HIGH priority, due in 1 day

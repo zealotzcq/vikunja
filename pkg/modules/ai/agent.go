@@ -344,6 +344,7 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 			toolResultMsg := Message{
 				Role:       "tool",
 				ToolCallID: toolCallID,
+				Name:       toolCall.Name,
 				Content:    step.Output,
 			}
 			messages = append(messages, toolResultMsg)

@@ -17,10 +17,11 @@ import (
 
 // Tool represents a function that the agent can call
 type Tool struct {
-	Name        string                                                                               `json:"name"`
-	Description string                                                                               `json:"description"`
-	Parameters  map[string]interface{}                                                               `json:"parameters"`
-	Execute     func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) `json:"-"`
+	Name           string                                                                               `json:"name"`
+	Description    string                                                                               `json:"description"`
+	Parameters     map[string]interface{}                                                               `json:"parameters"`
+	ShouldStopLoop bool                                                                                 `json:"should_stop_loop"`
+	Execute        func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) `json:"-"`
 }
 
 // ToolManager manages available tools
@@ -151,7 +152,8 @@ func RegisterDefaultTools() error {
 	sm := GetSkillManager()
 
 	questionTool := &Tool{
-		Name: "question",
+		Name:           "question",
+		ShouldStopLoop: false,
 		Description: `Use this tool when you need to ask the user questions during execution. This allows you to:
 1. Gather user preferences or requirements
 2. Clarify ambiguous instructions
@@ -245,7 +247,8 @@ Usage notes:
 	}
 
 	showNavigationTool := &Tool{
-		Name: "show_navigation",
+		Name:           "show_navigation",
+		ShouldStopLoop: true,
 		Description: `Display a navigation button for user to navigate to various locations.
 
 Use this tool when you want to provide a button that allows users to navigate to:
@@ -355,7 +358,8 @@ Example usage:
 	}
 
 	finishTaskTool := &Tool{
-		Name: "finish_job",
+		Name:           "finish_job",
+		ShouldStopLoop: true,
 		Description: `Call this tool when you have completed your work and want to respond to the user. This is the ONLY tool that ends the conversation.
 
 This tool sends your response to the user.
@@ -393,8 +397,9 @@ IMPORTANT: You MUST use this tool to end the conversation. Do not provide text r
 	}
 
 	skillTool := &Tool{
-		Name:        "skill",
-		Description: `Load a skill to get detailed instructions for a specific task. Skills provide specialized knowledge and step-by-step guidance. Use this when a task matches an available skill's description. Only the skills listed here are available: ` + sm.FormatSkillsForTool(),
+		Name:           "skill",
+		ShouldStopLoop: false,
+		Description:    `Load a skill to get detailed instructions for a specific task. Skills provide specialized knowledge and step-by-step guidance. Use this when a task matches an available skill's description. Only the skills listed here are available: ` + sm.FormatSkillsForTool(),
 		Parameters: map[string]interface{}{
 			"$schema": "https://json-schema.org/draft-2020-12/schema",
 			"type":    "object",
@@ -455,7 +460,8 @@ IMPORTANT: You MUST use this tool to end the conversation. Do not provide text r
 	}
 
 	assignTaskTool := &Tool{
-		Name: "assign_task",
+		Name:           "assign_task",
+		ShouldStopLoop: true,
 		Description: `Assign a task to a subordinate staff member. Use this when user wants to assign work or a task to someone.
 
 The system context contains subordinate staff information including:
@@ -485,6 +491,8 @@ Supported time expressions (fill in the time_expression parameter):
 - Weekdays: "next Monday", "last Friday", "下周一", "上周五", "周五"
 - Absolute dates: "2024-12-25", "2024年12月25日", "12月25日"
 - Combinations: "tomorrow at 3pm", "下周一上午9点", "next Friday 5pm"
+Important: 使用英文关键词（如tomorrow、next Monday等）
+Important:保持时间表达式的简洁性
 
 Example usage:
 - "让小王马上写报告" -> HIGH priority, no time_expr, due in 1 day

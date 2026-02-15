@@ -247,6 +247,8 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 				GetLLMLogger().LogExchange("agent", "", fmt.Sprintf("Warning: Tool call '%s' has empty arguments", toolCall.Name))
 			}
 
+			tool, toolExists := a.toolManager.GetTool(toolCall.Name)
+
 			executionResult, execErr := a.toolManager.ExecuteTool(toolCall.Name, agentCtx, toolCall.Arguments)
 			if execErr != nil {
 				step.Output = fmt.Sprintf("Error: %s", execErr.Error())
@@ -255,6 +257,13 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 					step.Output = executionResult.Error
 				} else {
 					step.Output = executionResult.Result
+				}
+
+				// Check if tool should stop the loop
+				if toolExists && tool.ShouldStopLoop && executionResult.StopCommand == nil {
+					executionResult.StopCommand = &ToolStopCommand{
+						Response: executionResult.Result,
+					}
 				}
 			}
 

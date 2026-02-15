@@ -28,7 +28,7 @@ export default class ChatService {
 		})
 	}
 
-	async getHistory(): Promise<{
+	async getHistory(companyID?: number): Promise<{
 		id: string
 		user_id: number
 		created_at: number
@@ -50,16 +50,20 @@ export default class ChatService {
 			throw new Error('No authentication token available')
 		}
 
-		const response = await this.http.get('/chat/history')
+		const response = await this.http.get('/chat/history', {
+			company_id: companyID,
+		})
 		return response.data
 	}
 
-	async clearSession(): Promise<void> {
+	async clearSession(companyID?: number): Promise<void> {
 		const token = getToken()
 		if (!token) {
 			return
 		}
-		await this.http.delete('/chat/session')
+		await this.http.delete('/chat/session', {
+			company_id: companyID,
+		})
 	}
 
 	async submitQuestionAnswer(

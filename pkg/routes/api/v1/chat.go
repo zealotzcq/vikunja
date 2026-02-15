@@ -21,7 +21,7 @@ import (
 )
 
 // isUserAllowedForChat checks if user is allowed to use the chat assistant
-func isUserAllowedForChat(a web.Auth) bool {
+func isUserAllowedForChat(a web.Auth, companyID int64) bool {
 	userObj, isUser := a.(*user.User)
 	if !isUser {
 		return false
@@ -30,7 +30,7 @@ func isUserAllowedForChat(a web.Auth) bool {
 	s := db.NewSession()
 	defer s.Close()
 
-	role := company.GetUserRole(s, userObj.ID)
+	role := company.GetUserRole(s, userObj.ID, companyID)
 	if role == "" {
 		return false
 	}
@@ -95,16 +95,16 @@ func SendMessage(c *echo.Context) error {
 		return echo.ErrForbidden
 	}
 
-	if !isUserAllowedForChat(a) {
-		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
-	}
-
 	userID := a.GetID()
 
 	// Bind request body
 	req := new(SendMessageRequest)
 	if err := c.Bind(req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
+	}
+
+	if !isUserAllowedForChat(a, req.CompanyID) {
+		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
 	}
 
 	userMsgID := req.MessageID
@@ -145,16 +145,16 @@ func GetSession(c *echo.Context) error {
 		return echo.ErrForbidden
 	}
 
-	if !isUserAllowedForChat(a) {
-		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
-	}
-
 	userID := a.GetID()
 
 	companyIDStr := c.QueryParam("company_id")
 	companyID, err := strconv.ParseInt(companyIDStr, 10, 64)
 	if err != nil || companyID <= 0 {
 		return echo.NewHTTPError(http.StatusBadRequest, "company_id is required and must be a positive integer")
+	}
+
+	if !isUserAllowedForChat(a, companyID) {
+		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
 	}
 
 	// Get or create session
@@ -177,16 +177,16 @@ func ClearSession(c *echo.Context) error {
 		return echo.ErrForbidden
 	}
 
-	if !isUserAllowedForChat(a) {
-		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
-	}
-
 	userID := a.GetID()
 
 	companyIDStr := c.QueryParam("company_id")
 	companyID, err := strconv.ParseInt(companyIDStr, 10, 64)
 	if err != nil || companyID <= 0 {
 		return echo.NewHTTPError(http.StatusBadRequest, "company_id is required and must be a positive integer")
+	}
+
+	if !isUserAllowedForChat(a, companyID) {
+		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
 	}
 
 	// Clear the session
@@ -208,16 +208,16 @@ func GetChatHistory(c *echo.Context) error {
 		return echo.ErrForbidden
 	}
 
-	if !isUserAllowedForChat(a) {
-		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
-	}
-
 	userID := a.GetID()
 
 	companyIDStr := c.QueryParam("company_id")
 	companyID, err := strconv.ParseInt(companyIDStr, 10, 64)
 	if err != nil || companyID <= 0 {
 		return echo.NewHTTPError(http.StatusBadRequest, "company_id is required and must be a positive integer")
+	}
+
+	if !isUserAllowedForChat(a, companyID) {
+		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
 	}
 
 	sessionData, err := chat_session.GetDefault().GetOrCreateSession(userID, companyID)
@@ -483,15 +483,15 @@ func SubmitQuestionAnswer(c *echo.Context) error {
 		return echo.ErrForbidden
 	}
 
-	if !isUserAllowedForChat(a) {
-		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
-	}
-
 	userID := a.GetID()
 
 	req := new(SubmitQuestionAnswerRequest)
 	if err := c.Bind(req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
+	}
+
+	if !isUserAllowedForChat(a, req.CompanyID) {
+		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
 	}
 
 	answerMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())

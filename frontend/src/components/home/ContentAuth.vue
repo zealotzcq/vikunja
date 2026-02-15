@@ -86,6 +86,7 @@ import {useBaseStore} from '@/stores/base'
 import {useLabelStore} from '@/stores/labels'
 import {useProjectStore} from '@/stores/projects'
 import {useChatStore} from '@/stores/chat'
+import {useCompanyStore} from '@/stores/company'
 
 import {useRouteWithModal} from '@/composables/useRouteWithModal'
 import {useRenewTokenOnFocus} from '@/composables/useRenewTokenOnFocus'
@@ -94,11 +95,8 @@ import {useAuthStore} from '@/stores/auth'
 
 const authStore = useAuthStore()
 const chatStore = useChatStore()
+const companyStore = useCompanyStore()
 const baseStore = useBaseStore()
-
-onMounted(() => {
-	chatStore.loadChatHistory()
-})
 
 watch(() => authStore.authUser, (user) => {
 	if (user) {

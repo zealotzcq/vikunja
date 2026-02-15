@@ -90,9 +90,9 @@ func AddStaffToCompany(s *xorm.Session, companyID, userID int64, role string) er
 	return err
 }
 
-func GetUserRole(s *xorm.Session, userID int64) string {
+func GetUserRole(s *xorm.Session, userID, companyID int64) string {
 	staff := &CompanyStaff{}
-	has, err := s.Where("user_id = ?", userID).Get(staff)
+	has, err := s.Where("user_id = ? AND company_id = ?", userID, companyID).Get(staff)
 	if err != nil || !has {
 		return ""
 	}

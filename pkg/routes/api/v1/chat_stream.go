@@ -72,16 +72,16 @@ func ChatStream(c *echo.Context) error {
 		return echo.ErrForbidden
 	}
 
-	if !isUserAllowedForChat(a) {
-		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
-	}
-
 	userID := a.GetID()
 
 	companyIDStr := c.QueryParam("company_id")
 	companyID, err := strconv.ParseInt(companyIDStr, 10, 64)
 	if err != nil || companyID <= 0 {
 		return echo.NewHTTPError(http.StatusBadRequest, "company_id is required and must be a positive integer")
+	}
+
+	if !isUserAllowedForChat(a, companyID) {
+		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
 	}
 
 	log.Printf("[Chat] SSE connected for user %d, company %d", userID, companyID)

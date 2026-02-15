@@ -31,6 +31,14 @@ export const useChatStore = defineStore('chat', () => {
 		}
 	}
 
+	watch(() => companyStore.currentCompanyId, () => {
+		if (authStore.authUser && companyStore.currentCompanyId) {
+			loadChatHistory()
+		} else {
+			isAvailable.value = false
+		}
+	}, {immediate: true})
+
 	function connectSSE() {
 		if (eventSource) {
 			eventSource.close()
@@ -86,11 +94,15 @@ export const useChatStore = defineStore('chat', () => {
 		if (!authStore.authUser) {
 			return
 		}
+		if (!companyStore.currentCompanyId) {
+			console.log('[Chat] No company ID available, skipping load')
+			return
+		}
 		isLoading.value = true
 		error.value = null
 		try {
-			console.log('[Chat] Loading chat history...')
-			const response = await chatService.getHistory()
+			console.log('[Chat] Loading chat history for company:', companyStore.currentCompanyId)
+			const response = await chatService.getHistory(companyStore.currentCompanyId)
 			console.log('[Chat] Chat history loaded:', response)
 			isAvailable.value = true
 
@@ -217,7 +229,7 @@ export const useChatStore = defineStore('chat', () => {
 		error.value = null
 		messages.value = []
 		lastMessageId.value = ''
-		await chatService.clearSession()
+		await chatService.clearSession(companyStore.currentCompanyId)
 		localStorage.removeItem('vikunja-chat-history')
 	}
 

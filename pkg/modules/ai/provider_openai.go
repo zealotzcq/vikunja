@@ -190,7 +190,7 @@ func (p *OpenAIProvider) makeRequest(ctx context.Context, messages []openAIMessa
 		Model:       p.config.OpenAIModel,
 		Messages:    messages,
 		Temperature: p.config.Temperature,
-		MaxTokens:   1000,
+		MaxTokens:   32000,
 	}
 
 	if tools != nil && len(tools) > 0 {

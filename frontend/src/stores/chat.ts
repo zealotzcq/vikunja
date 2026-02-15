@@ -34,6 +34,8 @@ export const useChatStore = defineStore('chat', () => {
 	watch(() => companyStore.currentCompanyId, async (newCompanyId) => {
 		console.log('[Chat] currentCompanyId changed:', newCompanyId, 'authUser:', authStore.authUser)
 		if (authStore.authUser && newCompanyId) {
+			messages.value = []
+			lastMessageId.value = ''
 			await loadChatHistory()
 			if (!isAvailable.value && isOpen.value) {
 				console.log('[Chat] User not allowed in this company, closing chat panel')
@@ -133,19 +135,17 @@ export const useChatStore = defineStore('chat', () => {
 				questionData: msg.questionData,
 			}))
 
-			const existingIds = new Set(messages.value.map(m => m.id))
-			const newItems = newMessages.filter(m => !existingIds.has(m.id))
+			messages.value = newMessages
 
-			if (newItems.length > 0) {
-				messages.value = newMessages
-				lastMessageId.value = newMessages[newMessages.length - 1].id
+			if (newMessages.length > 0) {
+				const lastMessage = newMessages[newMessages.length - 1]!
+				lastMessageId.value = lastMessage.id
 
-				const lastMsg = newItems[newItems.length - 1]
-				if (lastMsg.navigationCommand) {
-					console.log('[Chat] Executing navigation:', lastMsg.navigationCommand)
+				if (lastMessage.navigationCommand) {
+					console.log('[Chat] Executing navigation:', lastMessage.navigationCommand)
 					router.push({
-						name: lastMsg.navigationCommand.routeName,
-						params: lastMsg.navigationCommand.params,
+						name: lastMessage.navigationCommand.routeName,
+						params: lastMessage.navigationCommand.params,
 					})
 					if (isMobile.value) {
 						isOpen.value = false
@@ -189,7 +189,7 @@ export const useChatStore = defineStore('chat', () => {
 		error.value = null
 
 		try {
-			await chatService.submitQuestionAnswer(answer, companyStore.currentCompanyId)
+			await chatService.submitQuestionAnswer(answer, companyStore.currentCompanyId || undefined)
 		} catch (err: any) {
 			if (err?.response?.status === 401) {
 				error.value = '请先登录以使用聊天助手'
@@ -225,10 +225,10 @@ export const useChatStore = defineStore('chat', () => {
 			const route = router.currentRoute.value
 			await chatService.sendMessage(
 				content,
-				route.name,
+				String(route.name),
 				route.params,
 				msgId,
-				companyStore.currentCompanyId,
+				companyStore.currentCompanyId || undefined,
 			)
 		} catch (err: any) {
 			if (err?.response?.status === 401) {
@@ -246,7 +246,7 @@ export const useChatStore = defineStore('chat', () => {
 		error.value = null
 		messages.value = []
 		lastMessageId.value = ''
-		await chatService.clearSession(companyStore.currentCompanyId)
+		await chatService.clearSession(companyStore.currentCompanyId || undefined)
 		localStorage.removeItem('vikunja-chat-history')
 	}
 

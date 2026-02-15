@@ -9,7 +9,7 @@ export default class ChatService {
 		pageRoute: string,
 		pageParams: Record<string, any> = {},
 		messageID?: string,
-		companyID?: number,
+		companyID: number | undefined = undefined,
 	): Promise<void> {
 		const token = getToken()
 		if (!token) {
@@ -42,6 +42,12 @@ export default class ChatService {
 				params?: Record<string, any>
 				label: string
 			}
+			buttonNavigation?: {
+				routeName: string
+				params?: Record<string, any>
+				label: string
+			}
+			questionData?: string
 		}>
 		expires_at: number
 	}> {
@@ -54,7 +60,7 @@ export default class ChatService {
 		return response.data
 	}
 
-	async clearSession(companyID?: number): Promise<void> {
+	async clearSession(companyID: number | undefined = undefined): Promise<void> {
 		const token = getToken()
 		if (!token) {
 			return
@@ -64,7 +70,7 @@ export default class ChatService {
 
 	async submitQuestionAnswer(
 		answer: string,
-		companyID?: number,
+		companyID: number | undefined = undefined,
 	): Promise<void> {
 		const token = getToken()
 		if (!token) {

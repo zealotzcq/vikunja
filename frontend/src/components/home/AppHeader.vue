@@ -40,13 +40,15 @@
 						</span>
 					</BaseButton>
 				</template>
-				<DropdownItem
-					v-for="company in companyStore.companies"
-					:key="company.id"
-					@click="handleCompanySwitch(company.id)"
-				>
-					{{ company.description }}
-				</DropdownItem>
+				<template #default="{ close }">
+					<DropdownItem
+						v-for="company in companyStore.companies"
+						:key="company.id"
+						@click="handleCompanySwitch(company.id, close)"
+					>
+						{{ company.description }}
+					</DropdownItem>
+				</template>
 			</Dropdown>
 			<h1 v-else class="company-title">
 				{{ currentCompany.description }}
@@ -197,8 +199,11 @@ const menuActive = computed(() => baseStore.menuActive)
 const imprintUrl = computed(() => configStore.legal.imprintUrl)
 const privacyPolicyUrl = computed(() => configStore.legal.privacyPolicyUrl)
 
-function handleCompanySwitch(companyId: number) {
+function handleCompanySwitch(companyId: number, closeDropdown?: () => void) {
 	companyStore.setCurrentCompany(companyId)
+	if (closeDropdown) {
+		closeDropdown()
+	}
 }
 </script>
 

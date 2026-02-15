@@ -414,7 +414,17 @@ Task properties:
 - IsFavorite: true (favorited by default)
 - Subscription: Subscribed to task notifications
 
-If you cannot uniquely identify which staff member the user is referring to (e.g., multiple staff have similar names), use the 'question' tool to ask the user to clarify.
+员工判断：
+- 如果用户输入的称呼, 和员工的名称或昵称一致,则认为是这个员工
+- 如果用户输入的称呼，可以唯一区分出一个员工，也认为是这个员工
+example 1: 如果员工中只有一个王姓员工，那么小王,老王,王工等都匹配这个王姓员工
+example 2: 如果员工的昵称是老王,并且其他员工没有出现王字,那么王工,王同学这样的称呼也可以匹配王工的昵称，但是注意小王这个称呼无法匹配老王
+example 3: 如果员工中有一个叫Donald Trump,其他员工没有叫Donald的, 那么Donald,Donnie,Don都可以匹配这个员工
+example 4: 如果员工有多个姓李，昵称一个叫李工,另一个叫李同学,那么老李，小李则无法唯一区分他们
+- 可以适当放宽同音字的标准
+example 1: 如果员工的名字或者昵称是忻忻，并且其他员工没有近似的读音，那么欣欣，心心之类的也应该视作命中这个员工
+- if you cannot uniquely identify which staff member the user is referring to (e.g., multiple staff have similar names), use the 'question' tool to ask the user to clarify.
+
 
 Example usage:
 - "让小王马上写报告" -> HIGH priority, due in 1 day

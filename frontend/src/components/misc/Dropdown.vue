@@ -60,10 +60,12 @@ const emit = defineEmits<{
 defineSlots<{
 	'trigger': (props: {
 		close: () => void,
-		toggleOpen: () => void, 
+		toggleOpen: () => void,
 		open: boolean
 	}) => void,
-	'default': () => void
+	'default': (props: {
+		close: () => void
+	}) => void
 }>()
 
 const initialMount = ref(false)

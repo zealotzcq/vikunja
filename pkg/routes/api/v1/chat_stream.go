@@ -153,7 +153,7 @@ func ChatStream(c *echo.Context) error {
 
 func getMessageTypeForFrontend(msgType string) string {
 	switch msgType {
-	case "user_input", "assistant_response":
+	case "user_input", "assistant_response", "question", "button_navigation":
 		return "frontend_needed"
 	default:
 		return "internal"

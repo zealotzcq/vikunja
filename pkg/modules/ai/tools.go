@@ -3,6 +3,8 @@ package ai
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -356,24 +358,7 @@ Example usage:
 		Name: "finish_job",
 		Description: `Call this tool when you have completed your work and want to respond to the user. This is the ONLY tool that ends the conversation.
 
-This tool sends your response to the user and optionally provides navigation information.
-
-Available routes for navigation:
-- home: Homepage/Dashboard
-- projects.index: Project list page
-- project.index: Specific project detail (requires projectId in params). Use projectId: -1 for favorites
-- tasks.range: Task list page
-- task.detail: Specific task detail (requires id in params)
-- teams.index: Team list page
-- teams.edit: Specific team detail/edit (requires id in params)
-- labels.index: Label list page
-
-IMPORTANT: Use set_button_navigation tool BEFORE calling finish_job if you want to provide a button for the user to click.
-
-Parameters:
-- content (required): Your response message to the user
-- route_name (optional): Route name to navigate to
-- params (optional): Route parameters for navigation
+This tool sends your response to the user.
 
 IMPORTANT: You MUST use this tool to end the conversation. Do not provide text responses without calling this tool.`,
 		Parameters: map[string]interface{}{
@@ -382,14 +367,6 @@ IMPORTANT: You MUST use this tool to end the conversation. Do not provide text r
 				"content": map[string]interface{}{
 					"type":        "string",
 					"description": "Your response message to the user. This is REQUIRED.",
-				},
-				"route_name": map[string]interface{}{
-					"type":        "string",
-					"description": "The name of the route to navigate to (optional)",
-				},
-				"params": map[string]interface{}{
-					"type":        "object",
-					"description": "Optional route parameters (e.g., projectId, id)",
 				},
 			},
 			"required": []string{"content"},
@@ -402,29 +379,10 @@ IMPORTANT: You MUST use this tool to end the conversation. Do not provide text r
 				}, fmt.Errorf("content is required")
 			}
 
-			metadata := make(map[string]interface{})
-
-			routeName, hasRoute := params["route_name"].(string)
-			if hasRoute {
-				var routeParams map[string]interface{}
-				if p, ok := params["params"].(map[string]interface{}); ok {
-					routeParams = p
-				}
-				ctx.NavigationInfo = &NavigationInfo{
-					RouteName: routeName,
-					Params:    routeParams,
-				}
-				ctx.ShouldNavigate = true
-				metadata["navigation"] = true
-				metadata["route"] = routeName
-				metadata["params"] = routeParams
-			}
-
 			return &ToolExecutionResult{
 				Result: content,
 				StopCommand: &ToolStopCommand{
 					Response: content,
-					Metadata: metadata,
 				},
 			}, nil
 		},
@@ -498,7 +456,7 @@ IMPORTANT: You MUST use this tool to end the conversation. Do not provide text r
 
 	assignTaskTool := &Tool{
 		Name: "assign_task",
-		Description: `Assign a task to a subordinate staff member. Use this when the user wants to assign work or a task to someone.
+		Description: `Assign a task to a subordinate staff member. Use this when user wants to assign work or a task to someone.
 
 The system context contains subordinate staff information including:
 - User ID, Username, Name, and Project ID for each subordinate
@@ -509,34 +467,50 @@ Priority determination (based on user's tone/phrasing):
 - LOW priority: When user says "有空", "有时间", "不急", "when convenient", "no rush", etc.
 
 Due date calculation:
-- HIGH priority: 1 day from now
-- MEDIUM priority: 3 days from now
-- LOW priority: 7 days from now
+- If user specifies a time expression (e.g., "today", "tomorrow", "下周五", "2024-12-25"), use that expression
+- If NO time expression is specified, use priority-based calculation:
+  * HIGH priority: 1 day from now
+  * MEDIUM priority: 3 days from now
+  * LOW priority: 7 days from now
 
 Task properties:
 - Start date: Now (current time)
 - IsFavorite: true (favorited by default)
 - Subscription: Subscribed to task notifications
 
+Supported time expressions (fill in the time_expression parameter):
+- Relative dates: "today", "tomorrow", "yesterday", "今天", "明天", "昨天"
+- Relative times: "in 2 hours", "30 minutes later", "after 3 days", "2小时后", "30分钟后"
+- Time periods: "next week", "this month", "last year", "下周", "本月", "明年"
+- Weekdays: "next Monday", "last Friday", "下周一", "上周五", "周五"
+- Absolute dates: "2024-12-25", "2024年12月25日", "12月25日"
+- Combinations: "tomorrow at 3pm", "下周一上午9点", "next Friday 5pm"
+
 Example usage:
-- "让小王马上写报告" -> HIGH priority, due in 1 day
-- "叫李四有空的时候整理文档" -> LOW priority, due in 7 days
-- "给张三安排个任务" -> MEDIUM priority, due in 3 days`,
+- "让小王马上写报告" -> HIGH priority, no time_expr, due in 1 day
+- "叫李四有空的时候整理文档" -> LOW priority, no time_expr, due in 7 days
+- "给张三安排个任务，明天截止" -> MEDIUM priority, time_expr="tomorrow"
+- "让小王下周五提交报告" -> MEDIUM priority, time_expr="下周五"
+- "给李四分配任务，2小时后完成" -> HIGH priority, time_expr="2小时后"`,
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"user_identifier": map[string]interface{}{
 					"type":        "integer",
-					"description": "The user ID (integer) of the subordinate staff member to assign the task to. Must match a subordinate in the context.",
+					"description": "The user ID (integer) of subordinate staff member to assign task to. Must match a subordinate in the context.",
 				},
 				"task_title": map[string]interface{}{
 					"type":        "string",
-					"description": "The title or description of the task to assign",
+					"description": "The title or description of task to assign",
 				},
 				"priority": map[string]interface{}{
 					"type":        "string",
 					"description": "Priority level: 'high', 'medium', or 'low'. Default is 'medium' if not specified.",
 					"enum":        []string{"high", "medium", "low"},
+				},
+				"time_expression": map[string]interface{}{
+					"type":        "string",
+					"description": "Optional natural language time expression (e.g., 'tomorrow', '下周五', '2小时后', '2024-12-25'). If provided, this overrides the priority-based due date calculation. Current date/time is " + time.Now().Format("2006-01-02") + ".",
 				},
 			},
 			"required": []string{"user_identifier", "task_title"},
@@ -617,7 +591,23 @@ Example usage:
 			}
 
 			now := time.Now()
-			dueDate := now.AddDate(0, 0, daysToAdd)
+
+			var dueDate time.Time
+			var timeExpressionUsed bool
+
+			if timeExpr, ok := params["time_expression"].(string); ok && timeExpr != "" {
+				parsedTime, err := parseTimeExpression(timeExpr, now)
+				if err != nil {
+					return &ToolExecutionResult{
+						Error: fmt.Sprintf("Failed to parse time expression '%s': %v", timeExpr, err),
+					}, fmt.Errorf("failed to parse time expression: %w", err)
+				}
+				dueDate = parsedTime
+				timeExpressionUsed = true
+			} else {
+				dueDate = now.AddDate(0, 0, daysToAdd)
+				timeExpressionUsed = false
+			}
 
 			task := &models.Task{
 				Title:      taskTitle,
@@ -651,7 +641,11 @@ Example usage:
 
 			response := fmt.Sprintf("已成功为 %s 分配任务：%s\n", displayName, taskTitle)
 			response += fmt.Sprintf("- 优先级：%s\n", map[string]string{"high": "高", "medium": "中", "low": "低"}[priority])
-			response += fmt.Sprintf("- 截止日期：%s\n", dueDate.Format("2006-01-02"))
+			if timeExpressionUsed {
+				response += fmt.Sprintf("- 截止日期：%s (根据时间表达式设定)\n", dueDate.Format("2006-01-02 15:04"))
+			} else {
+				response += fmt.Sprintf("- 截止日期：%s (根据优先级设定)\n", dueDate.Format("2006-01-02"))
+			}
 
 			ctx.ButtonNavigation = &chat_session.ButtonNavigation{
 				RouteName: "task.detail",
@@ -665,11 +659,12 @@ Example usage:
 			return &ToolExecutionResult{
 				Result: response,
 				Metadata: map[string]interface{}{
-					"task_id":     task.ID,
-					"assigned_to": targetStaff.UserID,
-					"project_id":  targetStaff.ProjectID,
-					"priority":    priority,
-					"due_date":    dueDate.Format(time.RFC3339),
+					"task_id":         task.ID,
+					"assigned_to":     targetStaff.UserID,
+					"project_id":      targetStaff.ProjectID,
+					"priority":        priority,
+					"due_date":        dueDate.Format(time.RFC3339),
+					"time_expression": timeExpressionUsed,
 				},
 			}, nil
 		},
@@ -680,6 +675,322 @@ Example usage:
 	}
 
 	return nil
+}
+
+// parseTimeExpression parses natural language time expressions and returns the corresponding time
+// Supports:
+// - Absolute dates: 2024-12-25, 2024/12/25, 2024年12月25日
+// - Relative dates: today, tomorrow, yesterday, 今天, 明天, 昨天
+// - Relative times: in 2 hours, 30 minutes later, 2小时后, 30分钟后
+// - Time periods: next week, this month, next year, 下周, 本月, 明年
+// - Weekdays: next Monday, last Friday, 下周一, 上周五
+func parseTimeExpression(expr string, now time.Time) (time.Time, error) {
+	expr = strings.ToLower(strings.TrimSpace(expr))
+
+	// Absolute dates in various formats
+	if t, ok := parseAbsoluteDate(expr, now); ok {
+		return t, nil
+	}
+
+	// Relative dates: today, tomorrow, yesterday
+	if t, ok := parseRelativeDate(expr, now); ok {
+		return t, nil
+	}
+
+	// Relative times: in 2 hours, 30 minutes later, etc.
+	if t, ok := parseRelativeTime(expr, now); ok {
+		return t, nil
+	}
+
+	// Time periods: next week, this month, etc.
+	if t, ok := parseTimePeriod(expr, now); ok {
+		return t, nil
+	}
+
+	// Weekdays: next Monday, last Friday, etc.
+	if t, ok := parseWeekday(expr, now); ok {
+		return t, nil
+	}
+
+	return time.Time{}, fmt.Errorf("unable to parse time expression: %s", expr)
+}
+
+// parseAbsoluteDate parses absolute date formats
+func parseAbsoluteDate(expr string, now time.Time) (time.Time, bool) {
+	// YYYY-MM-DD format
+	re := regexp.MustCompile(`^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})`)
+	if matches := re.FindStringSubmatch(expr); matches != nil {
+		year, _ := strconv.Atoi(matches[1])
+		month, _ := strconv.Atoi(matches[2])
+		day, _ := strconv.Atoi(matches[3])
+		t := time.Date(year, time.Month(month), day, now.Hour(), now.Minute(), 0, 0, now.Location())
+		return t, true
+	}
+
+	// DD-MM-YYYY or DD/MM/YYYY format
+	re = regexp.MustCompile(`^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})`)
+	if matches := re.FindStringSubmatch(expr); matches != nil {
+		day, _ := strconv.Atoi(matches[1])
+		month, _ := strconv.Atoi(matches[2])
+		year, _ := strconv.Atoi(matches[3])
+		t := time.Date(year, time.Month(month), day, now.Hour(), now.Minute(), 0, 0, now.Location())
+		return t, true
+	}
+
+	// Chinese format: 2024年12月25日
+	re = regexp.MustCompile(`^(\d{4})年(\d{1,2})月(\d{1,2})日`)
+	if matches := re.FindStringSubmatch(expr); matches != nil {
+		year, _ := strconv.Atoi(matches[1])
+		month, _ := strconv.Atoi(matches[2])
+		day, _ := strconv.Atoi(matches[3])
+		t := time.Date(year, time.Month(month), day, now.Hour(), now.Minute(), 0, 0, now.Location())
+		return t, true
+	}
+
+	// Chinese format without year: 12月25日
+	re = regexp.MustCompile(`^(\d{1,2})月(\d{1,2})日`)
+	if matches := re.FindStringSubmatch(expr); matches != nil {
+		month, _ := strconv.Atoi(matches[1])
+		day, _ := strconv.Atoi(matches[2])
+		t := time.Date(now.Year(), time.Month(month), day, now.Hour(), now.Minute(), 0, 0, now.Location())
+		return t, true
+	}
+
+	return time.Time{}, false
+}
+
+// parseRelativeDate parses relative dates like today, tomorrow, yesterday
+func parseRelativeDate(expr string, now time.Time) (time.Time, bool) {
+	switch expr {
+	case "today", "今天":
+		return now, true
+	case "tomorrow", "明天":
+		return now.AddDate(0, 0, 1), true
+	case "yesterday", "昨天":
+		return now.AddDate(0, 0, -1), true
+	}
+	return time.Time{}, false
+}
+
+// parseRelativeTime parses relative times like "in 2 hours", "30 minutes later"
+func parseRelativeTime(expr string, now time.Time) (time.Time, bool) {
+	totalSeconds := 0
+
+	// English patterns
+	patterns := []struct {
+		re         string
+		multiplier int
+	}{
+		{`in\s+(\d+)\s+(second|minute|hour|day|week|month|year)s?`, 1},
+		{`(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+later`, 1},
+		{`after\s+(\d+)\s+(second|minute|hour|day|week|month|year)s?`, 1},
+	}
+
+	unitMultipliers := map[string]int{
+		"second": 1,
+		"minute": 60,
+		"hour":   3600,
+		"day":    86400,
+		"week":   604800,
+		"month":  2592000,
+		"year":   31536000,
+	}
+
+	for _, p := range patterns {
+		re := regexp.MustCompile(p.re)
+		if matches := re.FindStringSubmatch(expr); matches != nil {
+			amount, _ := strconv.Atoi(matches[1])
+			unit := matches[2]
+			totalSeconds += amount * unitMultipliers[unit]
+		}
+	}
+
+	// Chinese patterns
+	cnPatterns := []struct {
+		re         string
+		multiplier int
+	}{
+		{`(\d+)\s*秒(?:后|之?后)`, 1},
+		{`(\d+)\s*分(?:钟)?(?:后|之?后)`, 60},
+		{`(\d+)\s*小(?:时)?(?:后|之?后)`, 3600},
+		{`(\d+)\s*天(?:后|之?后)`, 86400},
+		{`(\d+)\s*周(?:后|之?后)`, 604800},
+		{`(\d+)\s*月(?:后|之?后)`, 2592000},
+		{`(\d+)\s*年(?:后|之?后)`, 31536000},
+	}
+
+	for _, p := range cnPatterns {
+		re := regexp.MustCompile(p.re)
+		if matches := re.FindStringSubmatch(expr); matches != nil {
+			amount, _ := strconv.Atoi(matches[1])
+			totalSeconds += amount * p.multiplier
+		}
+	}
+
+	if totalSeconds > 0 {
+		return now.Add(time.Duration(totalSeconds) * time.Second), true
+	}
+
+	return time.Time{}, false
+}
+
+// parseTimePeriod parses time periods like "next week", "this month"
+func parseTimePeriod(expr string, now time.Time) (time.Time, bool) {
+	// English patterns
+	if strings.Contains(expr, "next week") {
+		daysUntilSunday := (7 - int(now.Weekday())) % 7
+		if daysUntilSunday == 0 {
+			daysUntilSunday = 7
+		}
+		return now.AddDate(0, 0, daysUntilSunday), true
+	}
+	if strings.Contains(expr, "this week") {
+		daysUntilSaturday := (6 - int(now.Weekday())%7)
+		if daysUntilSaturday < 0 {
+			daysUntilSaturday += 7
+		}
+		return now.AddDate(0, 0, daysUntilSaturday), true
+	}
+	if strings.Contains(expr, "last week") {
+		daysBack := int(now.Weekday()) + 7
+		return now.AddDate(0, 0, -daysBack), true
+	}
+	if strings.Contains(expr, "next month") {
+		if now.Month() == 12 {
+			return time.Date(now.Year()+1, 1, 1, now.Hour(), now.Minute(), 0, 0, now.Location()), true
+		}
+		return time.Date(now.Year(), now.Month()+1, 1, now.Hour(), now.Minute(), 0, 0, now.Location()), true
+	}
+	if strings.Contains(expr, "this month") {
+		lastDay := time.Date(now.Year(), now.Month()+1, 0, now.Hour(), now.Minute(), 0, 0, now.Location())
+		return lastDay, true
+	}
+	if strings.Contains(expr, "last month") {
+		if now.Month() == 1 {
+			return time.Date(now.Year()-1, 12, 1, now.Hour(), now.Minute(), 0, 0, now.Location()), true
+		}
+		return time.Date(now.Year(), now.Month()-1, 1, now.Hour(), now.Minute(), 0, 0, now.Location()), true
+	}
+	if strings.Contains(expr, "next year") {
+		return time.Date(now.Year()+1, 1, 1, now.Hour(), now.Minute(), 0, 0, now.Location()), true
+	}
+	if strings.Contains(expr, "this year") {
+		return time.Date(now.Year(), 12, 31, now.Hour(), now.Minute(), 0, 0, now.Location()), true
+	}
+
+	// Chinese patterns
+	if regexp.MustCompile(`下(?:个)?周`).MatchString(expr) {
+		daysUntilSunday := (7 - int(now.Weekday())) % 7
+		if daysUntilSunday == 0 {
+			daysUntilSunday = 7
+		}
+		return now.AddDate(0, 0, daysUntilSunday), true
+	}
+	if regexp.MustCompile(`本(?:个)?周`).MatchString(expr) {
+		daysUntilSaturday := (6 - int(now.Weekday())%7)
+		if daysUntilSaturday < 0 {
+			daysUntilSaturday += 7
+		}
+		return now.AddDate(0, 0, daysUntilSaturday), true
+	}
+	if regexp.MustCompile(`上(?:个)?周`).MatchString(expr) {
+		daysBack := int(now.Weekday()) + 7
+		return now.AddDate(0, 0, -daysBack), true
+	}
+	if regexp.MustCompile(`下(?:个)?月`).MatchString(expr) {
+		if now.Month() == 12 {
+			return time.Date(now.Year()+1, 1, 1, now.Hour(), now.Minute(), 0, 0, now.Location()), true
+		}
+		return time.Date(now.Year(), now.Month()+1, 1, now.Hour(), now.Minute(), 0, 0, now.Location()), true
+	}
+	if regexp.MustCompile(`本月`).MatchString(expr) {
+		lastDay := time.Date(now.Year(), now.Month()+1, 0, now.Hour(), now.Minute(), 0, 0, now.Location())
+		return lastDay, true
+	}
+	if regexp.MustCompile(`上(?:个)?月`).MatchString(expr) {
+		if now.Month() == 1 {
+			return time.Date(now.Year()-1, 12, 1, now.Hour(), now.Minute(), 0, 0, now.Location()), true
+		}
+		return time.Date(now.Year(), now.Month()-1, 1, now.Hour(), now.Minute(), 0, 0, now.Location()), true
+	}
+	if regexp.MustCompile(`明年`).MatchString(expr) {
+		return time.Date(now.Year()+1, 1, 1, now.Hour(), now.Minute(), 0, 0, now.Location()), true
+	}
+	if regexp.MustCompile(`今年`).MatchString(expr) {
+		return time.Date(now.Year(), 12, 31, now.Hour(), now.Minute(), 0, 0, now.Location()), true
+	}
+
+	return time.Time{}, false
+}
+
+// parseWeekday parses weekday expressions like "next Monday", "last Friday"
+func parseWeekday(expr string, now time.Time) (time.Time, bool) {
+	weekdays := map[string]time.Weekday{
+		"sunday":    time.Sunday,
+		"monday":    time.Monday,
+		"tuesday":   time.Tuesday,
+		"wednesday": time.Wednesday,
+		"thursday":  time.Thursday,
+		"friday":    time.Friday,
+		"saturday":  time.Saturday,
+	}
+
+	cnWeekdays := map[string]time.Weekday{
+		"周日": time.Sunday, "星期日": time.Sunday,
+		"周一": time.Monday, "星期一": time.Monday,
+		"周二": time.Tuesday, "星期二": time.Tuesday,
+		"周三": time.Wednesday, "星期三": time.Wednesday,
+		"周四": time.Thursday, "星期四": time.Thursday,
+		"周五": time.Friday, "星期五": time.Friday,
+		"周六": time.Saturday, "星期六": time.Saturday,
+	}
+
+	var targetWeekday time.Weekday
+	var found bool
+
+	for day, wd := range weekdays {
+		if strings.Contains(expr, day) {
+			targetWeekday = wd
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		for day, wd := range cnWeekdays {
+			if strings.Contains(expr, day) {
+				targetWeekday = wd
+				found = true
+				break
+			}
+		}
+	}
+
+	if !found {
+		return time.Time{}, false
+	}
+
+	currentWeekday := now.Weekday()
+
+	// Check for next/last modifiers
+	if strings.Contains(expr, "next") || strings.Contains(expr, "下周") {
+		daysAhead := int(targetWeekday-currentWeekday+7) % 7
+		if daysAhead == 0 {
+			daysAhead = 7
+		}
+		return now.AddDate(0, 0, daysAhead), true
+	}
+	if strings.Contains(expr, "last") || strings.Contains(expr, "上周") {
+		daysBack := int(currentWeekday-targetWeekday+7) % 7
+		if daysBack == 0 {
+			daysBack = 7
+		}
+		return now.AddDate(0, 0, -daysBack), true
+	}
+
+	// Default to this week
+	daysAhead := int(targetWeekday-currentWeekday+7) % 7
+	return now.AddDate(0, 0, daysAhead), true
 }
 
 // ToolResponse represents the response from a tool execution

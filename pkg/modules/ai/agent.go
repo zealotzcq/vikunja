@@ -365,6 +365,7 @@ func (a *Agent) buildSystemPrompt(agentCtx *AgentContext) string {
 	sb.WriteString("\n\n")
 
 	sb.WriteString("## Environment Information\n")
+	sb.WriteString(fmt.Sprintf("- Date: %s\n", time.Now().Format("2006-01-02")))
 	if agentCtx.UserID > 0 {
 		sb.WriteString(fmt.Sprintf("- User ID: %d\n", agentCtx.UserID))
 	}

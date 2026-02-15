@@ -474,13 +474,13 @@ Example usage:
 
 			switch strings.ToLower(priority) {
 			case "high":
-				priorityValue = 6
+				priorityValue = 3
 				daysToAdd = 1
 			case "low":
-				priorityValue = 3
+				priorityValue = 1
 				daysToAdd = 7
 			default:
-				priorityValue = 4
+				priorityValue = 2
 				daysToAdd = 3
 			}
 
@@ -614,8 +614,6 @@ Example usage:
 			response := fmt.Sprintf("已成功为 %s 分配任务：%s\n", displayName, taskTitle)
 			response += fmt.Sprintf("- 优先级：%s\n", map[string]string{"high": "高", "medium": "中", "low": "低"}[priority])
 			response += fmt.Sprintf("- 截止日期：%s\n", dueDate.Format("2006-01-02"))
-			response += "- 已收藏\n"
-			response += "- 已订阅通知"
 
 			ctx.ButtonNavigation = &chat_session.ButtonNavigation{
 				RouteName: "task.detail",

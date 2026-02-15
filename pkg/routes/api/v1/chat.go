@@ -458,6 +458,15 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 
 	// Save assistant response message
 
+	var buttonNavigation *chat_session.ButtonNavigation
+	if agentResponse.ButtonNavigation != nil {
+		buttonNavigation = &chat_session.ButtonNavigation{
+			RouteName: agentResponse.ButtonNavigation.RouteName,
+			Params:    agentResponse.ButtonNavigation.Params,
+			Label:     agentResponse.ButtonNavigation.Label,
+		}
+	}
+
 	assistantMessage := chat_session.Message{
 		ID:                assistantMsgID,
 		Type:              "assistant_response",
@@ -470,6 +479,20 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 	}
 
 	chat_session.GetDefault().AddMessage(userID, req.CompanyID, assistantMessage)
+
+	// Save button navigation as separate message if exists
+	if buttonNavigation != nil {
+		buttonNavMsg := chat_session.Message{
+			ID:               fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+			Type:             "button_navigation",
+			Role:             "assistant",
+			Content:          "",
+			Timestamp:        time.Now().Unix(),
+			ButtonNavigation: buttonNavigation,
+			CompanyID:        req.CompanyID,
+		}
+		chat_session.GetDefault().AddMessage(userID, req.CompanyID, buttonNavMsg)
+	}
 }
 
 // SubmitQuestionAnswer handles submitting an answer to a question
@@ -652,4 +675,22 @@ func processQuestionAnswerAsync(ctx context.Context, userID, companyID int64, an
 	}
 
 	chat_session.GetDefault().AddMessage(userID, companyID, assistantMessage)
+
+	// Save button navigation as separate message if exists
+	if agentResponse.ButtonNavigation != nil {
+		buttonNavMsg := chat_session.Message{
+			ID:        fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+			Type:      "button_navigation",
+			Role:      "assistant",
+			Content:   "",
+			Timestamp: time.Now().Unix(),
+			ButtonNavigation: &chat_session.ButtonNavigation{
+				RouteName: agentResponse.ButtonNavigation.RouteName,
+				Params:    agentResponse.ButtonNavigation.Params,
+				Label:     agentResponse.ButtonNavigation.Label,
+			},
+			CompanyID: companyID,
+		}
+		chat_session.GetDefault().AddMessage(userID, companyID, buttonNavMsg)
+	}
 }

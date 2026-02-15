@@ -50,12 +50,13 @@ type AgentContext struct {
 	Language         string                              `json:"language"`
 	SubordinateStaff []chat_session.SubordinateStaffInfo `json:"subordinate_staff"`
 
-	NavigationInfo   *NavigationInfo `json:"navigation_info,omitempty"`
-	ShouldNavigate   bool            `json:"should_navigate"`
-	ExecutionSteps   []ExecutionStep `json:"execution_steps"`
-	TokensUsed       int             `json:"tokens_used"`
-	QuestionData     string          `json:"question_data,omitempty"`
-	WaitingForAnswer bool            `json:"waiting_for_answer,omitempty"`
+	NavigationInfo   *NavigationInfo                `json:"navigation_info,omitempty"`
+	ShouldNavigate   bool                           `json:"should_navigate"`
+	ExecutionSteps   []ExecutionStep                `json:"execution_steps"`
+	TokensUsed       int                            `json:"tokens_used"`
+	QuestionData     string                         `json:"question_data,omitempty"`
+	WaitingForAnswer bool                           `json:"waiting_for_answer,omitempty"`
+	ButtonNavigation *chat_session.ButtonNavigation `json:"button_navigation,omitempty"`
 }
 
 // Message represents a message in the conversation
@@ -251,11 +252,12 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 			messagesToSave = append(messagesToSave, assistantMsg)
 
 			return &AgentResponse{
-				Content:        providerResponse.Content,
-				NavigationInfo: agentCtx.NavigationInfo,
-				ShouldNavigate: agentCtx.ShouldNavigate,
-				ExecutionSteps: agentCtx.ExecutionSteps,
-				TokensUsed:     agentCtx.TokensUsed,
+				Content:          providerResponse.Content,
+				NavigationInfo:   agentCtx.NavigationInfo,
+				ShouldNavigate:   agentCtx.ShouldNavigate,
+				ExecutionSteps:   agentCtx.ExecutionSteps,
+				TokensUsed:       agentCtx.TokensUsed,
+				ButtonNavigation: agentCtx.ButtonNavigation,
 			}, messagesToSave, nil
 		}
 
@@ -270,11 +272,12 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 			messagesToSave = append(messagesToSave, assistantMsg)
 
 			return &AgentResponse{
-				Content:        providerResponse.Content,
-				NavigationInfo: agentCtx.NavigationInfo,
-				ShouldNavigate: agentCtx.ShouldNavigate,
-				ExecutionSteps: agentCtx.ExecutionSteps,
-				TokensUsed:     agentCtx.TokensUsed,
+				Content:          providerResponse.Content,
+				NavigationInfo:   agentCtx.NavigationInfo,
+				ShouldNavigate:   agentCtx.ShouldNavigate,
+				ExecutionSteps:   agentCtx.ExecutionSteps,
+				TokensUsed:       agentCtx.TokensUsed,
+				ButtonNavigation: agentCtx.ButtonNavigation,
 			}, messagesToSave, nil
 		}
 
@@ -356,12 +359,13 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 				metadata["tokens_used"] = agentCtx.TokensUsed
 
 				return &AgentResponse{
-					Content:        executionResult.StopCommand.Response,
-					NavigationInfo: agentCtx.NavigationInfo,
-					ShouldNavigate: agentCtx.ShouldNavigate,
-					ExecutionSteps: agentCtx.ExecutionSteps,
-					TokensUsed:     agentCtx.TokensUsed,
-					Metadata:       metadata,
+					Content:          executionResult.StopCommand.Response,
+					NavigationInfo:   agentCtx.NavigationInfo,
+					ShouldNavigate:   agentCtx.ShouldNavigate,
+					ExecutionSteps:   agentCtx.ExecutionSteps,
+					TokensUsed:       agentCtx.TokensUsed,
+					Metadata:         metadata,
+					ButtonNavigation: agentCtx.ButtonNavigation,
 				}, messagesToSave, nil
 			}
 		}
@@ -376,30 +380,33 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 			messagesToSave = append(messagesToSave, assistantMsg)
 
 			return &AgentResponse{
-				Content:        providerResponse.Content,
-				NavigationInfo: agentCtx.NavigationInfo,
-				ShouldNavigate: agentCtx.ShouldNavigate,
-				ExecutionSteps: agentCtx.ExecutionSteps,
-				TokensUsed:     agentCtx.TokensUsed,
+				Content:          providerResponse.Content,
+				NavigationInfo:   agentCtx.NavigationInfo,
+				ShouldNavigate:   agentCtx.ShouldNavigate,
+				ExecutionSteps:   agentCtx.ExecutionSteps,
+				TokensUsed:       agentCtx.TokensUsed,
+				ButtonNavigation: agentCtx.ButtonNavigation,
 			}, messagesToSave, nil
 		}
 
 		// Check if tool result indicates we should stop (e.g., navigation tool completed)
 		if agentCtx.ShouldNavigate {
 			return &AgentResponse{
-				Content:        "Navigation completed",
-				NavigationInfo: agentCtx.NavigationInfo,
-				ShouldNavigate: true,
-				ExecutionSteps: agentCtx.ExecutionSteps,
-				TokensUsed:     agentCtx.TokensUsed,
+				Content:          "Navigation completed",
+				NavigationInfo:   agentCtx.NavigationInfo,
+				ShouldNavigate:   true,
+				ExecutionSteps:   agentCtx.ExecutionSteps,
+				TokensUsed:       agentCtx.TokensUsed,
+				ButtonNavigation: agentCtx.ButtonNavigation,
 			}, messagesToSave, nil
 		}
 	}
 
 	return &AgentResponse{
-		Content:        "I apologize, but I couldn't complete your request. Please try again.",
-		ExecutionSteps: agentCtx.ExecutionSteps,
-		TokensUsed:     agentCtx.TokensUsed,
+		Content:          "I apologize, but I couldn't complete your request. Please try again.",
+		ExecutionSteps:   agentCtx.ExecutionSteps,
+		TokensUsed:       agentCtx.TokensUsed,
+		ButtonNavigation: agentCtx.ButtonNavigation,
 	}, messagesToSave, nil
 }
 
@@ -497,12 +504,13 @@ func messagesToPrompt(messages []Message) string {
 
 // AgentResponse represents the agent's response
 type AgentResponse struct {
-	Content        string                 `json:"content"`
-	NavigationInfo *NavigationInfo        `json:"navigation_info,omitempty"`
-	ShouldNavigate bool                   `json:"should_navigate"`
-	ExecutionSteps []ExecutionStep        `json:"execution_steps,omitempty"`
-	TokensUsed     int                    `json:"tokens_used"`
-	Metadata       map[string]interface{} `json:"metadata,omitempty"`
+	Content          string                         `json:"content"`
+	NavigationInfo   *NavigationInfo                `json:"navigation_info,omitempty"`
+	ShouldNavigate   bool                           `json:"should_navigate"`
+	ExecutionSteps   []ExecutionStep                `json:"execution_steps,omitempty"`
+	TokensUsed       int                            `json:"tokens_used"`
+	Metadata         map[string]interface{}         `json:"metadata,omitempty"`
+	ButtonNavigation *chat_session.ButtonNavigation `json:"button_navigation,omitempty"`
 }
 
 // Reset resets the agent state

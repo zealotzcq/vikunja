@@ -617,6 +617,14 @@ Example usage:
 			response += "- 已收藏\n"
 			response += "- 已订阅通知"
 
+			ctx.ButtonNavigation = &chat_session.ButtonNavigation{
+				RouteName: "task.detail",
+				Params: map[string]interface{}{
+					"id": task.ID,
+				},
+				Label: fmt.Sprintf("查看任务 #%d", task.ID),
+			}
+
 			return &ToolExecutionResult{
 				Result: response,
 				Metadata: map[string]interface{}{

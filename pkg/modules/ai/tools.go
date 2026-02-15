@@ -473,20 +473,21 @@ Task properties:
 - Subscription: Subscribed to task notifications
 
 Supported time expressions (fill in the time_expression parameter in English):
-- Relative dates: "today", "tomorrow", "yesterday", "今天", "明天", "昨天"
-- Relative times: "in 2 hours", "30 minutes later", "after 3 days", "2小时后", "30分钟后"
-- Time periods: "next week", "this month", "last year", "下周", "本月", "明年"
-- Weekdays: "next Monday", "last Friday", "下周一", "上周五", "周五"
-- Absolute dates: "2024-12-25", "2024年12月25日", "12月25日"
-- Combinations: "tomorrow at 3pm", "下周一上午9点", "next Friday 5pm"
-Important: 输出日期表达式的时候,使用英文关键词(如tomorrow、next Monday等)
+- Relative dates: "today", "tomorrow", "yesterday", "today", "tomorrow", "yesterday"
+- Relative times: "in 2 hours", "30 minutes later", "after 3 days", "in 2 hours", "30 minutes later"
+- Time periods: "next week", "this month", "last year", "next week", "this month", "next year"
+- Weekdays: "next Monday", "last Friday", "next Friday", "last Monday", "Friday"
+- Absolute dates: "2024-12-25", "December 25, 2024", "December 25"
+- Combinations: "tomorrow at 3pm", "next Monday at 9am", "next Friday at 5pm"
+注意:填充time_expression时,指定语言为英语,"大后天" 应该翻译成 "after 3 days"
+
 
 Example usage:
 - "让小王马上写报告" -> HIGH priority, no time_expr, due in 1 day
 - "叫李四有空的时候整理文档" -> LOW priority, no time_expr, due in 7 days
 - "给张三安排个任务，明天截止" -> MEDIUM priority, time_expr="tomorrow"
-- "让小王下周五提交报告" -> MEDIUM priority, time_expr="下周五"
-- "给李四分配任务，2小时后完成" -> HIGH priority, time_expr="2小时后"`,
+- "让小王下周五提交报告" -> MEDIUM priority, time_expr="Next Friday"
+- "给李四分配任务，2小时后完成" -> HIGH priority, time_expr="two hours later"`,
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -505,7 +506,7 @@ Example usage:
 				},
 				"time_expression": map[string]interface{}{
 					"type":        "string",
-					"description": "Optional natural language time expression (e.g., 'tomorrow', '下周五', '2小时后', '2024-12-25'). If provided, this overrides the priority-based due date calculation. Current date/time is " + time.Now().Format("2006-01-02") + ".",
+					"description": "Optional natural language time expression (e.g., 'tomorrow', 'Next Friday', '2 hours later', '2024-12-25'). If provided, this overrides the priority-based due date calculation. Current date/time is " + time.Now().Format("2006-01-02") + ".",
 				},
 			},
 			"required": []string{"user_identifier", "task_title"},

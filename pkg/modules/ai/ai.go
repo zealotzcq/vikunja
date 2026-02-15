@@ -30,6 +30,8 @@ func GenerateResponse(userContent string, routeName string, routeParams map[stri
 
 // GenerateAgentResponse generates an AI response using the agent system
 func GenerateAgentResponse(ctx context.Context, userID int64, userContent string, routeName string, routeParams map[string]interface{}) (*AgentResponse, error) {
+	// GenerateAgentResponse is deprecated, use SendMessage endpoint from chat.go instead
+	// This function is kept for backward compatibility with tests
 	config, err := LoadConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
@@ -42,7 +44,7 @@ func GenerateAgentResponse(ctx context.Context, userID int64, userContent string
 		return nil, fmt.Errorf("failed to get agent: %w", err)
 	}
 
-	session, err := chat_session.GetDefault().GetOrCreateSession(userID)
+	session, err := chat_session.GetDefault().GetOrCreateSession(userID, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
@@ -50,11 +52,12 @@ func GenerateAgentResponse(ctx context.Context, userID int64, userContent string
 	log.Printf("[AI] Session loaded - Messages count: %d", len(session.Messages))
 
 	agentCtx := &AgentContext{
-		UserID:         userID,
-		CurrentRoute:   routeName,
-		RouteParams:    routeParams,
-		SessionData:    make(map[string]interface{}),
-		MessageHistory: make([]Message, 0, len(session.Messages)),
+		UserID:           userID,
+		CurrentRoute:     routeName,
+		RouteParams:      routeParams,
+		SessionData:      make(map[string]interface{}),
+		MessageHistory:   make([]Message, 0, len(session.Messages)),
+		SubordinateStaff: session.SubordinateStaff,
 	}
 
 	for _, msg := range session.Messages {

@@ -31,8 +31,9 @@ func TestGenerateAgentResponseWithHistory(t *testing.T) {
 	agent.mu.Unlock()
 
 	userID := int64(123)
+	companyID := int64(0)
 
-	chat_session.GetDefault().ClearSession(userID)
+	chat_session.GetDefault().ClearSession(userID, companyID)
 
 	historyMessages := []chat_session.Message{
 		{
@@ -40,28 +41,31 @@ func TestGenerateAgentResponseWithHistory(t *testing.T) {
 			Role:      "user",
 			Content:   "Hello",
 			Timestamp: time.Now().Unix(),
+			CompanyID: companyID,
 		},
 		{
 			ID:        "msg_2",
 			Role:      "assistant",
 			Content:   "Hi there! How can I help you?",
 			Timestamp: time.Now().Unix(),
+			CompanyID: companyID,
 		},
 		{
 			ID:        "msg_3",
 			Role:      "user",
 			Content:   "Show me projects",
 			Timestamp: time.Now().Unix(),
+			CompanyID: companyID,
 		},
 	}
 
 	for _, msg := range historyMessages {
-		if err := chat_session.GetDefault().AddMessage(userID, msg); err != nil {
+		if err := chat_session.GetDefault().AddMessage(userID, companyID, msg); err != nil {
 			t.Fatalf("Failed to add message to session: %v", err)
 		}
 	}
 
-	session, err := chat_session.GetDefault().GetOrCreateSession(userID)
+	session, err := chat_session.GetDefault().GetOrCreateSession(userID, companyID)
 	if err != nil {
 		t.Fatalf("Failed to get session: %v", err)
 	}
@@ -99,15 +103,16 @@ func TestGenerateAgentResponseWithHistory(t *testing.T) {
 		t.Error("Response content should not be empty")
 	}
 
-	chat_session.GetDefault().ClearSession(userID)
+	chat_session.GetDefault().ClearSession(userID, companyID)
 }
 
 func TestAgentContextHistory(t *testing.T) {
 	userID := int64(456)
+	companyID := int64(0)
 
-	chat_session.GetDefault().ClearSession(userID)
+	chat_session.GetDefault().ClearSession(userID, companyID)
 
-	_, err := chat_session.GetDefault().GetOrCreateSession(userID)
+	_, err := chat_session.GetDefault().GetOrCreateSession(userID, companyID)
 	if err != nil {
 		t.Fatalf("Failed to create session: %v", err)
 	}
@@ -118,22 +123,24 @@ func TestAgentContextHistory(t *testing.T) {
 			Role:      "user",
 			Content:   "First message",
 			Timestamp: time.Now().Unix(),
+			CompanyID: companyID,
 		},
 		{
 			ID:        "msg_2",
 			Role:      "assistant",
 			Content:   "First response",
 			Timestamp: time.Now().Unix(),
+			CompanyID: companyID,
 		},
 	}
 
 	for _, msg := range historyMessages {
-		if err := chat_session.GetDefault().AddMessage(userID, msg); err != nil {
+		if err := chat_session.GetDefault().AddMessage(userID, companyID, msg); err != nil {
 			t.Fatalf("Failed to add message: %v", err)
 		}
 	}
 
-	updatedSession, err := chat_session.GetDefault().GetOrCreateSession(userID)
+	updatedSession, err := chat_session.GetDefault().GetOrCreateSession(userID, companyID)
 	if err != nil {
 		t.Fatalf("Failed to get session: %v", err)
 	}
@@ -177,15 +184,16 @@ func TestAgentContextHistory(t *testing.T) {
 		t.Errorf("Second history message role should be 'assistant', got '%s'", agentCtx.MessageHistory[1].Role)
 	}
 
-	chat_session.GetDefault().ClearSession(userID)
+	chat_session.GetDefault().ClearSession(userID, companyID)
 }
 
 func TestAgentContextWithEmptyHistory(t *testing.T) {
 	userID := int64(789)
+	companyID := int64(0)
 
-	chat_session.GetDefault().ClearSession(userID)
+	chat_session.GetDefault().ClearSession(userID, companyID)
 
-	_, err := chat_session.GetDefault().GetOrCreateSession(userID)
+	_, err := chat_session.GetDefault().GetOrCreateSession(userID, companyID)
 	if err != nil {
 		t.Fatalf("Failed to create session: %v", err)
 	}
@@ -202,5 +210,5 @@ func TestAgentContextWithEmptyHistory(t *testing.T) {
 		t.Errorf("Expected 0 history messages, got %d", len(agentCtx.MessageHistory))
 	}
 
-	chat_session.GetDefault().ClearSession(userID)
+	chat_session.GetDefault().ClearSession(userID, companyID)
 }

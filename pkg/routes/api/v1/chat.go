@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"code.vikunja.io/api/pkg/company"
@@ -101,9 +102,10 @@ func SendMessage(c *echo.Context) error {
 		Role:      "user",
 		Content:   req.Message,
 		Timestamp: time.Now().Unix(),
+		CompanyID: req.CompanyID,
 	}
 
-	if err := chat_session.GetDefault().AddMessage(userID, userMessage); err != nil {
+	if err := chat_session.GetDefault().AddMessage(userID, req.CompanyID, userMessage); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to save message: %v", err))
 	}
 
@@ -133,8 +135,14 @@ func GetSession(c *echo.Context) error {
 
 	userID := a.GetID()
 
+	companyIDStr := c.QueryParam("company_id")
+	companyID, err := strconv.ParseInt(companyIDStr, 10, 64)
+	if err != nil || companyID <= 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "company_id is required and must be a positive integer")
+	}
+
 	// Get or create session
-	sessionData, err := chat_session.GetDefault().GetOrCreateSession(userID)
+	sessionData, err := chat_session.GetDefault().GetOrCreateSession(userID, companyID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to get session: %v", err))
 	}
@@ -159,8 +167,14 @@ func ClearSession(c *echo.Context) error {
 
 	userID := a.GetID()
 
+	companyIDStr := c.QueryParam("company_id")
+	companyID, err := strconv.ParseInt(companyIDStr, 10, 64)
+	if err != nil || companyID <= 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "company_id is required and must be a positive integer")
+	}
+
 	// Clear the session
-	if err := chat_session.GetDefault().ClearSession(userID); err != nil {
+	if err := chat_session.GetDefault().ClearSession(userID, companyID); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to clear session: %v", err))
 	}
 
@@ -184,7 +198,13 @@ func GetChatHistory(c *echo.Context) error {
 
 	userID := a.GetID()
 
-	sessionData, err := chat_session.GetDefault().GetOrCreateSession(userID)
+	companyIDStr := c.QueryParam("company_id")
+	companyID, err := strconv.ParseInt(companyIDStr, 10, 64)
+	if err != nil || companyID <= 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "company_id is required and must be a positive integer")
+	}
+
+	sessionData, err := chat_session.GetDefault().GetOrCreateSession(userID, companyID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to get session: %v", err))
 	}
@@ -250,10 +270,12 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 		Language:       u.Language,
 	}
 
-	session, err := chat_session.GetDefault().GetOrCreateSession(userID)
+	session, err := chat_session.GetDefault().GetOrCreateSession(userID, req.CompanyID)
 	if err != nil {
 		return
 	}
+
+	agentCtx.SubordinateStaff = session.SubordinateStaff
 
 	for _, msg := range session.Messages {
 		// Skip the current user message we're processing (it will be added separately)
@@ -346,8 +368,9 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 			ToolName:  step.Action,
 			ToolInput: step.Input,
 			Timestamp: time.Now().Unix(),
+			CompanyID: req.CompanyID,
 		}
-		if err := chat_session.GetDefault().AddMessage(userID, toolCallMsg); err != nil {
+		if err := chat_session.GetDefault().AddMessage(userID, req.CompanyID, toolCallMsg); err != nil {
 		}
 
 		// Save tool result message with ToolCallID referencing the tool call
@@ -360,8 +383,9 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 			ToolOutput: step.Output,
 			ToolCallID: toolCallID,
 			Timestamp:  time.Now().Unix(),
+			CompanyID:  req.CompanyID,
 		}
-		if err := chat_session.GetDefault().AddMessage(userID, toolResultMsg); err != nil {
+		if err := chat_session.GetDefault().AddMessage(userID, req.CompanyID, toolResultMsg); err != nil {
 		}
 	}
 
@@ -375,7 +399,8 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 		Timestamp:         time.Now().Unix(),
 		NavigationCommand: navigationCommand,
 		Metadata:          metadata,
+		CompanyID:         req.CompanyID,
 	}
 
-	chat_session.GetDefault().AddMessage(userID, assistantMessage)
+	chat_session.GetDefault().AddMessage(userID, req.CompanyID, assistantMessage)
 }

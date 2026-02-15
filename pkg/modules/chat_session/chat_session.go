@@ -5,7 +5,10 @@ import (
 	"sync"
 	"time"
 
+	"code.vikunja.io/api/pkg/company"
+	"code.vikunja.io/api/pkg/db"
 	"code.vikunja.io/api/pkg/modules/keyvalue"
+	"code.vikunja.io/api/pkg/user"
 )
 
 const (
@@ -14,13 +17,22 @@ const (
 	cleanupInterval = 5 * time.Minute
 )
 
+// SubordinateStaffInfo represents information about a subordinate staff member
+type SubordinateStaffInfo struct {
+	UserID   int64  `json:"user_id"`
+	Username string `json:"username"`
+	Name     string `json:"name"`
+}
+
 // ChatSession represents a chat session in memory
 type ChatSession struct {
-	ID        string    `json:"id"`
-	UserID    int64     `json:"user_id"`
-	CreatedAt time.Time `json:"created_at"`
-	ExpiresAt time.Time `json:"expires_at"`
-	Messages  []Message `json:"messages"`
+	ID               string                 `json:"id"`
+	UserID           int64                  `json:"user_id"`
+	CompanyID        int64                  `json:"company_id"`
+	CreatedAt        time.Time              `json:"created_at"`
+	ExpiresAt        time.Time              `json:"expires_at"`
+	Messages         []Message              `json:"messages"`
+	SubordinateStaff []SubordinateStaffInfo `json:"subordinate_staff"`
 }
 
 // Message represents a chat message
@@ -36,6 +48,7 @@ type Message struct {
 	ToolOutput        string                 `json:"toolOutput,omitempty"`
 	ToolCallID        string                 `json:"toolCallID,omitempty"`
 	Metadata          map[string]interface{} `json:"metadata,omitempty"`
+	CompanyID         int64                  `json:"company_id,omitempty"`
 }
 
 // NavigationCommand represents a navigation action
@@ -48,14 +61,14 @@ type NavigationCommand struct {
 // Manager manages chat sessions in memory
 type Manager struct {
 	mu        sync.RWMutex
-	listeners map[int64][]chan Message
+	listeners map[string][]chan Message
 }
 
 var defaultManager = &Manager{}
 
 // getExistingSession gets an existing session without locking
-func (m *Manager) getExistingSession(userID int64) (*ChatSession, error) {
-	sessionKey := getSessionKey(userID)
+func (m *Manager) getExistingSession(userID, companyID int64) (*ChatSession, error) {
+	sessionKey := getSessionKey(userID, companyID)
 
 	sessionData, exists, err := keyvalue.Get(sessionKey)
 	if err != nil {
@@ -87,18 +100,78 @@ func (m *Manager) getExistingSession(userID int64) (*ChatSession, error) {
 	return &updatedSession, nil
 }
 
-// createNewSessionWithoutLock creates a new chat session without locking
-func (m *Manager) createNewSessionWithoutLock(userID int64) (*ChatSession, error) {
-	now := time.Now()
-	session := ChatSession{
-		ID:        generateSessionID(),
-		UserID:    userID,
-		CreatedAt: now,
-		ExpiresAt: now.Add(sessionTTL),
-		Messages:  []Message{},
+// getSubordinateStaff retrieves subordinate staff information for a user in a company
+func getSubordinateStaff(userID, companyID int64) (result []SubordinateStaffInfo, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("[Chat] Recovered from panic in getSubordinateStaff: %v\n", r)
+			result = []SubordinateStaffInfo{}
+			err = nil
+		}
+	}()
+
+	if companyID <= 0 {
+		return []SubordinateStaffInfo{}, nil
 	}
 
-	sessionKey := getSessionKey(userID)
+	s := db.NewSession()
+	if s == nil {
+		return []SubordinateStaffInfo{}, nil
+	}
+	defer s.Close()
+
+	var relations []*company.CompanyRelation
+	err = s.Where("company_id = ? AND superior_user_id = ?", companyID, userID).Find(&relations)
+	if err != nil {
+		return []SubordinateStaffInfo{}, nil
+	}
+
+	if len(relations) == 0 {
+		return []SubordinateStaffInfo{}, nil
+	}
+
+	subordinateUserIDs := make([]int64, len(relations))
+	for i, rel := range relations {
+		subordinateUserIDs[i] = rel.SubordinateUserID
+	}
+
+	users, err := user.GetUsersByIDs(s, subordinateUserIDs)
+	if err != nil {
+		return []SubordinateStaffInfo{}, nil
+	}
+
+	staffInfo := make([]SubordinateStaffInfo, 0, len(users))
+	for _, u := range users {
+		staffInfo = append(staffInfo, SubordinateStaffInfo{
+			UserID:   u.ID,
+			Username: u.Username,
+			Name:     u.Name,
+		})
+	}
+
+	return staffInfo, nil
+}
+
+// createNewSessionWithoutLock creates a new chat session without locking
+func (m *Manager) createNewSessionWithoutLock(userID, companyID int64) (*ChatSession, error) {
+	now := time.Now()
+
+	subordinateStaff, err := getSubordinateStaff(userID, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load subordinate staff: %w", err)
+	}
+
+	session := ChatSession{
+		ID:               generateSessionID(),
+		UserID:           userID,
+		CompanyID:        companyID,
+		CreatedAt:        now,
+		ExpiresAt:        now.Add(sessionTTL),
+		Messages:         []Message{},
+		SubordinateStaff: subordinateStaff,
+	}
+
+	sessionKey := getSessionKey(userID, companyID)
 	if err := keyvalue.Put(sessionKey, session); err != nil {
 		return nil, fmt.Errorf("failed to save session: %w", err)
 	}
@@ -107,8 +180,8 @@ func (m *Manager) createNewSessionWithoutLock(userID int64) (*ChatSession, error
 }
 
 // GetOrCreateSession gets an existing session for a user or creates a new one
-func (m *Manager) GetOrCreateSession(userID int64) (*ChatSession, error) {
-	session, err := m.getExistingSession(userID)
+func (m *Manager) GetOrCreateSession(userID, companyID int64) (*ChatSession, error) {
+	session, err := m.getExistingSession(userID, companyID)
 	if err != nil {
 		return nil, err
 	}
@@ -117,46 +190,49 @@ func (m *Manager) GetOrCreateSession(userID int64) (*ChatSession, error) {
 		return session, nil
 	}
 
-	return m.createNewSessionWithoutLock(userID)
+	return m.createNewSessionWithoutLock(userID, companyID)
 }
 
 // RegisterListener registers a listener for a user's session updates
-func (m *Manager) RegisterListener(userID int64, listener chan Message) {
+func (m *Manager) RegisterListener(userID, companyID int64, listener chan Message) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.listeners == nil {
-		m.listeners = make(map[int64][]chan Message)
+		m.listeners = make(map[string][]chan Message)
 	}
-	m.listeners[userID] = append(m.listeners[userID], listener)
-	fmt.Printf("[Chat] Registered listener for user %d, total listeners: %d\n", userID, len(m.listeners[userID]))
+	key := fmt.Sprintf("%d:%d", userID, companyID)
+	m.listeners[key] = append(m.listeners[key], listener)
+	fmt.Printf("[Chat] Registered listener for user %d, company %d, total listeners: %d\n", userID, companyID, len(m.listeners[key]))
 }
 
 // UnregisterListener removes a listener for a user
-func (m *Manager) UnregisterListener(userID int64, listener chan Message) {
+func (m *Manager) UnregisterListener(userID, companyID int64, listener chan Message) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	listeners, exists := m.listeners[userID]
+	key := fmt.Sprintf("%d:%d", userID, companyID)
+	listeners, exists := m.listeners[key]
 	if !exists {
 		return
 	}
 	for i, l := range listeners {
 		if l == listener {
-			m.listeners[userID] = append(listeners[:i], listeners[i+1:]...)
+			m.listeners[key] = append(listeners[:i], listeners[i+1:]...)
 			break
 		}
 	}
 }
 
 // notifyListeners notifies all registered listeners of a new message
-func (m *Manager) notifyListeners(userID int64, msg Message) {
+func (m *Manager) notifyListeners(userID, companyID int64, msg Message) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	listeners, exists := m.listeners[userID]
+	key := fmt.Sprintf("%d:%d", userID, companyID)
+	listeners, exists := m.listeners[key]
 	if !exists {
-		fmt.Printf("[Chat] No listeners for user %d\n", userID)
+		fmt.Printf("[Chat] No listeners for user %d, company %d\n", userID, companyID)
 		return
 	}
-	fmt.Printf("[Chat] Notifying %d listeners for user %d, message type: %s, id: %s\n", len(listeners), userID, msg.Type, msg.ID)
+	fmt.Printf("[Chat] Notifying %d listeners for user %d, company %d, message type: %s, id: %s\n", len(listeners), userID, companyID, msg.Type, msg.ID)
 	sentCount := 0
 	for _, listener := range listeners {
 		select {
@@ -170,10 +246,10 @@ func (m *Manager) notifyListeners(userID int64, msg Message) {
 }
 
 // AddMessage adds a message to a session
-func (m *Manager) AddMessage(userID int64, msg Message) error {
+func (m *Manager) AddMessage(userID, companyID int64, msg Message) error {
 	m.mu.Lock()
 
-	session, err := m.GetOrCreateSession(userID)
+	session, err := m.GetOrCreateSession(userID, companyID)
 	if err != nil {
 		m.mu.Unlock()
 		return err
@@ -184,7 +260,7 @@ func (m *Manager) AddMessage(userID int64, msg Message) error {
 	updatedSession.Messages = append(updatedSession.Messages, msg)
 	updatedSession.ExpiresAt = time.Now().Add(sessionTTL)
 
-	sessionKey := getSessionKey(userID)
+	sessionKey := getSessionKey(userID, companyID)
 	if err := keyvalue.Put(sessionKey, updatedSession); err != nil {
 		m.mu.Unlock()
 		return fmt.Errorf("failed to update session: %w", err)
@@ -195,14 +271,14 @@ func (m *Manager) AddMessage(userID int64, msg Message) error {
 
 	// Release lock before notifying listeners to avoid deadlock
 	m.mu.Unlock()
-	m.notifyListeners(userID, notifyMsg)
+	m.notifyListeners(userID, companyID, notifyMsg)
 
 	return nil
 }
 
-// ClearSession removes a session for a user
-func (m *Manager) ClearSession(userID int64) error {
-	sessionKey := getSessionKey(userID)
+// ClearSession removes a session for a user in a company
+func (m *Manager) ClearSession(userID, companyID int64) error {
+	sessionKey := getSessionKey(userID, companyID)
 	if err := keyvalue.Del(sessionKey); err != nil {
 		return fmt.Errorf("failed to clear session: %w", err)
 	}
@@ -249,14 +325,14 @@ func GetDefault() *Manager {
 	return defaultManager
 }
 
-// getSessionKey generates a storage key for a user's session
-func getSessionKey(userID int64) string {
-	return fmt.Sprintf("%s%d", sessionPrefix, userID)
+// getSessionKey generates a storage key for a user's session in a company
+func getSessionKey(userID, companyID int64) string {
+	return fmt.Sprintf("%s%d:%d", sessionPrefix, userID, companyID)
 }
 
 // generateSessionID generates a unique session ID
 func generateSessionID() string {
-	return fmt.Sprintf("ses_%d", time.Now().UnixNano())
+	return fmt.Sprintf("ses_%d_%d", time.Now().UnixNano(), time.Now().Unix())
 }
 
 // StartCleanupWorker starts a background worker to clean up expired sessions

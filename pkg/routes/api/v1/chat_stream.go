@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"code.vikunja.io/api/pkg/config"
@@ -77,7 +78,13 @@ func ChatStream(c *echo.Context) error {
 
 	userID := a.GetID()
 
-	log.Printf("[Chat] SSE connected for user %d", userID)
+	companyIDStr := c.QueryParam("company_id")
+	companyID, err := strconv.ParseInt(companyIDStr, 10, 64)
+	if err != nil || companyID <= 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "company_id is required and must be a positive integer")
+	}
+
+	log.Printf("[Chat] SSE connected for user %d, company %d", userID, companyID)
 
 	c.Response().Header().Set("Content-Type", "text/event-stream")
 	c.Response().Header().Set("Cache-Control", "no-cache")
@@ -94,11 +101,11 @@ func ChatStream(c *echo.Context) error {
 	fmt.Printf("[Chat] SSE connection for user %d, Last-Event-ID: %s\n", userID, lastEventID)
 
 	listener := make(chan chat_session.Message, 10)
-	chat_session.GetDefault().RegisterListener(userID, listener)
-	defer chat_session.GetDefault().UnregisterListener(userID, listener)
+	chat_session.GetDefault().RegisterListener(userID, companyID, listener)
+	defer chat_session.GetDefault().UnregisterListener(userID, companyID, listener)
 
 	if lastEventID != "" {
-		session, err := chat_session.GetDefault().GetOrCreateSession(userID)
+		session, err := chat_session.GetDefault().GetOrCreateSession(userID, companyID)
 		if err == nil && len(session.Messages) > 0 {
 			latestMsg := session.Messages[len(session.Messages)-1]
 			if latestMsg.ID != lastEventID {

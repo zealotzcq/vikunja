@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"code.vikunja.io/api/pkg/modules/chat_session"
 )
 
 // LLMProvider defines the interface for LLM providers
@@ -39,13 +41,14 @@ type ProviderToolCall struct {
 
 // AgentContext holds the context for an agent execution
 type AgentContext struct {
-	UserID         int64                  `json:"user_id"`
-	CompanyID      int64                  `json:"company_id"`
-	MessageHistory []Message              `json:"message_history"`
-	CurrentRoute   string                 `json:"current_route"`
-	RouteParams    map[string]interface{} `json:"route_params"`
-	SessionData    map[string]interface{} `json:"session_data"`
-	Language       string                 `json:"language"`
+	UserID           int64                               `json:"user_id"`
+	CompanyID        int64                               `json:"company_id"`
+	MessageHistory   []Message                           `json:"message_history"`
+	CurrentRoute     string                              `json:"current_route"`
+	RouteParams      map[string]interface{}              `json:"route_params"`
+	SessionData      map[string]interface{}              `json:"session_data"`
+	Language         string                              `json:"language"`
+	SubordinateStaff []chat_session.SubordinateStaffInfo `json:"subordinate_staff"`
 
 	NavigationInfo *NavigationInfo `json:"navigation_info,omitempty"`
 	ShouldNavigate bool            `json:"should_navigate"`
@@ -455,6 +458,18 @@ func (a *Agent) buildSystemPrompt(agentCtx *AgentContext) string {
 			sb.WriteString(fmt.Sprintf("- Route Params: %v\n", agentCtx.RouteParams))
 		}
 	}
+
+	if len(agentCtx.SubordinateStaff) > 0 {
+		sb.WriteString("\n- Subordinate Staff:\n")
+		for _, staff := range agentCtx.SubordinateStaff {
+			if staff.Name != "" {
+				sb.WriteString(fmt.Sprintf("  - %s (ID: %d, Username: %s)\n", staff.Name, staff.UserID, staff.Username))
+			} else {
+				sb.WriteString(fmt.Sprintf("  - %s (ID: %d, Username: %s)\n", staff.Username, staff.UserID, staff.Username))
+			}
+		}
+	}
+
 	sb.WriteString("\n")
 
 	return sb.String()

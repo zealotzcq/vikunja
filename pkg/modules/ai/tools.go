@@ -242,6 +242,116 @@ Usage notes:
 		return fmt.Errorf("failed to register question tool: %w", err)
 	}
 
+	showNavigationTool := &Tool{
+		Name: "show_navigation",
+		Description: `Display a navigation button for user to navigate to various locations.
+
+Use this tool when you want to provide a button that allows users to navigate to:
+- Tasks (route: task.detail with param id)
+- Projects (route: project.index with param projectId)
+- Teams (route: teams.edit with param id)
+- Labels (route: labels.index)
+- Task list (route: tasks.range)
+- Project list (route: projects.index)
+- Team list (route: teams.index)
+- Home (route: home)
+
+The button will display a label and optionally a title showing the target (e.g., task title, project title).
+
+When auto_navigate is true, the page will automatically navigate to the target location in addition to showing the button.
+When auto_navigate is false (default), only the button is shown without automatic navigation.
+
+Parameters:
+- route_name (required): The name of route to navigate to
+- params (optional): Route parameters (e.g., id for task, projectId for project)
+- label (required): The button label text (e.g., taskid,projectid)
+- title (optional): The title of the target entity to display after the label (e.g., taskid: task title, projectid: project title)
+- auto_navigate (optional): If true, automatically navigate to the target location; if false (default), only show the button
+
+Example usage:
+- Show task button: route_name="task.detail", params={"id": 123}, label="查看任务123", title="任务123:写报告", auto_navigate=false
+- Auto-navigate to project: route_name="project.index", params={"projectId": 456}, label="查看项目456", title="项目456:盘古计划", auto_navigate=true`,
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"route_name": map[string]interface{}{
+					"type":        "string",
+					"description": "The route name to navigate to (e.g., task.detail, project.index, teams.edit, labels.index, tasks.range, projects.index, teams.index, home)",
+				},
+				"params": map[string]interface{}{
+					"type":        "object",
+					"description": "Optional route parameters (e.g., id for task, projectId for project)",
+				},
+				"label": map[string]interface{}{
+					"type":        "string",
+					"description": "The button label text (required)",
+				},
+				"title": map[string]interface{}{
+					"type":        "string",
+					"description": "The title of the target entity to display after the label (optional, e.g., task title, project title)",
+				},
+				"auto_navigate": map[string]interface{}{
+					"type":        "boolean",
+					"description": "If true, automatically navigate to the target location; if false (default), only show the button",
+				},
+			},
+			"required": []string{"route_name", "label"},
+		},
+		Execute: func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) {
+			routeName, ok := params["route_name"].(string)
+			if !ok || routeName == "" {
+				return &ToolExecutionResult{
+					Error: "route_name is required",
+				}, fmt.Errorf("route_name is required")
+			}
+
+			label, ok := params["label"].(string)
+			if !ok || label == "" {
+				return &ToolExecutionResult{
+					Error: "label is required",
+				}, fmt.Errorf("label is required")
+			}
+
+			var routeParams map[string]interface{}
+			if p, ok := params["params"].(map[string]interface{}); ok {
+				routeParams = p
+			}
+
+			var title string
+			if t, ok := params["title"].(string); ok {
+				title = t
+			}
+
+			autoNavigate := false
+			if an, ok := params["auto_navigate"].(bool); ok {
+				autoNavigate = an
+			}
+
+			ctx.ButtonNavigation = &chat_session.ButtonNavigation{
+				RouteName: routeName,
+				Params:    routeParams,
+				Label:     label,
+				Title:     title,
+			}
+
+			if autoNavigate {
+				ctx.NavigationInfo = &NavigationInfo{
+					RouteName: routeName,
+					Params:    routeParams,
+				}
+				ctx.ShouldNavigate = true
+			}
+
+			return &ToolExecutionResult{
+				Result: "Navigation button shown",
+			}, nil
+		},
+	}
+
+	if err := tm.RegisterTool(showNavigationTool); err != nil {
+		return fmt.Errorf("failed to register show_navigation tool: %w", err)
+	}
+
 	finishTaskTool := &Tool{
 		Name: "finish_job",
 		Description: `Call this tool when you have completed your work and want to respond to the user. This is the ONLY tool that ends the conversation.
@@ -258,11 +368,12 @@ Available routes for navigation:
 - teams.edit: Specific team detail/edit (requires id in params)
 - labels.index: Label list page
 
+IMPORTANT: Use set_button_navigation tool BEFORE calling finish_job if you want to provide a button for the user to click.
+
 Parameters:
 - content (required): Your response message to the user
 - route_name (optional): Route name to navigate to
 - params (optional): Route parameters for navigation
-- button_navigation (optional): Button navigation config with route_name, params, and label
 
 IMPORTANT: You MUST use this tool to end the conversation. Do not provide text responses without calling this tool.`,
 		Parameters: map[string]interface{}{
@@ -279,23 +390,6 @@ IMPORTANT: You MUST use this tool to end the conversation. Do not provide text r
 				"params": map[string]interface{}{
 					"type":        "object",
 					"description": "Optional route parameters (e.g., projectId, id)",
-				},
-				"button_navigation": map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"route_name": map[string]interface{}{
-							"type":        "string",
-							"description": "The route name for the button",
-						},
-						"params": map[string]interface{}{
-							"type":        "object",
-							"description": "Route parameters for the button",
-						},
-						"label": map[string]interface{}{
-							"type":        "string",
-							"description": "The button label",
-						},
-					},
 				},
 			},
 			"required": []string{"content"},
@@ -324,21 +418,6 @@ IMPORTANT: You MUST use this tool to end the conversation. Do not provide text r
 				metadata["navigation"] = true
 				metadata["route"] = routeName
 				metadata["params"] = routeParams
-			}
-
-			if btnNav, ok := params["button_navigation"].(map[string]interface{}); ok {
-				buttonNav := &chat_session.ButtonNavigation{}
-				if rn, ok := btnNav["route_name"].(string); ok {
-					buttonNav.RouteName = rn
-				}
-				if p, ok := btnNav["params"].(map[string]interface{}); ok {
-					buttonNav.Params = p
-				}
-				if label, ok := btnNav["label"].(string); ok {
-					buttonNav.Label = label
-				}
-				ctx.ButtonNavigation = buttonNav
-				metadata["button_navigation"] = buttonNav
 			}
 
 			return &ToolExecutionResult{
@@ -447,8 +526,8 @@ Example usage:
 			"type": "object",
 			"properties": map[string]interface{}{
 				"user_identifier": map[string]interface{}{
-					"type":        "string",
-					"description": "The name or identifier of the subordinate staff member to assign the task to. Must match a subordinate in the context.",
+					"type":        "integer",
+					"description": "The user ID (integer) of the subordinate staff member to assign the task to. Must match a subordinate in the context.",
 				},
 				"task_title": map[string]interface{}{
 					"type":        "string",
@@ -463,11 +542,18 @@ Example usage:
 			"required": []string{"user_identifier", "task_title"},
 		},
 		Execute: func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) {
-			userIdentifier, ok := params["user_identifier"].(string)
-			if !ok || userIdentifier == "" {
+			userIdentifierFloat, ok := params["user_identifier"].(float64)
+			if !ok {
 				return &ToolExecutionResult{
-					Error: "user_identifier is required",
-				}, fmt.Errorf("user_identifier is required")
+					Error: "user_identifier must be an integer",
+				}, fmt.Errorf("user_identifier must be an integer")
+			}
+
+			userIdentifier := int64(userIdentifierFloat)
+			if userIdentifier <= 0 {
+				return &ToolExecutionResult{
+					Error: "user_identifier must be a positive integer",
+				}, fmt.Errorf("user_identifier must be a positive integer")
 			}
 
 			taskTitle, ok := params["task_title"].(string)
@@ -498,78 +584,19 @@ Example usage:
 			}
 
 			var targetStaff *chat_session.SubordinateStaffInfo
-			var matchingStaff []*chat_session.SubordinateStaffInfo
 
 			for _, staff := range ctx.SubordinateStaff {
-				staffName := staff.Name
-				if staffName == "" {
-					staffName = staff.Username
-				}
-
-				if strings.Contains(strings.ToLower(staffName), strings.ToLower(userIdentifier)) ||
-					strings.Contains(strings.ToLower(staff.Username), strings.ToLower(userIdentifier)) {
-					matchingStaff = append(matchingStaff, &staff)
+				if staff.UserID == userIdentifier {
+					targetStaff = &staff
+					break
 				}
 			}
 
-			if len(matchingStaff) == 0 {
+			if targetStaff == nil {
 				return &ToolExecutionResult{
-					Error: fmt.Sprintf("No staff found matching '%s'", userIdentifier),
-				}, fmt.Errorf("no staff found matching '%s'", userIdentifier)
+					Error: fmt.Sprintf("No staff found with user ID %d", userIdentifier),
+				}, fmt.Errorf("no staff found with user ID %d", userIdentifier)
 			}
-
-			if len(matchingStaff) > 1 {
-				var options []interface{}
-				for _, staff := range matchingStaff {
-					displayName := staff.Name
-					if displayName == "" {
-						displayName = staff.Username
-					}
-					options = append(options, map[string]interface{}{
-						"label":       displayName,
-						"description": fmt.Sprintf("Username: %s", staff.Username),
-					})
-				}
-
-				questionsData := map[string]interface{}{
-					"questions": []map[string]interface{}{
-						{
-							"question": fmt.Sprintf("'%s' 匹配到多人，请选择具体的人员：", userIdentifier),
-							"header":   "选择人员",
-							"options":  options,
-							"multiple": false,
-						},
-					},
-				}
-
-				questionsJSON, err := json.Marshal(questionsData)
-				if err != nil {
-					return &ToolExecutionResult{
-						Error: fmt.Sprintf("failed to marshal questions: %v", err),
-					}, fmt.Errorf("failed to marshal questions: %w", err)
-				}
-
-				ctx.QuestionData = string(questionsJSON)
-				ctx.WaitingForAnswer = true
-
-				staffIDs := make([]int64, len(matchingStaff))
-				for i, staff := range matchingStaff {
-					staffIDs[i] = staff.UserID
-				}
-
-				return &ToolExecutionResult{
-					Error: "Multiple matching staff found, asking user to clarify",
-					StopCommand: &ToolStopCommand{
-						Response: fmt.Sprintf("'%s' 匹配到多人，请选择具体的人员", userIdentifier),
-						Metadata: map[string]interface{}{
-							"question":   true,
-							"candidates": staffIDs,
-						},
-					},
-				}, nil
-			}
-
-			targetStaff = matchingStaff[0]
 
 			if targetStaff.ProjectID <= 0 {
 				return &ToolExecutionResult{
@@ -631,7 +658,8 @@ Example usage:
 				Params: map[string]interface{}{
 					"id": task.ID,
 				},
-				Label: fmt.Sprintf("查看任务 #%d", task.ID),
+				Label: "查看任务",
+				Title: taskTitle,
 			}
 
 			return &ToolExecutionResult{

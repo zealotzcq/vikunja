@@ -47,6 +47,12 @@
 								@click="chatStore.executeButtonNavigation(msg.buttonNavigation.routeName, msg.buttonNavigation.params)"
 							>
 								{{ msg.buttonNavigation.label }}
+								<span
+									v-if="msg.buttonNavigation.title"
+									class="nav-title"
+								>
+									: {{ msg.buttonNavigation.title }}
+								</span>
 							</BaseButton>
 						</div>
 
@@ -255,46 +261,46 @@ watch(
 const messageIdsRef = ref<string[]>([])
 const isHistoryLoaded = ref(false)
 
-	watch(
-		chatStore.messages,
-		(newMessages) => {
-			if (!isHistoryLoaded.value && newMessages.length > 0) {
-				messageIdsRef.value = newMessages.map(msg => msg.id)
-				isHistoryLoaded.value = true
-				return
+watch(
+	chatStore.messages,
+	(newMessages) => {
+		if (!isHistoryLoaded.value && newMessages.length > 0) {
+			messageIdsRef.value = newMessages.map(msg => msg.id)
+			isHistoryLoaded.value = true
+			return
+		}
+
+		if (newMessages.length === 0) {
+			isProcessing.value = false
+			processingText.value = ''
+			messageIdsRef.value = []
+			isHistoryLoaded.value = false
+			return
+		}
+
+		const lastMessage = newMessages[newMessages.length - 1]
+		if (!lastMessage) return
+
+		const isNewMessage = !messageIdsRef.value.includes(lastMessage.id)
+		if (!isNewMessage) return
+
+		messageIdsRef.value = [...messageIdsRef.value, lastMessage.id]
+
+		if (lastMessage.type === 'tool_call') {
+			const toolName = lastMessage.toolName || lastMessage.content
+			processingText.value = t('chatAssistant.processingTool', {tool: toolName})
+			isProcessing.value = true
+		} else if (lastMessage.type === 'tool_result') {
+			if (processingText.value.includes('使用')) {
+				processingText.value = t('chatAssistant.processing')
 			}
-
-			if (newMessages.length === 0) {
-				isProcessing.value = false
-				processingText.value = ''
-				messageIdsRef.value = []
-				isHistoryLoaded.value = false
-				return
-			}
-
-			const lastMessage = newMessages[newMessages.length - 1]
-			if (!lastMessage) return
-
-			const isNewMessage = !messageIdsRef.value.includes(lastMessage.id)
-			if (!isNewMessage) return
-
-			messageIdsRef.value = [...messageIdsRef.value, lastMessage.id]
-
-			if (lastMessage.type === 'tool_call') {
-				const toolName = lastMessage.toolName || lastMessage.content
-				processingText.value = t('chatAssistant.processingTool', {tool: toolName})
-				isProcessing.value = true
-			} else if (lastMessage.type === 'tool_result') {
-				if (processingText.value.includes('使用')) {
-					processingText.value = t('chatAssistant.processing')
-				}
-			} else if (lastMessage.type === 'assistant_response' || lastMessage.type === 'question' || lastMessage.type === 'button_navigation') {
-				isProcessing.value = false
-				processingText.value = ''
-			}
-		},
-		{deep: true},
-	)
+		} else if (lastMessage.type === 'assistant_response' || lastMessage.type === 'question' || lastMessage.type === 'button_navigation') {
+			isProcessing.value = false
+			processingText.value = ''
+		}
+	},
+	{deep: true},
+)
 </script>
 
 <style lang="scss" scoped>
@@ -489,6 +495,14 @@ const isHistoryLoaded = ref(false)
 	border-radius: 0.375rem;
 	cursor: pointer;
 	transition: background-color 0.2s;
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+
+	.nav-title {
+		opacity: 0.85;
+		font-weight: 400;
+	}
 
 	&:hover {
 		background: var(--primary-dark);

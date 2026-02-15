@@ -47,6 +47,7 @@ export default class ChatService {
 				routeName: string
 				params?: Record<string, unknown>
 				label: string
+				title?: string
 			}
 			questionData?: string
 			toolName?: string

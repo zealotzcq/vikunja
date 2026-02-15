@@ -59,6 +59,7 @@ type NavigationCommand struct {
 	RouteName string                 `json:"routeName"`
 	Params    map[string]interface{} `json:"params"`
 	Label     string                 `json:"label"`
+	Title     string                 `json:"title,omitempty"`
 }
 
 // ButtonNavigation represents a button-based navigation action
@@ -66,6 +67,7 @@ type ButtonNavigation struct {
 	RouteName string                 `json:"routeName"`
 	Params    map[string]interface{} `json:"params"`
 	Label     string                 `json:"label"`
+	Title     string                 `json:"title,omitempty"`
 }
 
 // Manager manages chat sessions in memory

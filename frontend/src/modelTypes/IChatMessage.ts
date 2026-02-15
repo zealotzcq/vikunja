@@ -16,6 +16,7 @@ export interface IChatMessage {
 		routeName: string
 		params?: Record<string, unknown>
 		label: string
+		title?: string
 	}
 	questionData?: string
 	questionAnswered?: boolean
@@ -29,6 +30,7 @@ export interface INavigationCommand {
 	routeName: string
 	params?: Record<string, unknown>
 	label: string
+	title?: string
 }
 
 export interface IQuestion {

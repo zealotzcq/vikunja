@@ -191,10 +191,17 @@ function sendMessage() {
 	}
 	chatStore.sendMessage(userInput.value)
 	userInput.value = ''
+	isProcessing.value = true
+	processingText.value = t('chatAssistant.processing')
 }
 
 function clearMessages() {
 	chatStore.clearMessages()
+	isProcessing.value = false
+	processingText.value = ''
+	messageIdsRef.value = []
+	isHistoryLoaded.value = false
+	answeredQuestionId.value = null
 }
 
 async function handleQuestionOption(question: IQuestion, option: IQuestionOption) {
@@ -202,13 +209,16 @@ async function handleQuestionOption(question: IQuestion, option: IQuestionOption
 	answeredQuestionId.value = lastMessageWithQuestion.value?.id || null
 
 	const userMessageText = t('chatAssistant.selectedOption', {option: answer})
-		chatStore.addMessage({
-			id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-			type: 'user_input',
-			role: 'user',
-			content: userMessageText,
-			timestamp: Date.now(),
-		})
+	chatStore.addMessage({
+		id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+		type: 'user_input',
+		role: 'user',
+		content: userMessageText,
+		timestamp: Date.now(),
+	})
+
+	isProcessing.value = true
+	processingText.value = t('chatAssistant.processing')
 
 	await chatStore.submitQuestionAnswer(answer)
 }
@@ -281,9 +291,6 @@ watch(
 		} else if (lastMessage.type === 'assistant_response') {
 			isProcessing.value = false
 			processingText.value = ''
-		} else if (lastMessage.type === 'user_input' && !isProcessing.value) {
-			processingText.value = t('chatAssistant.processing')
-			isProcessing.value = true
 		}
 	},
 	{deep: true},

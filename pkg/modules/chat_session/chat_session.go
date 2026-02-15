@@ -38,7 +38,7 @@ type ChatSession struct {
 // Message represents a chat message
 type Message struct {
 	ID                string                 `json:"id"`
-	Type              string                 `json:"type"` // "user_input", "tool_call", "tool_result", "assistant_response"
+	Type              string                 `json:"type"` // "user_input", "tool_call", "tool_result", "assistant_response", "question", "button_navigation"
 	Role              string                 `json:"role"` // "user" | "assistant" | "tool"
 	Content           string                 `json:"content"`
 	Timestamp         int64                  `json:"timestamp"`
@@ -49,10 +49,19 @@ type Message struct {
 	ToolCallID        string                 `json:"toolCallID,omitempty"`
 	Metadata          map[string]interface{} `json:"metadata,omitempty"`
 	CompanyID         int64                  `json:"company_id,omitempty"`
+	QuestionData      string                 `json:"questionData,omitempty"`
+	ButtonNavigation  *ButtonNavigation      `json:"buttonNavigation,omitempty"`
 }
 
 // NavigationCommand represents a navigation action
 type NavigationCommand struct {
+	RouteName string                 `json:"routeName"`
+	Params    map[string]interface{} `json:"params"`
+	Label     string                 `json:"label"`
+}
+
+// ButtonNavigation represents a button-based navigation action
+type ButtonNavigation struct {
 	RouteName string                 `json:"routeName"`
 	Params    map[string]interface{} `json:"params"`
 	Label     string                 `json:"label"`

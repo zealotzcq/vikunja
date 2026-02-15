@@ -50,10 +50,12 @@ type AgentContext struct {
 	Language         string                              `json:"language"`
 	SubordinateStaff []chat_session.SubordinateStaffInfo `json:"subordinate_staff"`
 
-	NavigationInfo *NavigationInfo `json:"navigation_info,omitempty"`
-	ShouldNavigate bool            `json:"should_navigate"`
-	ExecutionSteps []ExecutionStep `json:"execution_steps"`
-	TokensUsed     int             `json:"tokens_used"`
+	NavigationInfo   *NavigationInfo `json:"navigation_info,omitempty"`
+	ShouldNavigate   bool            `json:"should_navigate"`
+	ExecutionSteps   []ExecutionStep `json:"execution_steps"`
+	TokensUsed       int             `json:"tokens_used"`
+	QuestionData     string          `json:"question_data,omitempty"`
+	WaitingForAnswer bool            `json:"waiting_for_answer,omitempty"`
 }
 
 // Message represents a message in the conversation

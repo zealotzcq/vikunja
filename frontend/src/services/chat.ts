@@ -61,4 +61,19 @@ export default class ChatService {
 		}
 		await this.http.delete('/chat/session')
 	}
+
+	async submitQuestionAnswer(
+		answer: string,
+		companyID?: number,
+	): Promise<void> {
+		const token = getToken()
+		if (!token) {
+			throw new Error('No authentication token available')
+		}
+
+		await this.http.post('/chat/submit-question-answer', {
+			answer,
+			company_id: companyID,
+		})
+	}
 }

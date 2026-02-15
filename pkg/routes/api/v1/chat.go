@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -46,6 +47,12 @@ type SendMessageRequest struct {
 	CompanyID int64     `json:"company_id"`
 }
 
+// SubmitQuestionAnswerRequest represents a request to submit a question answer
+type SubmitQuestionAnswerRequest struct {
+	Answer    string `json:"answer" validate:"required"`
+	CompanyID int64  `json:"company_id" validate:"required"`
+}
+
 // PageInfo represents current page context
 type PageInfo struct {
 	RouteName string                 `json:"route_name" validate:"required"`
@@ -59,10 +66,19 @@ type ChatMessage struct {
 	Content           string             `json:"content"`
 	Timestamp         int64              `json:"timestamp"`
 	NavigationCommand *NavigationCommand `json:"navigationCommand,omitempty"`
+	ButtonNavigation  *ButtonNavigation  `json:"buttonNavigation,omitempty"`
+	QuestionData      string             `json:"questionData,omitempty"`
 }
 
 // NavigationCommand represents a navigation action
 type NavigationCommand struct {
+	RouteName string                 `json:"routeName"`
+	Params    map[string]interface{} `json:"params"`
+	Label     string                 `json:"label"`
+}
+
+// ButtonNavigation represents a button-based navigation action
+type ButtonNavigation struct {
 	RouteName string                 `json:"routeName"`
 	Params    map[string]interface{} `json:"params"`
 	Label     string                 `json:"label"`
@@ -211,7 +227,7 @@ func GetChatHistory(c *echo.Context) error {
 
 	frontendMessages := []ChatMessage{}
 	for _, msg := range sessionData.Messages {
-		if msg.Type == "user_input" || msg.Type == "assistant_response" {
+		if msg.Type == "user_input" || msg.Type == "assistant_response" || msg.Type == "question" || msg.Type == "button_navigation" {
 			var navigationCommand *NavigationCommand
 			if msg.NavigationCommand != nil {
 				navigationCommand = &NavigationCommand{
@@ -220,12 +236,24 @@ func GetChatHistory(c *echo.Context) error {
 					Label:     msg.NavigationCommand.Label,
 				}
 			}
+
+			var buttonNavigation *ButtonNavigation
+			if msg.ButtonNavigation != nil {
+				buttonNavigation = &ButtonNavigation{
+					RouteName: msg.ButtonNavigation.RouteName,
+					Params:    msg.ButtonNavigation.Params,
+					Label:     msg.ButtonNavigation.Label,
+				}
+			}
+
 			frontendMessages = append(frontendMessages, ChatMessage{
 				ID:                msg.ID,
 				Role:              msg.Role,
 				Content:           msg.Content,
 				Timestamp:         msg.Timestamp,
 				NavigationCommand: navigationCommand,
+				ButtonNavigation:  buttonNavigation,
+				QuestionData:      msg.QuestionData,
 			})
 		}
 	}
@@ -328,6 +356,13 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 				Content:    msg.ToolOutput,
 				ToolCallID: msg.ToolCallID,
 			})
+
+		case "question_answer":
+			// User's answer to a question
+			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
+				Role:    "user",
+				Content: msg.Content,
+			})
 		}
 	}
 
@@ -352,6 +387,38 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 	}
 	if agentResponse.TokensUsed > 0 {
 		metadata["tokens_used"] = agentResponse.TokensUsed
+	}
+
+	hasQuestion := false
+	var questionData string
+
+	for _, step := range agentResponse.ExecutionSteps {
+		if step.Action == "question" {
+			hasQuestion = true
+
+			var result map[string]interface{}
+			if err := json.Unmarshal([]byte(step.Input), &result); err == nil {
+				if questions, ok := result["questions"]; ok {
+					questionsJSON, _ := json.Marshal(questions)
+					questionData = string(questionsJSON)
+				}
+			}
+			break
+		}
+	}
+
+	if hasQuestion && questionData != "" {
+		questionMessage := chat_session.Message{
+			ID:           fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+			Type:         "question",
+			Role:         "assistant",
+			Content:      "Please answer the following question:",
+			QuestionData: questionData,
+			Timestamp:    time.Now().Unix(),
+			CompanyID:    req.CompanyID,
+		}
+		chat_session.GetDefault().AddMessage(userID, req.CompanyID, questionMessage)
+		return
 	}
 
 	// Save tool calls and tool results to session
@@ -403,4 +470,186 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 	}
 
 	chat_session.GetDefault().AddMessage(userID, req.CompanyID, assistantMessage)
+}
+
+// SubmitQuestionAnswer handles submitting an answer to a question
+func SubmitQuestionAnswer(c *echo.Context) error {
+	a, err := auth.GetAuthFromClaims(c)
+	if err != nil {
+		return err
+	}
+
+	if _, is := a.(*models.LinkSharing); is {
+		return echo.ErrForbidden
+	}
+
+	if !isUserAllowedForChat(a) {
+		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
+	}
+
+	userID := a.GetID()
+
+	req := new(SubmitQuestionAnswerRequest)
+	if err := c.Bind(req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
+	}
+
+	answerMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
+	answerMessage := chat_session.Message{
+		ID:        answerMsgID,
+		Type:      "question_answer",
+		Role:      "user",
+		Content:   req.Answer,
+		Timestamp: time.Now().Unix(),
+		CompanyID: req.CompanyID,
+	}
+
+	if err := chat_session.GetDefault().AddMessage(userID, req.CompanyID, answerMessage); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to save answer: %v", err))
+	}
+
+	go processQuestionAnswerAsync(context.Background(), userID, req.CompanyID, req.Answer)
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"id":        answerMsgID,
+		"status":    "processing",
+		"timestamp": time.Now().Unix(),
+	})
+}
+
+// processQuestionAnswerAsync processes a question answer asynchronously
+func processQuestionAnswerAsync(ctx context.Context, userID, companyID int64, answer string) {
+	session, err := chat_session.GetDefault().GetOrCreateSession(userID, companyID)
+	if err != nil {
+		return
+	}
+
+	agent, err := ai.GetAgent()
+	if err != nil {
+		return
+	}
+
+	u, err := user.GetUserByID(db.NewSession(), userID)
+	if err != nil {
+		return
+	}
+
+	agentCtx := &ai.AgentContext{
+		UserID:         userID,
+		CompanyID:      companyID,
+		SessionData:    make(map[string]interface{}),
+		MessageHistory: []ai.Message{},
+		Language:       u.Language,
+	}
+
+	agentCtx.SubordinateStaff = session.SubordinateStaff
+
+	for _, msg := range session.Messages {
+		switch msg.Type {
+		case "user_input":
+			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
+				Role:    msg.Role,
+				Content: msg.Content,
+			})
+		case "assistant_response":
+			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
+				Role:    msg.Role,
+				Content: msg.Content,
+			})
+		case "tool_call":
+			if msg.ToolName == "" {
+				continue
+			}
+			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
+				Role:    msg.Role,
+				Content: msg.Content,
+				ToolCalls: []ai.ToolCallInfo{
+					{
+						ID:        msg.ID,
+						Type:      "function",
+						Name:      msg.ToolName,
+						Arguments: msg.ToolInput,
+					},
+				},
+			})
+		case "tool_result":
+			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
+				Role:       msg.Role,
+				Content:    msg.ToolOutput,
+				ToolCallID: msg.ToolCallID,
+			})
+		case "question_answer":
+			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
+				Role:    "user",
+				Content: msg.Content,
+			})
+		}
+	}
+
+	agentResponse, err := agent.ProcessMessage(ctx, agentCtx, answer)
+	if err != nil {
+		return
+	}
+
+	assistantMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
+	var navigationCommand *chat_session.NavigationCommand
+	if agentResponse.ShouldNavigate && agentResponse.NavigationInfo != nil {
+		navigationCommand = &chat_session.NavigationCommand{
+			RouteName: agentResponse.NavigationInfo.RouteName,
+			Params:    agentResponse.NavigationInfo.Params,
+			Label:     agentResponse.Content,
+		}
+	}
+
+	metadata := make(map[string]interface{})
+	if len(agentResponse.ExecutionSteps) > 0 {
+		metadata["execution_steps"] = agentResponse.ExecutionSteps
+	}
+	if agentResponse.TokensUsed > 0 {
+		metadata["tokens_used"] = agentResponse.TokensUsed
+	}
+
+	for _, step := range agentResponse.ExecutionSteps {
+		toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
+
+		toolCallMsg := chat_session.Message{
+			ID:        toolCallID,
+			Type:      "tool_call",
+			Role:      "assistant",
+			Content:   step.Thought,
+			ToolName:  step.Action,
+			ToolInput: step.Input,
+			Timestamp: time.Now().Unix(),
+			CompanyID: companyID,
+		}
+		if err := chat_session.GetDefault().AddMessage(userID, companyID, toolCallMsg); err != nil {
+		}
+
+		toolResultMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
+		toolResultMsg := chat_session.Message{
+			ID:         toolResultMsgID,
+			Type:       "tool_result",
+			Role:       "tool",
+			ToolName:   step.Action,
+			ToolOutput: step.Output,
+			ToolCallID: toolCallID,
+			Timestamp:  time.Now().Unix(),
+			CompanyID:  companyID,
+		}
+		if err := chat_session.GetDefault().AddMessage(userID, companyID, toolResultMsg); err != nil {
+		}
+	}
+
+	assistantMessage := chat_session.Message{
+		ID:                assistantMsgID,
+		Type:              "assistant_response",
+		Role:              "assistant",
+		Content:           agentResponse.Content,
+		Timestamp:         time.Now().Unix(),
+		NavigationCommand: navigationCommand,
+		Metadata:          metadata,
+		CompanyID:         companyID,
+	}
+
+	chat_session.GetDefault().AddMessage(userID, companyID, assistantMessage)
 }

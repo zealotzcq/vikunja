@@ -100,6 +100,8 @@ export const useChatStore = defineStore('chat', () => {
 				content: msg.content,
 				timestamp: msg.timestamp,
 				navigationCommand: msg.navigationCommand,
+				buttonNavigation: msg.buttonNavigation,
+				questionData: msg.questionData,
 			}))
 
 			const existingIds = new Set(messages.value.map(m => m.id))
@@ -136,6 +138,38 @@ export const useChatStore = defineStore('chat', () => {
 			}
 		} finally {
 			isLoading.value = false
+		}
+	}
+
+	async function executeButtonNavigation(routeName: string, params?: Record<string, any>) {
+		console.log('[Chat] Executing button navigation:', {routeName, params})
+		router.push({
+			name: routeName,
+			params: params,
+		})
+		if (isMobile.value) {
+			isOpen.value = false
+		}
+	}
+
+	async function submitQuestionAnswer(answer: string) {
+		if (!authStore.authUser) {
+			error.value = '请先登录以使用聊天助手'
+			return
+		}
+		error.value = null
+
+		try {
+			await chatService.submitQuestionAnswer(answer, companyStore.currentCompanyId)
+		} catch (err: any) {
+			if (err?.response?.status === 401) {
+				error.value = '请先登录以使用聊天助手'
+			} else if (err?.message === 'No authentication token available') {
+				error.value = '请先登录以使用聊天助手'
+			} else {
+				error.value = '提交答案失败，请稍后重试'
+				console.error('[Chat] Failed to submit question answer:', err)
+			}
 		}
 	}
 
@@ -215,6 +249,8 @@ export const useChatStore = defineStore('chat', () => {
 		setMobile,
 		connectSSE,
 		disconnectSSE,
+		executeButtonNavigation,
+		submitQuestionAnswer,
 	}
 })
 

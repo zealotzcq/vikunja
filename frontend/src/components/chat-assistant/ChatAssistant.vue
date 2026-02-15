@@ -31,6 +31,37 @@
 						:class="['message', msg.role]"
 					>
 						<div class="message-content">{{ msg.content }}</div>
+
+						<div v-if="msg.buttonNavigation" class="button-navigation">
+							<BaseButton
+								class="nav-button"
+								@click="chatStore.executeButtonNavigation(msg.buttonNavigation.routeName, msg.buttonNavigation.params)"
+							>
+								{{ msg.buttonNavigation.label }}
+							</BaseButton>
+						</div>
+
+						<div v-if="msg.questionData && msg.id === lastMessageWithQuestion?.id" class="question-panel">
+							<div
+								v-for="(question, qIndex) in parsedQuestions"
+								:key="qIndex"
+								class="question-item"
+							>
+								<div class="question-text">{{ question.question }}</div>
+								<div class="question-options">
+									<div
+										v-for="(option, oIndex) in question.options"
+										:key="oIndex"
+										class="question-option"
+										@click="handleQuestionOption(question, option)"
+									>
+										<div class="option-label">{{ option.label }}</div>
+										<div class="option-description">{{ option.description }}</div>
+									</div>
+								</div>
+							</div>
+						</div>
+
 						<span class="message-time">{{ formatTime(msg.timestamp) }}</span>
 					</div>
 				</div>
@@ -58,7 +89,7 @@
 </template>
 
 <script lang="ts" setup>
-  import {ref, watch, nextTick, onMounted, onUnmounted} from 'vue'
+  import {ref, watch, nextTick, onMounted, onUnmounted, computed} from 'vue'
   import {useI18n} from 'vue-i18n'
   import {useRouter} from 'vue-router'
 
@@ -66,6 +97,7 @@
   import Icon from '@/components/misc/Icon'
 
   import {useChatStore} from '@/stores/chat'
+  import type {IQuestion} from '@/modelTypes/IChatMessage'
 
   const {t} = useI18n({useScope: 'global'})
   const chatStore = useChatStore()
@@ -73,6 +105,22 @@
 
   const userInput = ref('')
   const messagesContainer = ref<HTMLElement | null>(null)
+
+  const lastMessageWithQuestion = computed(() => {
+		return chatStore.messages.find(msg => msg.questionData)
+	})
+
+	const parsedQuestions = computed<IQuestion[]>(() => {
+		if (!lastMessageWithQuestion.value?.questionData) {
+			return []
+		}
+		try {
+			return JSON.parse(lastMessageWithQuestion.value.questionData)
+		} catch (e) {
+			console.error('[Chat] Failed to parse question data:', e)
+			return []
+		}
+	})
 
   onMounted(() => {
 	chatStore.loadChatHistory()
@@ -99,6 +147,11 @@
 
   function clearMessages() {
 	chatStore.clearMessages()
+  }
+
+  async function handleQuestionOption(question: IQuestion, option: any) {
+		const answer = option.label
+		await chatStore.submitQuestionAnswer(answer)
   }
 
   function scrollToBottom() {
@@ -268,6 +321,110 @@
 
 	.assistant & {
 		margin-inline-start: 1rem;
+	}
+}
+
+.button-navigation {
+	margin-block-start: 0.5rem;
+}
+
+.nav-button {
+	padding: 0.5rem 1rem;
+	font-size: 0.875rem;
+	background: var(--primary);
+	color: var(--white);
+	border: none;
+	border-radius: 0.375rem;
+	cursor: pointer;
+	transition: background-color 0.2s;
+
+	&:hover {
+		background: var(--primary-dark);
+	}
+}
+
+.question-panel {
+	margin-block-start: 0.5rem;
+	padding: 0.75rem;
+	background: var(--grey-50);
+	border-radius: 0.5rem;
+}
+
+.question-item {
+	margin-block-end: 0.75rem;
+
+	&:last-child {
+		margin-block-end: 0;
+	}
+}
+
+.question-text {
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--grey-800);
+	margin-block-end: 0.5rem;
+}
+
+.question-options {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.question-option {
+	padding: 0.625rem;
+	background: var(--white);
+	border: 1px solid var(--grey-200);
+	border-radius: 0.375rem;
+	cursor: pointer;
+	transition: all 0.2s;
+
+	&:hover {
+		background: var(--grey-50);
+		border-color: var(--primary);
+	}
+
+	&:active {
+		transform: scale(0.98);
+	}
+}
+
+.option-label {
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--grey-800);
+	margin-block-end: 0.25rem;
+}
+
+.option-description {
+	font-size: 0.8125rem;
+	color: var(--grey-600);
+	line-height: 1.4;
+}
+
+.dark .question-panel {
+	background: var(--grey-700);
+
+	.question-text {
+		color: var(--grey-100);
+	}
+}
+
+.dark .question-option {
+	background: var(--grey-800);
+	border-color: var(--grey-600);
+
+	&:hover {
+		background: var(--grey-700);
+		border-color: var(--primary);
+	}
+
+	.option-label {
+		color: var(--grey-100);
+	}
+
+	.option-description {
+		color: var(--grey-400);
 	}
 }
 

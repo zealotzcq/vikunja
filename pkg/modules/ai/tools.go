@@ -142,6 +142,100 @@ func RegisterDefaultTools() error {
 	tm := GetToolManager()
 	sm := GetSkillManager()
 
+	questionTool := &Tool{
+		Name: "question",
+		Description: `Use this tool when you need to ask the user questions during execution. This allows you to:
+1. Gather user preferences or requirements
+2. Clarify ambiguous instructions
+3. Get decisions on implementation choices as you work
+4. Offer choices to the user about what direction to take.
+
+Usage notes:
+- When custom is enabled (default), a "Type your own answer" option is added automatically; don't include "Other" or catch-all options
+- Answers are returned as arrays of labels; set multiple: true to allow selecting more than one
+- If you recommend a specific option, make that the first option in the list and add "(Recommended)" at the end of the label`,
+		Parameters: map[string]interface{}{
+			"$schema": "https://json-schema.org/draft-2020-12/schema",
+			"type":    "object",
+			"properties": map[string]interface{}{
+				"questions": map[string]interface{}{
+					"description": "Questions to ask",
+					"type":        "array",
+					"items": map[string]interface{}{
+						"type": "object",
+						"properties": map[string]interface{}{
+							"question": map[string]interface{}{
+								"description": "Complete question",
+								"type":        "string",
+							},
+							"header": map[string]interface{}{
+								"description": "Very short label (max 30 chars)",
+								"type":        "string",
+							},
+							"options": map[string]interface{}{
+								"description": "Available choices",
+								"type":        "array",
+								"items": map[string]interface{}{
+									"ref":  "QuestionOption",
+									"type": "object",
+									"properties": map[string]interface{}{
+										"label": map[string]interface{}{
+											"description": "Display text (1-5 words, concise)",
+											"type":        "string",
+										},
+										"description": map[string]interface{}{
+											"description": "Explanation of choice",
+											"type":        "string",
+										},
+									},
+									"required": []string{"label", "description"},
+								},
+							},
+							"multiple": map[string]interface{}{
+								"description": "Allow selecting multiple choices",
+								"type":        "boolean",
+							},
+						},
+						"required": []string{"question", "header", "options"},
+					},
+				},
+			},
+			"required": []string{"questions"},
+		},
+		Execute: func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) {
+			questionsData, ok := params["questions"]
+			if !ok {
+				return &ToolExecutionResult{
+					Error: "questions is required",
+				}, fmt.Errorf("questions is required")
+			}
+
+			questionsJSON, err := json.Marshal(questionsData)
+			if err != nil {
+				return &ToolExecutionResult{
+					Error: fmt.Sprintf("failed to marshal questions: %v", err),
+				}, fmt.Errorf("failed to marshal questions: %w", err)
+			}
+
+			ctx.QuestionData = string(questionsJSON)
+			ctx.WaitingForAnswer = true
+
+			return &ToolExecutionResult{
+				Result: "Question sent to user",
+				StopCommand: &ToolStopCommand{
+					Response: "I need some information from you to proceed",
+					Metadata: map[string]interface{}{
+						"question": true,
+					},
+				},
+			}, nil
+		},
+	}
+
+	if err := tm.RegisterTool(questionTool); err != nil {
+		return fmt.Errorf("failed to register question tool: %w", err)
+	}
+
 	navigationTool := &Tool{
 		Name: "navigate",
 		Description: `Navigate to a specific page in the application.

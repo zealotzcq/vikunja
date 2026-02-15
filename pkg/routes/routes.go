@@ -644,6 +644,7 @@ func registerAPIRoutes(a *echo.Group) {
 	// Chat Assistant
 	chat := a.Group("/chat")
 	chat.POST("/send", apiv1.SendMessage)
+	chat.POST("/submit-question-answer", apiv1.SubmitQuestionAnswer)
 	chat.GET("/session", apiv1.GetSession)
 	chat.GET("/history", apiv1.GetChatHistory)
 	chat.GET("/stream", apiv1.ChatStream)

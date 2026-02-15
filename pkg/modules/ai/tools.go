@@ -254,25 +254,23 @@ Usage notes:
 Use this tool when you want to provide a button that allows users to navigate to:
 - Tasks (route: task.detail with param id)
 - Projects (route: project.index with param projectId)
-- Task list (route: tasks.range)
 - Project list (route: projects.index)
-- Home (route: home)
+- Home (route: home) - all task list, higher priority than upcoming page
+- Favourite task list (route: project.index with param projectId = -1)
+- Upcomming task list (route: tasks.range with param showNulls=true)
 
 The button will display a label and optionally a title showing the target (e.g., task title, project title).
-
-When auto_navigate is true, the page will automatically navigate to the target location in addition to showing the button.
-When auto_navigate is false (default), only the button is shown without automatic navigation.
 
 Parameters:
 - route_name (required): The name of route to navigate to
 - params (optional): Route parameters (e.g., id for task, projectId for project)
 - label (required): The button label text (e.g., taskid,projectid)
 - title (optional): The title of the target entity to display after the label (e.g., taskid: task title, projectid: project title)
-- auto_navigate (optional): If true, automatically navigate to the target location; if false (default), only show the button
 
 Example usage:
-- Show task button: route_name="task.detail", params={"id": 123}, label="查看任务123", title="任务123:写报告", auto_navigate=false
-- Auto-navigate to project: route_name="project.index", params={"projectId": 456}, label="查看项目456", title="项目456:盘古计划", auto_navigate=true`,
+- Show task button: route_name="task.detail", params={"id": 123}, label="查看任务123", title="任务123:写报告"
+- Navigate to project: route_name="project.index", params={"projectId": 456}, label="查看项目456", title="项目456:盘古计划"
+- Navigate to home: route_name="home", label="回到主页"`,
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -291,10 +289,6 @@ Example usage:
 				"title": map[string]interface{}{
 					"type":        "string",
 					"description": "The title of the target entity to display after the label (optional, e.g., task title, project title)",
-				},
-				"auto_navigate": map[string]interface{}{
-					"type":        "boolean",
-					"description": "If true, automatically navigate to the target location; if false (default), only show the button",
 				},
 			},
 			"required": []string{"route_name", "label"},
@@ -324,17 +318,14 @@ Example usage:
 				title = t
 			}
 
-			autoNavigate := false
-			if an, ok := params["auto_navigate"].(bool); ok {
-				autoNavigate = an
-			}
-
 			ctx.ButtonNavigation = &chat_session.ButtonNavigation{
 				RouteName: routeName,
 				Params:    routeParams,
 				Label:     label,
 				Title:     title,
 			}
+
+			autoNavigate := routeName != "task.detail"
 
 			if autoNavigate {
 				ctx.NavigationInfo = &NavigationInfo{

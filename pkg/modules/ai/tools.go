@@ -242,11 +242,13 @@ Usage notes:
 		return fmt.Errorf("failed to register question tool: %w", err)
 	}
 
-	navigationTool := &Tool{
-		Name: "navigate",
-		Description: `Navigate to a specific page in the application.
+	finishTaskTool := &Tool{
+		Name: "finish_task",
+		Description: `Call this tool when you have completed your work and want to respond to the user. This is the ONLY tool that ends the conversation.
 
-Available routes:
+This tool sends your response to the user and optionally provides navigation information.
+
+Available routes for navigation:
 - home: Homepage/Dashboard
 - projects.index: Project list page
 - project.index: Specific project detail (requires projectId in params). Use projectId: -1 for favorites
@@ -256,44 +258,49 @@ Available routes:
 - teams.edit: Specific team detail/edit (requires id in params)
 - labels.index: Label list page
 
-IMPORTANT: You MUST provide a 'content' parameter with a natural language response to the user explaining the navigation action. This will be shown to the user.
+Parameters:
+- content (required): Your response message to the user
+- route_name (optional): Route name to navigate to
+- params (optional): Route parameters for navigation
+- button_navigation (optional): Button navigation config with route_name, params, and label
 
-Usage examples:
-- Navigate to homepage: {"route_name": "home", "content": "好的，我正在为您返回首页"}
-- Navigate to projects: {"route_name": "projects.index", "content": "正在为您打开项目列表"}
-- Navigate to project 123: {"route_name": "project.index", "params": {"projectId": 123}, "content": "正在为您打开项目 123"}
-- Navigate to favorites: {"route_name": "project.index", "params": {"projectId": -1}, "content": "正在为您打开收藏"}
-- Navigate to tasks: {"route_name": "tasks.range", "content": "正在为您打开任务列表"}
-- Navigate to task 456: {"route_name": "task.detail", "params": {"id": 456}, "content": "正在为您打开任务 456"}
-- Navigate to teams: {"route_name": "teams.index", "content": "正在为您打开团队列表"}
-- Navigate to team 789: {"route_name": "teams.edit", "params": {"id": 789}, "content": "正在为您打开团队 789"}
-- Navigate to labels: {"route_name": "labels.index", "content": "正在为您打开标签列表"}`,
+IMPORTANT: You MUST use this tool to end the conversation. Do not provide text responses without calling this tool.`,
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
+				"content": map[string]interface{}{
+					"type":        "string",
+					"description": "Your response message to the user. This is REQUIRED.",
+				},
 				"route_name": map[string]interface{}{
 					"type":        "string",
-					"description": "The name of the route to navigate to",
+					"description": "The name of the route to navigate to (optional)",
 				},
 				"params": map[string]interface{}{
 					"type":        "object",
 					"description": "Optional route parameters (e.g., projectId, id)",
 				},
-				"content": map[string]interface{}{
-					"type":        "string",
-					"description": "Natural language response to the user explaining the navigation action. This is REQUIRED and will be shown to the user.",
+				"button_navigation": map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"route_name": map[string]interface{}{
+							"type":        "string",
+							"description": "The route name for the button",
+						},
+						"params": map[string]interface{}{
+							"type":        "object",
+							"description": "Route parameters for the button",
+						},
+						"label": map[string]interface{}{
+							"type":        "string",
+							"description": "The button label",
+						},
+					},
 				},
 			},
-			"required": []string{"route_name", "content"},
+			"required": []string{"content"},
 		},
 		Execute: func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) {
-			routeName, ok := params["route_name"].(string)
-			if !ok {
-				return &ToolExecutionResult{
-					Error: "route_name is required",
-				}, fmt.Errorf("route_name is required")
-			}
-
 			content, ok := params["content"].(string)
 			if !ok {
 				return &ToolExecutionResult{
@@ -301,33 +308,51 @@ Usage examples:
 				}, fmt.Errorf("content is required")
 			}
 
-			var routeParams map[string]interface{}
-			if p, ok := params["params"].(map[string]interface{}); ok {
-				routeParams = p
+			metadata := make(map[string]interface{})
+
+			routeName, hasRoute := params["route_name"].(string)
+			if hasRoute {
+				var routeParams map[string]interface{}
+				if p, ok := params["params"].(map[string]interface{}); ok {
+					routeParams = p
+				}
+				ctx.NavigationInfo = &NavigationInfo{
+					RouteName: routeName,
+					Params:    routeParams,
+				}
+				ctx.ShouldNavigate = true
+				metadata["navigation"] = true
+				metadata["route"] = routeName
+				metadata["params"] = routeParams
 			}
 
-			ctx.NavigationInfo = &NavigationInfo{
-				RouteName: routeName,
-				Params:    routeParams,
+			if btnNav, ok := params["button_navigation"].(map[string]interface{}); ok {
+				buttonNav := &chat_session.ButtonNavigation{}
+				if rn, ok := btnNav["route_name"].(string); ok {
+					buttonNav.RouteName = rn
+				}
+				if p, ok := btnNav["params"].(map[string]interface{}); ok {
+					buttonNav.Params = p
+				}
+				if label, ok := btnNav["label"].(string); ok {
+					buttonNav.Label = label
+				}
+				ctx.ButtonNavigation = buttonNav
+				metadata["button_navigation"] = buttonNav
 			}
-			ctx.ShouldNavigate = true
 
 			return &ToolExecutionResult{
 				Result: content,
 				StopCommand: &ToolStopCommand{
 					Response: content,
-					Metadata: map[string]interface{}{
-						"navigation": true,
-						"route":      routeName,
-						"params":     routeParams,
-					},
+					Metadata: metadata,
 				},
 			}, nil
 		},
 	}
 
-	if err := tm.RegisterTool(navigationTool); err != nil {
-		return fmt.Errorf("failed to register navigation tool: %w", err)
+	if err := tm.RegisterTool(finishTaskTool); err != nil {
+		return fmt.Errorf("failed to register finish_task tool: %w", err)
 	}
 
 	skillTool := &Tool{
@@ -413,18 +438,6 @@ Task properties:
 - Start date: Now (current time)
 - IsFavorite: true (favorited by default)
 - Subscription: Subscribed to task notifications
-
-员工判断：
-- 如果用户输入的称呼, 和员工的名称或昵称一致,则认为是这个员工
-- 如果用户输入的称呼，可以唯一区分出一个员工，也认为是这个员工
-example 1: 如果员工中只有一个王姓员工，那么小王,老王,王工等都匹配这个王姓员工
-example 2: 如果员工的昵称是老王,并且其他员工没有出现王字,那么王工,王同学这样的称呼也可以匹配王工的昵称，但是注意小王这个称呼无法匹配老王
-example 3: 如果员工中有一个叫Donald Trump,其他员工没有叫Donald的, 那么Donald,Donnie,Don都可以匹配这个员工
-example 4: 如果员工有多个姓李，昵称一个叫李工,另一个叫李同学,那么老李，小李则无法唯一区分他们
-- 可以适当放宽同音字的标准
-example 1: 如果员工的名字或者昵称是忻忻，并且其他员工没有近似的读音，那么欣欣，心心之类的也应该视作命中这个员工
-- if you cannot uniquely identify which staff member the user is referring to (e.g., multiple staff have similar names), use the 'question' tool to ask the user to clarify.
-- 当存在多个可能候选时，使用'question'工具进行 clarification,不要用语言询问，使用'question'工具
 
 Example usage:
 - "让小王马上写报告" -> HIGH priority, due in 1 day

@@ -215,81 +215,24 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 	messagesToSave := make([]Message, 0)
 
 	for i := 0; i < maxIterations; i++ {
-		tools := a.toolManager.GetEnabledTools()
 		toolDefinitions := a.toolManager.GetToolDefinitions()
 
-		var providerResponse *LLMProviderResponse
-		var err error
-
-		if len(tools) == 0 {
-			prompt := messagesToPrompt(messages)
-			llmResponse, genErr := a.llmProvider.Generate(ctx, prompt)
-			if genErr != nil {
-				return nil, nil, fmt.Errorf("LLM generation failed: %w", genErr)
-			}
-			providerResponse = &LLMProviderResponse{
-				Content:      llmResponse,
-				FinishReason: "stop",
-			}
-		} else {
-			if len(toolDefinitions) == 0 {
-				return nil, nil, fmt.Errorf("tools enabled but no tool definitions available")
-			}
-			providerResponse, err = a.llmProvider.GenerateWithMessages(ctx, messages, toolDefinitions)
+		if len(toolDefinitions) == 0 {
+			return nil, nil, fmt.Errorf("no tool definitions available")
 		}
+
+		providerResponse, err := a.llmProvider.GenerateWithMessages(ctx, messages, toolDefinitions)
 
 		if err != nil {
 			return nil, nil, fmt.Errorf("LLM generation failed: %w", err)
 		}
 
-		// Check if LLM wants to stop or has no tool calls
-		if providerResponse.FinishReason == "stop" || len(providerResponse.ToolCalls) == 0 {
-			assistantMsg := Message{
-				Role:    "assistant",
-				Content: providerResponse.Content,
-			}
-			messages = append(messages, assistantMsg)
-			messagesToSave = append(messagesToSave, assistantMsg)
-
-			return &AgentResponse{
-				Content:          providerResponse.Content,
-				NavigationInfo:   agentCtx.NavigationInfo,
-				ShouldNavigate:   agentCtx.ShouldNavigate,
-				ExecutionSteps:   agentCtx.ExecutionSteps,
-				TokensUsed:       agentCtx.TokensUsed,
-				ButtonNavigation: agentCtx.ButtonNavigation,
-			}, messagesToSave, nil
-		}
-
 		// Process tool calls
-		if len(providerResponse.ToolCalls) == 0 {
-			// No tool calls, treat as regular response
-			assistantMsg := Message{
-				Role:    "assistant",
-				Content: providerResponse.Content,
-			}
-			messages = append(messages, assistantMsg)
-			messagesToSave = append(messagesToSave, assistantMsg)
-
-			return &AgentResponse{
-				Content:          providerResponse.Content,
-				NavigationInfo:   agentCtx.NavigationInfo,
-				ShouldNavigate:   agentCtx.ShouldNavigate,
-				ExecutionSteps:   agentCtx.ExecutionSteps,
-				TokensUsed:       agentCtx.TokensUsed,
-				ButtonNavigation: agentCtx.ButtonNavigation,
-			}, messagesToSave, nil
-		}
-
-		// Process tool calls
-		hasValidToolCall := false
 		for _, toolCall := range providerResponse.ToolCalls {
 			if toolCall.Name == "" {
 				GetLLMLogger().LogExchange("agent", "", fmt.Sprintf("Warning: Skipping tool call with empty name, ID: %s, arguments: %v", toolCall.ID, toolCall.Arguments))
 				continue
 			}
-
-			hasValidToolCall = true
 
 			step := ExecutionStep{
 				StepNumber: i + 1,
@@ -369,37 +312,6 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 					ButtonNavigation: agentCtx.ButtonNavigation,
 				}, messagesToSave, nil
 			}
-		}
-
-		// If all tool calls were invalid, treat as regular response
-		if !hasValidToolCall {
-			assistantMsg := Message{
-				Role:    "assistant",
-				Content: providerResponse.Content,
-			}
-			messages = append(messages, assistantMsg)
-			messagesToSave = append(messagesToSave, assistantMsg)
-
-			return &AgentResponse{
-				Content:          providerResponse.Content,
-				NavigationInfo:   agentCtx.NavigationInfo,
-				ShouldNavigate:   agentCtx.ShouldNavigate,
-				ExecutionSteps:   agentCtx.ExecutionSteps,
-				TokensUsed:       agentCtx.TokensUsed,
-				ButtonNavigation: agentCtx.ButtonNavigation,
-			}, messagesToSave, nil
-		}
-
-		// Check if tool result indicates we should stop (e.g., navigation tool completed)
-		if agentCtx.ShouldNavigate {
-			return &AgentResponse{
-				Content:          "Navigation completed",
-				NavigationInfo:   agentCtx.NavigationInfo,
-				ShouldNavigate:   true,
-				ExecutionSteps:   agentCtx.ExecutionSteps,
-				TokensUsed:       agentCtx.TokensUsed,
-				ButtonNavigation: agentCtx.ButtonNavigation,
-			}, messagesToSave, nil
 		}
 	}
 

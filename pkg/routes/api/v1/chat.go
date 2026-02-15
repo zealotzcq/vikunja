@@ -412,7 +412,7 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 			ID:           fmt.Sprintf("msg_%d", time.Now().UnixNano()),
 			Type:         "question",
 			Role:         "assistant",
-			Content:      "Please answer the following question:",
+			Content:      "",
 			QuestionData: questionData,
 			Timestamp:    time.Now().Unix(),
 			CompanyID:    req.CompanyID,

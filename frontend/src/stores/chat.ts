@@ -15,7 +15,7 @@ export const useChatStore = defineStore('chat', () => {
 	const router = useRouter()
 	const isMobile = ref(false)
 	const isAvailable = ref(false)
-	const isOpen = ref(false)
+	const isOpen = ref(localStorage.getItem('chatAssistantOpen') === 'true')
 	const messages = ref<IChatMessage[]>([])
 	const isLoading = ref(false)
 	const error = ref<string | null>(null)
@@ -23,7 +23,26 @@ export const useChatStore = defineStore('chat', () => {
 
 	const chatService = new ChatService()
 	let eventSource: EventSource | null = null
-	const processedRefreshMessages = new Set<string>()
+
+	function getProcessedRefreshMessages(): Set<string> {
+		const stored = localStorage.getItem('vikunja-chat-processed-refresh')
+		if (!stored) return new Set()
+		try {
+			return new Set(JSON.parse(stored))
+		} catch {
+			return new Set()
+		}
+	}
+
+	function addProcessedRefreshMessage(msgId: string) {
+		const set = getProcessedRefreshMessages()
+		set.add(msgId)
+		localStorage.setItem('vikunja-chat-processed-refresh', JSON.stringify([...set]))
+	}
+
+	function clearProcessedRefreshMessages() {
+		localStorage.removeItem('vikunja-chat-processed-refresh')
+	}
 
 	function setMobile(value: boolean) {
 		isMobile.value = value
@@ -153,9 +172,10 @@ export const useChatStore = defineStore('chat', () => {
 					}
 				}
 
-				if (lastMessage.buttonNavigation && !processedRefreshMessages.has(lastMessage.id)) {
+				const processed = getProcessedRefreshMessages()
+				if (lastMessage.buttonNavigation && !processed.has(lastMessage.id)) {
 					console.log('[Chat] New button navigation message received, reloading page')
-					processedRefreshMessages.add(lastMessage.id)
+					addProcessedRefreshMessage(lastMessage.id)
 					window.location.reload()
 				}
 			}
@@ -253,7 +273,7 @@ export const useChatStore = defineStore('chat', () => {
 		error.value = null
 		messages.value = []
 		lastMessageId.value = ''
-		processedRefreshMessages.clear()
+		clearProcessedRefreshMessages()
 		await chatService.clearSession(companyStore.currentCompanyId || undefined)
 		localStorage.removeItem('vikunja-chat-history')
 	}

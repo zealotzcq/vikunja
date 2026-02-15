@@ -177,6 +177,18 @@ func (m *Manager) createNewSessionWithoutLock(userID, companyID int64) (*ChatSes
 		return nil, fmt.Errorf("failed to load subordinate staff: %w", err)
 	}
 
+	currentUser, err := user.GetUserByID(db.NewSession(), userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load current user: %w", err)
+	}
+
+	allStaff := append(subordinateStaff, SubordinateStaffInfo{
+		UserID:    currentUser.ID,
+		Username:  currentUser.Username,
+		Name:      currentUser.Name,
+		ProjectID: currentUser.DefaultProjectID,
+	})
+
 	session := ChatSession{
 		ID:               generateSessionID(),
 		UserID:           userID,
@@ -184,7 +196,7 @@ func (m *Manager) createNewSessionWithoutLock(userID, companyID int64) (*ChatSes
 		CreatedAt:        now,
 		ExpiresAt:        now.Add(sessionTTL),
 		Messages:         []Message{},
-		SubordinateStaff: subordinateStaff,
+		SubordinateStaff: allStaff,
 	}
 
 	sessionKey := getSessionKey(userID, companyID)

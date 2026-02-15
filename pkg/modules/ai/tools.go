@@ -243,7 +243,7 @@ Usage notes:
 	}
 
 	finishTaskTool := &Tool{
-		Name: "finish_task",
+		Name: "finish_job",
 		Description: `Call this tool when you have completed your work and want to respond to the user. This is the ONLY tool that ends the conversation.
 
 This tool sends your response to the user and optionally provides navigation information.
@@ -352,7 +352,7 @@ IMPORTANT: You MUST use this tool to end the conversation. Do not provide text r
 	}
 
 	if err := tm.RegisterTool(finishTaskTool); err != nil {
-		return fmt.Errorf("failed to register finish_task tool: %w", err)
+		return fmt.Errorf("failed to register finish_job tool: %w", err)
 	}
 
 	skillTool := &Tool{

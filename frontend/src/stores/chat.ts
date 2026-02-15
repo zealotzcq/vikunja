@@ -179,9 +179,9 @@ export const useChatStore = defineStore('chat', () => {
 
 				const processed = getProcessedRefreshMessages()
 				if (lastMessage.type === 'assistant_response' && lastMessage.buttonNavigation && !processed.has(lastMessage.id)) {
-					console.log('[Chat] New button navigation message received, reloading page')
+					console.log('[Chat] New button navigation message received, reloading current route')
 					addProcessedRefreshMessage(lastMessage.id)
-					window.location.reload()
+					router.push(router.currentRoute.value)
 				}
 			}
 

@@ -254,11 +254,8 @@ Usage notes:
 Use this tool when you want to provide a button that allows users to navigate to:
 - Tasks (route: task.detail with param id)
 - Projects (route: project.index with param projectId)
-- Teams (route: teams.edit with param id)
-- Labels (route: labels.index)
 - Task list (route: tasks.range)
 - Project list (route: projects.index)
-- Team list (route: teams.index)
 - Home (route: home)
 
 The button will display a label and optionally a title showing the target (e.g., task title, project title).
@@ -462,9 +459,9 @@ IMPORTANT: You MUST use this tool to end the conversation. Do not provide text r
 	assignTaskTool := &Tool{
 		Name:           "assign_task",
 		ShouldStopLoop: true,
-		Description: `Assign a task to a subordinate staff member. Use this when user wants to assign work or a task to someone.
+		Description: `Assign a task to a staff member or the user himself. Use this when user wants to assign work or a task to someone.
 
-The system context contains subordinate staff information including:
+The system context contains information of subordinate staffs and the user, including:
 - User ID, Username, Name, and Project ID for each subordinate
 
 Priority determination (based on user's tone/phrasing):

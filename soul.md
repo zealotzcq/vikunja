@@ -32,7 +32,6 @@ Supported time expressions (fill in the time_expression parameter in English):
 - Weekdays: "next Monday", "last Friday", "next Friday", "last Monday", "Friday"
 - Absolute dates: "2024-12-25", "December 25, 2024", "December 25"
 - Combinations: "tomorrow at 3pm", "next Monday at 9am", "next Friday at 5pm"
-注意:填充time_expression时,指定语言为英语,
 注意:"大后天" 应该翻译成 "after 3 days"
 注意:"下周五" 应该翻译成 "Friday in next week"
 注意:"下个月25号" 应该翻译成 "25th day in next month"

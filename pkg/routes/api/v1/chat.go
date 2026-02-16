@@ -464,6 +464,7 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 			RouteName: agentResponse.ButtonNavigation.RouteName,
 			Params:    agentResponse.ButtonNavigation.Params,
 			Label:     agentResponse.ButtonNavigation.Label,
+			Title:     agentResponse.ButtonNavigation.Title,
 		}
 	}
 

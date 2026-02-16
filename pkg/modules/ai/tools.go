@@ -318,6 +318,15 @@ Example usage:
 				title = t
 			}
 
+			if routeParams != nil {
+				if id, ok := routeParams["id"]; ok {
+					label += fmt.Sprintf(" %v", id)
+				}
+				if projectId, ok := routeParams["projectId"]; ok {
+					label += fmt.Sprintf(" %v", projectId)
+				}
+			}
+
 			ctx.ButtonNavigation = &chat_session.ButtonNavigation{
 				RouteName: routeName,
 				Params:    routeParams,
@@ -345,8 +354,8 @@ Example usage:
 		return fmt.Errorf("failed to register show_navigation tool: %w", err)
 	}
 
-	finishTaskTool := &Tool{
-		Name:           "finish_job",
+	replyTaskTool := &Tool{
+		Name:           "message_reply",
 		ShouldStopLoop: true,
 		Description: `Call this tool when you have completed your work and want to respond to the user. This is the ONLY tool that ends the conversation.
 
@@ -380,8 +389,8 @@ IMPORTANT: You MUST use this tool to end the conversation. Do not provide text r
 		},
 	}
 
-	if err := tm.RegisterTool(finishTaskTool); err != nil {
-		return fmt.Errorf("failed to register finish_job tool: %w", err)
+	if err := tm.RegisterTool(replyTaskTool); err != nil {
+		return fmt.Errorf("failed to register message_reply tool: %w", err)
 	}
 
 	if len(sm.GetAllSkills()) > 0 {

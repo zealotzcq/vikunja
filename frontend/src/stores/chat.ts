@@ -138,7 +138,7 @@ export const useChatStore = defineStore('chat', () => {
 				type: msg.type || (msg.role === 'user' ? 'user_input' : 'assistant_response'),
 				role: msg.role,
 				content: msg.content,
-				timestamp: msg.timestamp,
+				timestamp: msg.timestamp * 1000,
 				navigationCommand: msg.navigationCommand,
 				buttonNavigation: msg.buttonNavigation,
 				questionData: msg.questionData,

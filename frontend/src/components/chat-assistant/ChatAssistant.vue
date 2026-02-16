@@ -57,7 +57,7 @@
 						</div>
 
 						<div
-							v-if="msg.questionData && msg.id === lastMessageWithQuestion?.id"
+							v-if="msg.questionData && msg.toolCallID === lastMessageWithQuestion?.toolCallID"
 							class="question-panel"
 						>
 							<div
@@ -73,8 +73,7 @@
 										v-for="(option, oIndex) in question.options"
 										:key="oIndex"
 										class="question-option"
-										:class="[{disabled: answeredQuestionId}]"
-										@click="!answeredQuestionId && handleQuestionOption(question, option)"
+										@click="handleQuestionOption(question, option)"
 									>
 										<div class="option-label">
 											{{ option.label }}
@@ -147,9 +146,26 @@ const chatStore = useChatStore()
 
 const userInput = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
-const answeredQuestionId = ref<string | null>(null)
 const isProcessing = ref(false)
 const processingText = ref('')
+
+const ANSWERED_TOOL_CALLS_KEY = 'vikunja-answered-tool-calls'
+
+function getAnsweredToolCalls(): Set<string> {
+	const stored = localStorage.getItem(ANSWERED_TOOL_CALLS_KEY)
+	if (!stored) return new Set()
+	try {
+		return new Set(JSON.parse(stored))
+	} catch {
+		return new Set()
+	}
+}
+
+function setToolCallAnswered(toolCallId: string) {
+	const set = getAnsweredToolCalls()
+	set.add(toolCallId)
+	localStorage.setItem(ANSWERED_TOOL_CALLS_KEY, JSON.stringify([...set]))
+}
 
 watch(
 	() => chatStore.hasPendingResponse,
@@ -162,7 +178,13 @@ watch(
 )
 
 const lastMessageWithQuestion = computed(() => {
-	return chatStore.messages.find(msg => msg.questionData)
+	const answeredToolCalls = getAnsweredToolCalls()
+	const messagesWithQuestions = chatStore.messages.filter(msg => 
+		msg.questionData && 
+		msg.toolCallID && 
+		!answeredToolCalls.has(msg.toolCallID),
+	)
+	return messagesWithQuestions[messagesWithQuestions.length - 1] || undefined
 })
 
 const visibleMessages = computed(() => {
@@ -215,14 +237,16 @@ function clearMessages() {
 	chatStore.clearMessages()
 	isProcessing.value = false
 	processingText.value = ''
-	messageIdsRef.value = []
-	isHistoryLoaded.value = false
-	answeredQuestionId.value = null
+	localStorage.removeItem(ANSWERED_TOOL_CALLS_KEY)
 }
 
 async function handleQuestionOption(question: IQuestion, option: IQuestionOption) {
 	const answer = option.label
-	answeredQuestionId.value = lastMessageWithQuestion.value?.id || null
+	const toolCallId = lastMessageWithQuestion.value?.toolCallID
+
+	if (toolCallId) {
+		setToolCallAnswered(toolCallId)
+	}
 
 	const userMessageText = t('chatAssistant.selectedOption', {option: answer})
 	chatStore.addMessage({
@@ -271,20 +295,20 @@ watch(
 watch(
 	visibleMessages,
 	(newMessages) => {
-			if (newMessages.length === 0) {
-				isProcessing.value = false
-				processingText.value = ''
-				return
-			}
+		if (newMessages.length === 0) {
+			isProcessing.value = false
+			processingText.value = ''
+			return
+		}
 
-			const lastMessage = newMessages[newMessages.length - 1]
-			if (!lastMessage) return
+		const lastMessage = newMessages[newMessages.length - 1]
+		if (!lastMessage) return
 
-			isProcessing.value = lastMessage.role === 'user'
-			processingText.value = isProcessing.value ? t('chatAssistant.processing') : ''
-		},
-		{deep: true},
-	)
+		isProcessing.value = lastMessage.role === 'user'
+		processingText.value = isProcessing.value ? t('chatAssistant.processing') : ''
+	},
+	{deep: true},
+)
 </script>
 
 <style lang="scss" scoped>

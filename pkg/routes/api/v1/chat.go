@@ -68,6 +68,7 @@ type ChatMessage struct {
 	NavigationCommand *NavigationCommand `json:"navigationCommand,omitempty"`
 	ButtonNavigation  *ButtonNavigation  `json:"buttonNavigation,omitempty"`
 	QuestionData      string             `json:"questionData,omitempty"`
+	ToolCallID        string             `json:"toolCallID,omitempty"`
 }
 
 // NavigationCommand represents a navigation action
@@ -256,6 +257,7 @@ func GetChatHistory(c *echo.Context) error {
 				NavigationCommand: navigationCommand,
 				ButtonNavigation:  buttonNavigation,
 				QuestionData:      msg.QuestionData,
+				ToolCallID:        msg.ToolCallID,
 			})
 		}
 	}
@@ -408,9 +410,15 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 	}
 
 	// Save tool calls and tool results to session (including question tool calls)
+	questionToolCallID := ""
 	for _, step := range agentResponse.ExecutionSteps {
 		// Use step.Action and step.Input directly (new structured format)
 		toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
+
+		// If this is a question tool call, save the ID for later use
+		if step.Action == "question" {
+			questionToolCallID = toolCallID
+		}
 
 		// Save tool call message
 		toolCallMsg := chat_session.Message{
@@ -426,7 +434,7 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 		if err := chat_session.GetDefault().AddMessage(userID, req.CompanyID, toolCallMsg); err != nil {
 		}
 
-		// Save tool result message with ToolCallID referencing the tool call
+		// Save tool result message with ToolCallID referencing tool call
 		toolResultMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
 		toolResultMsg := chat_session.Message{
 			ID:         toolResultMsgID,
@@ -452,6 +460,7 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 			QuestionData: questionData,
 			Timestamp:    time.Now().Unix(),
 			CompanyID:    req.CompanyID,
+			ToolCallID:   questionToolCallID,
 		}
 		chat_session.GetDefault().AddMessage(userID, req.CompanyID, questionMessage)
 		return
@@ -651,8 +660,14 @@ func processQuestionAnswerAsync(ctx context.Context, userID, companyID int64, an
 		}
 	}
 
+	questionToolCallID := ""
 	for _, step := range agentResponse.ExecutionSteps {
 		toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
+
+		// If this is a question tool call, save the ID for later use
+		if step.Action == "question" {
+			questionToolCallID = toolCallID
+		}
 
 		toolCallMsg := chat_session.Message{
 			ID:        toolCallID,
@@ -692,6 +707,7 @@ func processQuestionAnswerAsync(ctx context.Context, userID, companyID int64, an
 			QuestionData: questionData,
 			Timestamp:    time.Now().Unix(),
 			CompanyID:    companyID,
+			ToolCallID:   questionToolCallID,
 		}
 		chat_session.GetDefault().AddMessage(userID, companyID, questionMessage)
 		return

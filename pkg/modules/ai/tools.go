@@ -384,67 +384,69 @@ IMPORTANT: You MUST use this tool to end the conversation. Do not provide text r
 		return fmt.Errorf("failed to register finish_job tool: %w", err)
 	}
 
-	skillTool := &Tool{
-		Name:           "skill",
-		ShouldStopLoop: false,
-		Description:    `Load a skill to get detailed instructions for a specific task. Skills provide specialized knowledge and step-by-step guidance. Use this when a task matches an available skill's description. Only the skills listed here are available: ` + sm.FormatSkillsForTool(),
-		Parameters: map[string]interface{}{
-			"$schema": "https://json-schema.org/draft-2020-12/schema",
-			"type":    "object",
-			"properties": map[string]interface{}{
-				"name": map[string]interface{}{
-					"description": "The skill identifier from available_skills (e.g., 'skill-creator', 'chinese-novelist', ...)",
-					"type":        "string",
+	if len(sm.GetAllSkills()) > 0 {
+		skillTool := &Tool{
+			Name:           "skill",
+			ShouldStopLoop: false,
+			Description:    `Load a skill to get detailed instructions for a specific task. Skills provide specialized knowledge and step-by-step guidance. Use this when a task matches an available skill's description. Only the skills listed here are available: ` + sm.FormatSkillsForTool(),
+			Parameters: map[string]interface{}{
+				"$schema": "https://json-schema.org/draft-2020-12/schema",
+				"type":    "object",
+				"properties": map[string]interface{}{
+					"name": map[string]interface{}{
+						"description": "The skill identifier from available_skills (e.g., 'skill-creator', 'chinese-novelist', ...)",
+						"type":        "string",
+					},
 				},
+				"required":             []string{"name"},
+				"additionalProperties": false,
 			},
-			"required":             []string{"name"},
-			"additionalProperties": false,
-		},
-		Execute: func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) {
-			skillName, ok := params["name"].(string)
-			if !ok {
+			Execute: func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) {
+				skillName, ok := params["name"].(string)
+				if !ok {
+					return &ToolExecutionResult{
+						Error: "name is required",
+					}, fmt.Errorf("name is required")
+				}
+
+				skillContent, err := sm.LoadSkillContent(skillName)
+				if err != nil {
+					available := strings.Join(func() []string {
+						skills := sm.GetAllSkills()
+						names := make([]string, 0, len(skills))
+						for name := range skills {
+							names = append(names, name)
+						}
+						return names
+					}(), ", ")
+					return &ToolExecutionResult{
+						Error: fmt.Sprintf("skill '%s' not found. Available skills: %s", skillName, available),
+					}, fmt.Errorf("skill '%s' not found. Available skills: %s", skillName, available)
+				}
+
+				var sb strings.Builder
+				sb.WriteString(fmt.Sprintf("## Skill: %s\n\n", skillContent.Metadata.Name))
+				sb.WriteString(fmt.Sprintf("**Base directory**: %s\n\n", skillContent.Dir))
+				if skillContent.Metadata.Description != "" {
+					sb.WriteString(fmt.Sprintf("**Description**: %s\n\n", skillContent.Metadata.Description))
+				}
+				if skillContent.Metadata.License != "" {
+					sb.WriteString(fmt.Sprintf("**License**: %s\n\n", skillContent.Metadata.License))
+				}
+				if skillContent.Metadata.Compatibility != "" {
+					sb.WriteString(fmt.Sprintf("**Compatibility**: %s\n\n", skillContent.Metadata.Compatibility))
+				}
+				sb.WriteString(strings.TrimSpace(skillContent.Content))
+
 				return &ToolExecutionResult{
-					Error: "name is required",
-				}, fmt.Errorf("name is required")
-			}
+					Result: sb.String(),
+				}, nil
+			},
+		}
 
-			skillContent, err := sm.LoadSkillContent(skillName)
-			if err != nil {
-				available := strings.Join(func() []string {
-					skills := sm.GetAllSkills()
-					names := make([]string, 0, len(skills))
-					for name := range skills {
-						names = append(names, name)
-					}
-					return names
-				}(), ", ")
-				return &ToolExecutionResult{
-					Error: fmt.Sprintf("skill '%s' not found. Available skills: %s", skillName, available),
-				}, fmt.Errorf("skill '%s' not found. Available skills: %s", skillName, available)
-			}
-
-			var sb strings.Builder
-			sb.WriteString(fmt.Sprintf("## Skill: %s\n\n", skillContent.Metadata.Name))
-			sb.WriteString(fmt.Sprintf("**Base directory**: %s\n\n", skillContent.Dir))
-			if skillContent.Metadata.Description != "" {
-				sb.WriteString(fmt.Sprintf("**Description**: %s\n\n", skillContent.Metadata.Description))
-			}
-			if skillContent.Metadata.License != "" {
-				sb.WriteString(fmt.Sprintf("**License**: %s\n\n", skillContent.Metadata.License))
-			}
-			if skillContent.Metadata.Compatibility != "" {
-				sb.WriteString(fmt.Sprintf("**Compatibility**: %s\n\n", skillContent.Metadata.Compatibility))
-			}
-			sb.WriteString(strings.TrimSpace(skillContent.Content))
-
-			return &ToolExecutionResult{
-				Result: sb.String(),
-			}, nil
-		},
-	}
-
-	if err := tm.RegisterTool(skillTool); err != nil {
-		return fmt.Errorf("failed to register skill tool: %w", err)
+		if err := tm.RegisterTool(skillTool); err != nil {
+			return fmt.Errorf("failed to register skill tool: %w", err)
+		}
 	}
 
 	assignTaskTool := &Tool{
@@ -603,6 +605,10 @@ Example usage:
 			} else {
 				dueDate = now.AddDate(0, 0, daysToAdd)
 				timeExpressionUsed = false
+			}
+
+			if dueDate.Before(now.Add(time.Hour)) {
+				dueDate = now.Add(time.Hour)
 			}
 
 			task := &models.Task{

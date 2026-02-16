@@ -16,6 +16,7 @@ var (
 type LLMLogger struct {
 	enabled    bool
 	logDir     string
+	briefMode  bool
 	counter    uint64
 	counterMux sync.Mutex
 }
@@ -24,9 +25,10 @@ func GetLLMLogger() *LLMLogger {
 	if llmLogger == nil {
 		config := GetConfig()
 		llmLogger = &LLMLogger{
-			enabled: config.LLMLog,
-			logDir:  "llmlog",
-			counter: 0,
+			enabled:   config.LLMLog,
+			logDir:    config.LLMLogPath,
+			briefMode: config.LLMLogBriefMode,
+			counter:   0,
 		}
 	}
 	return llmLogger
@@ -48,8 +50,16 @@ func (l *LLMLogger) LogRequest(provider, prompt string) error {
 	counter := l.nextCounter()
 	filename := fmt.Sprintf("%s_req_%s_%04d.json", provider, timestamp, counter)
 
+	requestData := parseJSON(prompt)
+
+	if l.briefMode {
+		if reqMap, ok := requestData.(map[string]interface{}); ok {
+			delete(reqMap, "tools")
+		}
+	}
+
 	return l.writeJSONLog(filename, map[string]interface{}{
-		"request": parseJSON(prompt),
+		"request": requestData,
 	})
 }
 

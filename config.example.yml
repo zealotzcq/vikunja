@@ -5,6 +5,7 @@ service:
   # interface: 0.0.0.0:80
   # 公开 URL（可选，用于 CORS 和 邮件）
   # publicurl: http://your-domain.com
+  JWTSecret: "your-secret-here"
   rootpath: ./
 
 cors:
@@ -43,8 +44,13 @@ ai:
   # Agent 行为配置
   max_iterations: 10
   # LLM 日志记录（可选，默认：false）
-  # 启用后将在 ./llmlog 目录下保存每次请求和响应
+  # 启用后将在 llm_log_path 目录下保存每次请求和响应
   llm_log: false
+  # LLM 日志保存路径（可选，默认：llmlog）
+  # llm_log_path: llmlog
+  # LLM 日志简略模式（可选，默认：false）
+  # 启用后保存请求时将不包含 tools 部分
+  # llm_log_brief_mode: false
   temperature: 0.7
   # 启用的技能列表（空表示启用所有）
   enabled_skills: []

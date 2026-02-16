@@ -1256,7 +1256,7 @@
 	},
 	"chatAssistant": {
 		"title": "AI 助手",
-		"placeholder": "让小李马上写计划...",
+		"placeholder": "让小李马上写计划/小赵的进展",
 		"send": "发送",
 		"close": "关闭聊天",
 		"clear": "清空消息",

@@ -24,11 +24,13 @@ type Config struct {
 	OllamaModel   string `mapstructure:"model"`
 
 	// Agent Configuration
-	MaxIterations int      `mapstructure:"max_iterations"`
-	Temperature   float64  `mapstructure:"temperature"`
-	EnabledSkills []string `mapstructure:"enabled_skills"`
-	EnabledTools  []string `mapstructure:"enabled_tools"`
-	LLMLog        bool     `mapstructure:"llm_log"`
+	MaxIterations   int      `mapstructure:"max_iterations"`
+	Temperature     float64  `mapstructure:"temperature"`
+	EnabledSkills   []string `mapstructure:"enabled_skills"`
+	EnabledTools    []string `mapstructure:"enabled_tools"`
+	LLMLog          bool     `mapstructure:"llm_log"`
+	LLMLogPath      string   `mapstructure:"llm_log_path"`
+	LLMLogBriefMode bool     `mapstructure:"llm_log_brief_mode"`
 
 	// System Prompt File (path to file containing the system prompt)
 	SystemPromptFile string `mapstructure:"system_prompt_file"`
@@ -83,6 +85,12 @@ func LoadConfig() (*Config, error) {
 		if viper.IsSet("ai.llm_log") {
 			config.LLMLog = viper.GetBool("ai.llm_log")
 		}
+		if viper.IsSet("ai.llm_log_path") {
+			config.LLMLogPath = viper.GetString("ai.llm_log_path")
+		}
+		if viper.IsSet("ai.llm_log_brief_mode") {
+			config.LLMLogBriefMode = viper.GetBool("ai.llm_log_brief_mode")
+		}
 
 		systemPromptFile := "./soul.md"
 		if viper.IsSet("ai.system_prompt_file") {
@@ -123,6 +131,9 @@ func LoadConfig() (*Config, error) {
 		}
 		if config.EnabledTools == nil {
 			config.EnabledTools = []string{}
+		}
+		if config.LLMLogPath == "" {
+			config.LLMLogPath = "llmlog"
 		}
 
 		err = nil

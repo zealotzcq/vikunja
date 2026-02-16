@@ -173,6 +173,10 @@ func messageToPayload(msg chat_session.Message) map[string]interface{} {
 		payload["navigationCommand"] = msg.NavigationCommand
 	}
 
+	if msg.ButtonNavigation != nil {
+		payload["buttonNavigation"] = msg.ButtonNavigation
+	}
+
 	if msg.Metadata != nil {
 		payload["metadata"] = msg.Metadata
 	}

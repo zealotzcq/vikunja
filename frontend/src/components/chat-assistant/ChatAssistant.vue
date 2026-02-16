@@ -268,51 +268,23 @@ watch(
 	},
 )
 
-const messageIdsRef = ref<string[]>([])
-const isHistoryLoaded = ref(false)
-
 watch(
-	chatStore.messages,
+	visibleMessages,
 	(newMessages) => {
-		if (newMessages.length === 0) {
-			isProcessing.value = false
-			processingText.value = ''
-			messageIdsRef.value = []
-			isHistoryLoaded.value = false
-			return
-		}
-
-		if (messageIdsRef.value.length === 0 && newMessages.length > 0) {
-			messageIdsRef.value = newMessages.map(msg => msg.id)
-			isHistoryLoaded.value = true
-
-			const lastMessage = newMessages[newMessages.length - 1]
-			if (lastMessage && (lastMessage.type === 'assistant_response' || lastMessage.type === 'question' || lastMessage.type === 'button_navigation')) {
+			if (newMessages.length === 0) {
 				isProcessing.value = false
 				processingText.value = ''
+				return
 			}
-			return
-		}
 
-		const lastMessage = newMessages[newMessages.length - 1]
-		if (!lastMessage) return
+			const lastMessage = newMessages[newMessages.length - 1]
+			if (!lastMessage) return
 
-		const isNewMessage = !messageIdsRef.value.includes(lastMessage.id)
-		if (!isNewMessage) return
-
-		messageIdsRef.value = [...messageIdsRef.value, lastMessage.id]
-
-		if (lastMessage.type === 'tool_call') {
-			const toolName = lastMessage.toolName || lastMessage.content
-			processingText.value = t('chatAssistant.processingTool', {tool: toolName})
-			isProcessing.value = true
-		} else if (lastMessage.type === 'assistant_response' || lastMessage.type === 'question' || lastMessage.type === 'button_navigation') {
-			isProcessing.value = false
-			processingText.value = ''
-		}
-	},
-	{deep: true},
-)
+			isProcessing.value = lastMessage.role === 'user'
+			processingText.value = isProcessing.value ? t('chatAssistant.processing') : ''
+		},
+		{deep: true},
+	)
 </script>
 
 <style lang="scss" scoped>

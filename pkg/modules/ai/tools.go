@@ -470,7 +470,7 @@ IMPORTANT: You MUST use this tool to end the conversation. Do not provide text r
 			ShouldStopLoop: false,
 			Description:    `Load a skill to get detailed instructions for a specific task. Skills provide specialized knowledge and step-by-step guidance. Use this when a task matches an available skill's description. Only the skills listed here are available: ` + sm.FormatSkillsForTool(),
 			Parameters: map[string]interface{}{
-				"type":    "object",
+				"type": "object",
 				"properties": map[string]interface{}{
 					"name": map[string]interface{}{
 						"description": "The skill identifier from available_skills (e.g., 'skill-creator', 'chinese-novelist', ...)",
@@ -765,13 +765,16 @@ Example usage:
 
 			return &ToolExecutionResult{
 				Result: response,
-				Metadata: map[string]interface{}{
-					"task_id":         task.ID,
-					"assigned_to":     targetStaff.UserID,
-					"project_id":      projectID,
-					"priority":        priority,
-					"due_date":        dueDate.Format(time.RFC3339),
-					"time_expression": timeExpressionUsed,
+				StopCommand: &ToolStopCommand{
+					Response: response,
+					Metadata: map[string]interface{}{
+						"task_id":         task.ID,
+						"assigned_to":     targetStaff.UserID,
+						"project_id":      projectID,
+						"priority":        priority,
+						"due_date":        dueDate.Format(time.RFC3339),
+						"time_expression": timeExpressionUsed,
+					},
 				},
 			}, nil
 		},

@@ -116,7 +116,6 @@ func (m *Manager) getExistingSession(userID, companyID int64) (*ChatSession, err
 func getSubordinateStaff(userID, companyID int64) (result []SubordinateStaffInfo, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Printf("[Chat] Recovered from panic in getSubordinateStaff: %v\n", r)
 			result = []SubordinateStaffInfo{}
 			err = nil
 		}
@@ -232,7 +231,6 @@ func (m *Manager) RegisterListener(userID, companyID int64, listener chan Messag
 	}
 	key := fmt.Sprintf("%d:%d", userID, companyID)
 	m.listeners[key] = append(m.listeners[key], listener)
-	fmt.Printf("[Chat] Registered listener for user %d, company %d, total listeners: %d\n", userID, companyID, len(m.listeners[key]))
 }
 
 // UnregisterListener removes a listener for a user
@@ -259,10 +257,8 @@ func (m *Manager) notifyListeners(userID, companyID int64, msg Message) {
 	key := fmt.Sprintf("%d:%d", userID, companyID)
 	listeners, exists := m.listeners[key]
 	if !exists {
-		fmt.Printf("[Chat] No listeners for user %d, company %d\n", userID, companyID)
 		return
 	}
-	fmt.Printf("[Chat] Notifying %d listeners for user %d, company %d, message type: %s, id: %s\n", len(listeners), userID, companyID, msg.Type, msg.ID)
 	sentCount := 0
 	for _, listener := range listeners {
 		select {
@@ -272,7 +268,6 @@ func (m *Manager) notifyListeners(userID, companyID int64, msg Message) {
 			fmt.Printf("[Chat] Listener channel full, skipping\n")
 		}
 	}
-	fmt.Printf("[Chat] Sent message to %d/%d listeners\n", sentCount, len(listeners))
 }
 
 // AddMessage adds a message to a session

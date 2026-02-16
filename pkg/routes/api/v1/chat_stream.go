@@ -84,8 +84,6 @@ func ChatStream(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
 	}
 
-	log.Printf("[Chat] SSE connected for user %d, company %d", userID, companyID)
-
 	c.Response().Header().Set("Content-Type", "text/event-stream")
 	c.Response().Header().Set("Cache-Control", "no-cache")
 	c.Response().Header().Set("Connection", "keep-alive")
@@ -98,7 +96,6 @@ func ChatStream(c *echo.Context) error {
 	}
 
 	lastEventID := c.Request().Header.Get("Last-Event-ID")
-	fmt.Printf("[Chat] SSE connection for user %d, Last-Event-ID: %s\n", userID, lastEventID)
 
 	listener := make(chan chat_session.Message, 10)
 	chat_session.GetDefault().RegisterListener(userID, companyID, listener)
@@ -127,7 +124,6 @@ func ChatStream(c *echo.Context) error {
 	for {
 		select {
 		case msg := <-listener:
-			fmt.Printf("[Chat] SSE received message for user %d: type=%s, id=%s\n", userID, msg.Type, msg.ID)
 			msgType := getMessageTypeForFrontend(msg.Type)
 			if msgType != "" {
 				update := ChatUpdate{
@@ -135,17 +131,14 @@ func ChatStream(c *echo.Context) error {
 					MessageType:   msgType,
 					Payload:       messageToPayload(msg),
 				}
-				fmt.Printf("[Chat] SSE sending update: last_message_id=%s, message_type=%s\n", update.LastMessageID, update.MessageType)
 				sendSSEUpdate(c, flusher, update)
 			} else {
-				fmt.Printf("[Chat] SSE message type %s not needed for frontend\n", msg.Type)
 			}
 
 		case <-ticker.C:
 			sendKeepAlive(c, flusher)
 
 		case <-ctx.Done():
-			fmt.Printf("[Chat] SSE connection closed for user %d\n", userID)
 			return nil
 		}
 	}

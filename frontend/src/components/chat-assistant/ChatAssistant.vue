@@ -57,11 +57,11 @@
 						</div>
 
 						<div
-							v-if="msg.questionData && msg.toolCallID === lastMessageWithQuestion?.toolCallID"
+							v-if="msg.questionData"
 							class="question-panel"
 						>
 							<div
-								v-for="(question, qIndex) in parsedQuestions"
+								v-for="(question, qIndex) in parseQuestions(msg.questionData)"
 								:key="qIndex"
 								class="question-item"
 							>
@@ -73,7 +73,8 @@
 										v-for="(option, oIndex) in question.options"
 										:key="oIndex"
 										class="question-option"
-										@click="handleQuestionOption(question, option)"
+										:class="{ disabled: isQuestionDisabled(msg) }"
+										@click="!isQuestionDisabled(msg) && handleQuestionOption(question, option)"
 									>
 										<div class="option-label">
 											{{ option.label }}
@@ -139,7 +140,7 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import Icon from '@/components/misc/Icon'
 
 import {useChatStore} from '@/stores/chat'
-import type {IQuestion, IQuestionOption} from '@/modelTypes/IChatMessage'
+import type {IChatMessage, IQuestion, IQuestionOption} from '@/modelTypes/IChatMessage'
 
 const {t} = useI18n({useScope: 'global'})
 const chatStore = useChatStore()
@@ -203,10 +204,34 @@ const parsedQuestions = computed<IQuestion[]>(() => {
 	try {
 		return JSON.parse(lastMessageWithQuestion.value.questionData)
 	} catch (e) {
-		console.error('[Chat] Failed to parse question data:', e)
 		return []
 	}
 })
+
+function parseQuestions(questionData: string): IQuestion[] {
+	if (!questionData) {
+		return []
+	}
+	try {
+		return JSON.parse(questionData)
+	} catch (e) {
+		return []
+	}
+}
+
+function isQuestionDisabled(msg: IChatMessage): boolean {
+	if (!msg.toolCallID) {
+		return false
+	}
+	
+	const msgIndex = chatStore.messages.findIndex(m => m.id === msg.id)
+	if (msgIndex === -1) {
+		return false
+	}
+	
+	const messagesAfter = chatStore.messages.slice(msgIndex + 1)
+	return messagesAfter.some(m => m.type === 'user_input')
+}
 
 onMounted(() => {
 	chatStore.loadChatHistory()

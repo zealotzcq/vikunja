@@ -483,16 +483,6 @@ Task properties:
 - IsFavorite: true (favorited by default)
 - Subscription: Subscribed to task notifications
 
-Supported time expressions (fill in the time_expression parameter in English):
-- Relative dates: "today", "tomorrow", "yesterday", "today", "tomorrow", "yesterday"
-- Relative times: "in 2 hours", "30 minutes later", "after 3 days", "in 2 hours", "30 minutes later"
-- Time periods: "next week", "this month", "last year", "next week", "this month", "next year"
-- Weekdays: "next Monday", "last Friday", "next Friday", "last Monday", "Friday"
-- Absolute dates: "2024-12-25", "December 25, 2024", "December 25"
-- Combinations: "tomorrow at 3pm", "next Monday at 9am", "next Friday at 5pm"
-注意:填充time_expression时,指定语言为英语,"大后天" 应该翻译成 "after 3 days"
-
-
 Example usage:
 - "让小王马上写报告" -> HIGH priority, no time_expr, due in 1 day
 - "叫李四有空的时候整理文档" -> LOW priority, no time_expr, due in 7 days
@@ -658,12 +648,17 @@ Example usage:
 				response += fmt.Sprintf("- 截止日期：%s (根据优先级设定)\n", dueDate.Format("2006-01-02"))
 			}
 
+			label := "查看任务"
+			if task.ID > 0 {
+				label += fmt.Sprintf(" %d", task.ID)
+			}
+
 			ctx.ButtonNavigation = &chat_session.ButtonNavigation{
 				RouteName: "task.detail",
 				Params: map[string]interface{}{
 					"id": task.ID,
 				},
-				Label: "查看任务",
+				Label: label,
 				Title: taskTitle,
 			}
 
@@ -695,8 +690,20 @@ Example usage:
 // - Relative times: in 2 hours, 30 minutes later, 2小时后, 30分钟后
 // - Time periods: next week, this month, next year, 下周, 本月, 明年
 // - Weekdays: next Monday, last Friday, 下周一, 上周五
+// - Weekday in period: Tuesday in next week, 下周三, 周五在下周
+// - Day in month: 25th day in next month, 下个月的25号
 func parseTimeExpression(expr string, now time.Time) (time.Time, error) {
 	expr = strings.ToLower(strings.TrimSpace(expr))
+
+	// Weekday in period: Tuesday in next week, 下周三, 周五在下周
+	if t, ok := parseWeekdayInPeriod(expr, now); ok {
+		return t, nil
+	}
+
+	// Day in month: 25th day in next month, 下个月的25号
+	if t, ok := parseDayInMonth(expr, now); ok {
+		return t, nil
+	}
 
 	// Absolute dates in various formats
 	if t, ok := parseAbsoluteDate(expr, now); ok {
@@ -1002,6 +1009,164 @@ func parseWeekday(expr string, now time.Time) (time.Time, bool) {
 	// Default to this week
 	daysAhead := int(targetWeekday-currentWeekday+7) % 7
 	return now.AddDate(0, 0, daysAhead), true
+}
+
+// parseWeekdayInPeriod parses expressions like "Tuesday in next week", "周五在下周", "下周三"
+func parseWeekdayInPeriod(expr string, now time.Time) (time.Time, bool) {
+	weekdays := map[string]time.Weekday{
+		"sunday":    time.Sunday,
+		"monday":    time.Monday,
+		"tuesday":   time.Tuesday,
+		"wednesday": time.Wednesday,
+		"thursday":  time.Thursday,
+		"friday":    time.Friday,
+		"saturday":  time.Saturday,
+	}
+
+	cnWeekdays := map[string]time.Weekday{
+		"周日": time.Sunday, "星期日": time.Sunday,
+		"周一": time.Monday, "星期一": time.Monday,
+		"周二": time.Tuesday, "星期二": time.Tuesday,
+		"周三": time.Wednesday, "星期三": time.Wednesday,
+		"周四": time.Thursday, "星期四": time.Thursday,
+		"周五": time.Friday, "星期五": time.Friday,
+		"周六": time.Saturday, "星期六": time.Saturday,
+	}
+
+	var targetWeekday time.Weekday
+	var found bool
+
+	for day, wd := range weekdays {
+		if strings.Contains(expr, day) {
+			targetWeekday = wd
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		for day, wd := range cnWeekdays {
+			if strings.Contains(expr, day) {
+				targetWeekday = wd
+				found = true
+				break
+			}
+		}
+	}
+
+	if !found {
+		return time.Time{}, false
+	}
+
+	var periodStart time.Time
+	var periodFound bool
+
+	if strings.Contains(expr, "next week") || strings.Contains(expr, "in next week") || regexp.MustCompile(`下(?:个)?周`).MatchString(expr) {
+		daysUntilSunday := (7 - int(now.Weekday())) % 7
+		if daysUntilSunday == 0 {
+			daysUntilSunday = 7
+		}
+		periodStart = now.AddDate(0, 0, daysUntilSunday)
+		periodFound = true
+	} else if strings.Contains(expr, "this week") || strings.Contains(expr, "in this week") || regexp.MustCompile(`本(?:个)?周`).MatchString(expr) {
+		periodStart = now
+		periodFound = true
+	} else if strings.Contains(expr, "last week") || strings.Contains(expr, "in last week") || regexp.MustCompile(`上(?:个)?周`).MatchString(expr) {
+		daysBack := int(now.Weekday()) + 7
+		periodStart = now.AddDate(0, 0, -daysBack)
+		periodFound = true
+	}
+
+	if !periodFound {
+		return time.Time{}, false
+	}
+
+	daysToWeekday := int(targetWeekday-periodStart.Weekday()+7) % 7
+	result := time.Date(periodStart.Year(), periodStart.Month(), periodStart.Day()+daysToWeekday, now.Hour(), now.Minute(), 0, 0, now.Location())
+	return result, true
+}
+
+// parseDayInMonth parses expressions like "25th day in next month", "下个月的25号"
+func parseDayInMonth(expr string, now time.Time) (time.Time, bool) {
+	var dayOfMonth int
+	var monthOffset int
+	var found bool
+
+	year := now.Year()
+	month := now.Month()
+
+	if regexp.MustCompile(`(\d{1,2})(?:st|nd|rd|th)?\s*day\s*in\s*next\s*month`).MatchString(expr) {
+		re := regexp.MustCompile(`(\d{1,2})(?:st|nd|rd|th)?\s*day\s*in\s*next\s*month`)
+		matches := re.FindStringSubmatch(expr)
+		if len(matches) > 1 {
+			dayOfMonth, _ = strconv.Atoi(matches[1])
+			monthOffset = 1
+			found = true
+		}
+	} else if regexp.MustCompile(`(\d{1,2})(?:st|nd|rd|th)?\s*day\s*in\s*this\s*month`).MatchString(expr) {
+		re := regexp.MustCompile(`(\d{1,2})(?:st|nd|rd|th)?\s*day\s*in\s*this\s*month`)
+		matches := re.FindStringSubmatch(expr)
+		if len(matches) > 1 {
+			dayOfMonth, _ = strconv.Atoi(matches[1])
+			monthOffset = 0
+			found = true
+		}
+	} else if regexp.MustCompile(`(\d{1,2})(?:st|nd|rd|th)?\s*day\s*in\s*last\s*month`).MatchString(expr) {
+		re := regexp.MustCompile(`(\d{1,2})(?:st|nd|rd|th)?\s*day\s*in\s*last\s*month`)
+		matches := re.FindStringSubmatch(expr)
+		if len(matches) > 1 {
+			dayOfMonth, _ = strconv.Atoi(matches[1])
+			monthOffset = -1
+			found = true
+		}
+	} else if regexp.MustCompile(`下(?:个)?月(?:的|在)?(\d{1,2})(?:号|日)`).MatchString(expr) {
+		re := regexp.MustCompile(`下(?:个)?月(?:的|在)?(\d{1,2})(?:号|日)`)
+		matches := re.FindStringSubmatch(expr)
+		if len(matches) > 1 {
+			dayOfMonth, _ = strconv.Atoi(matches[1])
+			monthOffset = 1
+			found = true
+		}
+	} else if regexp.MustCompile(`本(?:个)?月(?:的|在)?(\d{1,2})(?:号|日)`).MatchString(expr) {
+		re := regexp.MustCompile(`本(?:个)?月(?:的|在)?(\d{1,2})(?:号|日)`)
+		matches := re.FindStringSubmatch(expr)
+		if len(matches) > 1 {
+			dayOfMonth, _ = strconv.Atoi(matches[1])
+			monthOffset = 0
+			found = true
+		}
+	} else if regexp.MustCompile(`上(?:个)?月(?:的|在)?(\d{1,2})(?:号|日)`).MatchString(expr) {
+		re := regexp.MustCompile(`上(?:个)?月(?:的|在)?(\d{1,2})(?:号|日)`)
+		matches := re.FindStringSubmatch(expr)
+		if len(matches) > 1 {
+			dayOfMonth, _ = strconv.Atoi(matches[1])
+			monthOffset = -1
+			found = true
+		}
+	}
+
+	if !found || dayOfMonth < 1 || dayOfMonth > 31 {
+		return time.Time{}, false
+	}
+
+	adjustedMonth := int(month) + monthOffset
+	adjustedYear := year
+
+	if adjustedMonth > 12 {
+		adjustedYear++
+		adjustedMonth -= 12
+	} else if adjustedMonth < 1 {
+		adjustedYear--
+		adjustedMonth += 12
+	}
+
+	lastDayOfMonth := time.Date(adjustedYear, time.Month(adjustedMonth+1), 0, 0, 0, 0, 0, now.Location()).Day()
+	if dayOfMonth > lastDayOfMonth {
+		dayOfMonth = lastDayOfMonth
+	}
+
+	result := time.Date(adjustedYear, time.Month(adjustedMonth), dayOfMonth, now.Hour(), now.Minute(), 0, 0, now.Location())
+	return result, true
 }
 
 // ToolResponse represents the response from a tool execution

@@ -82,6 +82,7 @@ type ButtonNavigation struct {
 	RouteName string                 `json:"routeName"`
 	Params    map[string]interface{} `json:"params"`
 	Label     string                 `json:"label"`
+	Title     string                 `json:"title,omitempty"`
 }
 
 // SendMessage handles sending a message to the chat assistant
@@ -243,6 +244,7 @@ func GetChatHistory(c *echo.Context) error {
 					RouteName: msg.ButtonNavigation.RouteName,
 					Params:    msg.ButtonNavigation.Params,
 					Label:     msg.ButtonNavigation.Label,
+					Title:     msg.ButtonNavigation.Title,
 				}
 			}
 

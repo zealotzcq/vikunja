@@ -54,7 +54,9 @@ func (l *LLMLogger) LogRequest(provider, prompt string) error {
 
 	if l.briefMode {
 		if reqMap, ok := requestData.(map[string]interface{}); ok {
-			delete(reqMap, "tools")
+			if requestInner, ok := reqMap["request"].(map[string]interface{}); ok {
+				delete(requestInner, "tools")
+			}
 		}
 	}
 

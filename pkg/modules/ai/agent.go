@@ -227,6 +227,20 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 			return nil, nil, fmt.Errorf("LLM generation failed: %w", err)
 		}
 
+		// If LLM returns content but no tool calls, convert to message_reply tool call
+		if providerResponse.Content != "" && len(providerResponse.ToolCalls) == 0 {
+			providerResponse.ToolCalls = []ProviderToolCall{
+				{
+					ID:   fmt.Sprintf("call_%d", time.Now().UnixNano()),
+					Type: "function",
+					Name: "message_reply",
+					Arguments: map[string]interface{}{
+						"content": providerResponse.Content,
+					},
+				},
+			}
+		}
+
 		// Process tool calls
 		for _, toolCall := range providerResponse.ToolCalls {
 			if toolCall.Name == "" {

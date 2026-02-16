@@ -131,6 +131,129 @@ func TestParseTimeExpression(t *testing.T) {
 			wantErr:   true,
 			checkTime: nil,
 		},
+		{
+			name:    "Tuesday in next week",
+			expr:    "Tuesday in next week",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2024, 12, 24, 10, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "周五在下周",
+			expr:    "周五在下周",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2024, 12, 27, 10, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "下周三",
+			expr:    "下周三",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2024, 12, 25, 10, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "25th day in next month",
+			expr:    "25th day in next month",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2025, 1, 25, 10, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "下个月的25号",
+			expr:    "下个月的25号",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2025, 1, 25, 10, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "15th day in this month",
+			expr:    "15th day in this month",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2024, 12, 15, 10, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "本月15号",
+			expr:    "本月15号",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2024, 12, 15, 10, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "Friday in this week",
+			expr:    "Friday in this week",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				// Dec 20, 2024 is Friday, so Friday of this week is today
+				expected := time.Date(2024, 12, 20, 10, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "Monday in this week",
+			expr:    "Monday in this week",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				// Dec 20, 2024 is Friday, Monday of this week was Dec 16
+				// But we should return the next Monday which is Dec 23
+				expected := time.Date(2024, 12, 23, 10, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "Wednesday in last week",
+			expr:    "Wednesday in last week",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				// Dec 20, 2024 is Friday, Wednesday of last week was Dec 11
+				expected := time.Date(2024, 12, 11, 10, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "last week Friday",
+			expr:    "last week Friday",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				// Dec 20, 2024 is Friday, Friday of last week was Dec 13
+				expected := time.Date(2024, 12, 13, 10, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "10th day in last month",
+			expr:    "10th day in last month",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				// Dec 20, 2024, last month is November
+				expected := time.Date(2024, 11, 10, 10, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "上月10号",
+			expr:    "上月10号",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2024, 11, 10, 10, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
 	}
 
 	for _, tt := range tests {

@@ -570,12 +570,6 @@ Example usage:
 				}, fmt.Errorf("no staff found with user ID %d", userIdentifier)
 			}
 
-			if targetStaff.ProjectID <= 0 {
-				return &ToolExecutionResult{
-					Error: fmt.Sprintf("Staff member %s does not have an associated project", targetStaff.Username),
-				}, fmt.Errorf("staff member %s does not have an associated project", targetStaff.Username)
-			}
-
 			s := db.NewSession()
 			if s == nil {
 				return &ToolExecutionResult{
@@ -586,6 +580,42 @@ Example usage:
 
 			authUser := &user.User{
 				ID: ctx.UserID,
+			}
+
+			var projectID int64
+			if targetStaff.ProjectID > 0 {
+				projectID = targetStaff.ProjectID
+			} else {
+				targetUser := &user.User{ID: targetStaff.UserID}
+				projectsInterface, _, _, err := (&models.Project{}).ReadAll(s, targetUser, "", 1, 1)
+				if err != nil {
+					return &ToolExecutionResult{
+						Error: fmt.Sprintf("Failed to get projects for user %s: %v", targetStaff.Username, err),
+					}, fmt.Errorf("failed to get projects: %w", err)
+				}
+
+				projects, ok := projectsInterface.([]*models.Project)
+				if !ok || len(projects) == 0 {
+					if targetStaff.UserID == ctx.UserID {
+						defaultProject := &models.Project{
+							Title:       "个人任务",
+							Description: "默认个人任务项目",
+							OwnerID:     ctx.UserID,
+						}
+						if err := defaultProject.Create(s, authUser); err != nil {
+							return &ToolExecutionResult{
+								Error: fmt.Sprintf("Failed to create default project: %v", err),
+							}, fmt.Errorf("failed to create default project: %w", err)
+						}
+						projectID = defaultProject.ID
+					} else {
+						return &ToolExecutionResult{
+							Error: fmt.Sprintf("Staff member %s does not have an associated project", targetStaff.Username),
+						}, fmt.Errorf("staff member %s does not have an associated project", targetStaff.Username)
+					}
+				} else {
+					projectID = projects[0].ID
+				}
 			}
 
 			now := time.Now()
@@ -613,7 +643,7 @@ Example usage:
 
 			task := &models.Task{
 				Title:      taskTitle,
-				ProjectID:  targetStaff.ProjectID,
+				ProjectID:  projectID,
 				StartDate:  now,
 				DueDate:    dueDate,
 				Priority:   priorityValue,
@@ -668,7 +698,7 @@ Example usage:
 				Metadata: map[string]interface{}{
 					"task_id":         task.ID,
 					"assigned_to":     targetStaff.UserID,
-					"project_id":      targetStaff.ProjectID,
+					"project_id":      projectID,
 					"priority":        priority,
 					"due_date":        dueDate.Format(time.RFC3339),
 					"time_expression": timeExpressionUsed,

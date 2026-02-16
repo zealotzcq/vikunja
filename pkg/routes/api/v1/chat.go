@@ -360,11 +360,10 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 			})
 
 		case "question_answer":
-			// User's answer to a question
-			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
-				Role:    "user",
-				Content: msg.Content,
-			})
+			// Skip question_answer messages
+			// These are saved to the session but not used in the agent's message history
+			// They represent answers to questions and are already handled through the question/answer flow
+			continue
 		}
 	}
 
@@ -405,25 +404,10 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 					questionData = string(questionsJSON)
 				}
 			}
-			break
 		}
 	}
 
-	if hasQuestion && questionData != "" {
-		questionMessage := chat_session.Message{
-			ID:           fmt.Sprintf("msg_%d", time.Now().UnixNano()),
-			Type:         "question",
-			Role:         "assistant",
-			Content:      "",
-			QuestionData: questionData,
-			Timestamp:    time.Now().Unix(),
-			CompanyID:    req.CompanyID,
-		}
-		chat_session.GetDefault().AddMessage(userID, req.CompanyID, questionMessage)
-		return
-	}
-
-	// Save tool calls and tool results to session
+	// Save tool calls and tool results to session (including question tool calls)
 	for _, step := range agentResponse.ExecutionSteps {
 		// Use step.Action and step.Input directly (new structured format)
 		toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
@@ -456,6 +440,21 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 		}
 		if err := chat_session.GetDefault().AddMessage(userID, req.CompanyID, toolResultMsg); err != nil {
 		}
+	}
+
+	// Save question message if there was a question tool call
+	if hasQuestion && questionData != "" {
+		questionMessage := chat_session.Message{
+			ID:           fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+			Type:         "question",
+			Role:         "assistant",
+			Content:      "",
+			QuestionData: questionData,
+			Timestamp:    time.Now().Unix(),
+			CompanyID:    req.CompanyID,
+		}
+		chat_session.GetDefault().AddMessage(userID, req.CompanyID, questionMessage)
+		return
 	}
 
 	// Save assistant response message
@@ -521,11 +520,12 @@ func SubmitQuestionAnswer(c *echo.Context) error {
 	}
 
 	answerMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
+	answerContent := fmt.Sprintf("[回答问题]%s", req.Answer)
 	answerMessage := chat_session.Message{
 		ID:        answerMsgID,
 		Type:      "question_answer",
 		Role:      "user",
-		Content:   req.Answer,
+		Content:   answerContent,
 		Timestamp: time.Now().Unix(),
 		CompanyID: req.CompanyID,
 	}
@@ -534,7 +534,7 @@ func SubmitQuestionAnswer(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to save answer: %v", err))
 	}
 
-	go processQuestionAnswerAsync(context.Background(), userID, req.CompanyID, req.Answer)
+	go processQuestionAnswerAsync(context.Background(), userID, req.CompanyID, answerContent)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"id":        answerMsgID,
@@ -605,10 +605,9 @@ func processQuestionAnswerAsync(ctx context.Context, userID, companyID int64, an
 				ToolCallID: msg.ToolCallID,
 			})
 		case "question_answer":
-			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
-				Role:    "user",
-				Content: msg.Content,
-			})
+			// Skip question_answer messages - they are already passed as the 'answer' parameter to ProcessMessage
+			// Including them here would cause the same message to be added twice to the LLM's messages array
+			continue
 		}
 	}
 
@@ -633,6 +632,23 @@ func processQuestionAnswerAsync(ctx context.Context, userID, companyID int64, an
 	}
 	if agentResponse.TokensUsed > 0 {
 		metadata["tokens_used"] = agentResponse.TokensUsed
+	}
+
+	hasQuestion := false
+	var questionData string
+
+	for _, step := range agentResponse.ExecutionSteps {
+		if step.Action == "question" {
+			hasQuestion = true
+
+			var result map[string]interface{}
+			if err := json.Unmarshal([]byte(step.Input), &result); err == nil {
+				if questions, ok := result["questions"]; ok {
+					questionsJSON, _ := json.Marshal(questions)
+					questionData = string(questionsJSON)
+				}
+			}
+		}
 	}
 
 	for _, step := range agentResponse.ExecutionSteps {
@@ -664,6 +680,21 @@ func processQuestionAnswerAsync(ctx context.Context, userID, companyID int64, an
 		}
 		if err := chat_session.GetDefault().AddMessage(userID, companyID, toolResultMsg); err != nil {
 		}
+	}
+
+	// Save question message if there was a question tool call
+	if hasQuestion && questionData != "" {
+		questionMessage := chat_session.Message{
+			ID:           fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+			Type:         "question",
+			Role:         "assistant",
+			Content:      "",
+			QuestionData: questionData,
+			Timestamp:    time.Now().Unix(),
+			CompanyID:    companyID,
+		}
+		chat_session.GetDefault().AddMessage(userID, companyID, questionMessage)
+		return
 	}
 
 	assistantMessage := chat_session.Message{

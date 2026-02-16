@@ -165,8 +165,7 @@ Usage notes:
 - Answers are returned as arrays of labels; set multiple: true to allow selecting more than one
 - If you recommend a specific option, make that the first option in the list and add "(Recommended)" at the end of the label`,
 		Parameters: map[string]interface{}{
-			"$schema": "https://json-schema.org/draft-2020-12/schema",
-			"type":    "object",
+			"type": "object",
 			"properties": map[string]interface{}{
 				"questions": map[string]interface{}{
 					"description": "Questions to ask",
@@ -216,8 +215,80 @@ Usage notes:
 			questionsData, ok := params["questions"]
 			if !ok {
 				return &ToolExecutionResult{
-					Error: "questions is required",
+					Error: "questions is required. Please provide a 'questions' array parameter containing question objects.",
 				}, fmt.Errorf("questions is required")
+			}
+
+			questionsArray, ok := questionsData.([]interface{})
+			if !ok {
+				return &ToolExecutionResult{
+					Error: "questions must be an array of question objects. Format: {\"questions\": [{\"question\": \"...\", \"header\": \"...\", \"options\": [...]}]}",
+				}, fmt.Errorf("questions must be an array")
+			}
+
+			if len(questionsArray) == 0 {
+				return &ToolExecutionResult{
+					Error: "questions array cannot be empty. Please provide at least one question.",
+				}, fmt.Errorf("questions array cannot be empty")
+			}
+
+			for i, q := range questionsArray {
+				questionObj, ok := q.(map[string]interface{})
+				if !ok {
+					return &ToolExecutionResult{
+						Error: fmt.Sprintf("question at index %d must be an object with 'question', 'header', and 'options' fields", i),
+					}, fmt.Errorf("question at index %d must be an object", i)
+				}
+
+				questionText, ok := questionObj["question"].(string)
+				if !ok || questionText == "" {
+					return &ToolExecutionResult{
+						Error: fmt.Sprintf("question at index %d must have a non-empty 'question' field", i),
+					}, fmt.Errorf("question at index %d missing 'question' field", i)
+				}
+
+				header, ok := questionObj["header"].(string)
+				if !ok || header == "" {
+					return &ToolExecutionResult{
+						Error: fmt.Sprintf("question at index %d must have a non-empty 'header' field (max 30 chars)", i),
+					}, fmt.Errorf("question at index %d missing 'header' field", i)
+				}
+
+				if len(header) > 30 {
+					return &ToolExecutionResult{
+						Error: fmt.Sprintf("question at index %d 'header' field exceeds 30 character limit (current: %d)", i, len(header)),
+					}, fmt.Errorf("question at index %d header too long", i)
+				}
+
+				options, ok := questionObj["options"].([]interface{})
+				if !ok || len(options) == 0 {
+					return &ToolExecutionResult{
+						Error: fmt.Sprintf("question at index %d must have a non-empty 'options' array", i),
+					}, fmt.Errorf("question at index %d missing or empty 'options' array", i)
+				}
+
+				for j, opt := range options {
+					optObj, ok := opt.(map[string]interface{})
+					if !ok {
+						return &ToolExecutionResult{
+							Error: fmt.Sprintf("option at index %d in question %d must be an object with 'label' and 'description' fields", j, i),
+						}, fmt.Errorf("option at index %d must be an object", j)
+					}
+
+					label, ok := optObj["label"].(string)
+					if !ok || label == "" {
+						return &ToolExecutionResult{
+							Error: fmt.Sprintf("option at index %d in question %d must have a non-empty 'label' field", j, i),
+						}, fmt.Errorf("option at index %d missing 'label' field", j)
+					}
+
+					description, ok := optObj["description"].(string)
+					if !ok || description == "" {
+						return &ToolExecutionResult{
+							Error: fmt.Sprintf("option at index %d in question %d must have a non-empty 'description' field", j, i),
+						}, fmt.Errorf("option at index %d missing 'description' field", j)
+					}
+				}
 			}
 
 			questionsJSON, err := json.Marshal(questionsData)
@@ -399,7 +470,6 @@ IMPORTANT: You MUST use this tool to end the conversation. Do not provide text r
 			ShouldStopLoop: false,
 			Description:    `Load a skill to get detailed instructions for a specific task. Skills provide specialized knowledge and step-by-step guidance. Use this when a task matches an available skill's description. Only the skills listed here are available: ` + sm.FormatSkillsForTool(),
 			Parameters: map[string]interface{}{
-				"$schema": "https://json-schema.org/draft-2020-12/schema",
 				"type":    "object",
 				"properties": map[string]interface{}{
 					"name": map[string]interface{}{

@@ -3,6 +3,8 @@ package ai
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -34,6 +36,22 @@ var (
 	toolManager *ToolManager
 	toolOnce    sync.Once
 )
+
+// loadToolPrompt loads tool description from a file in the prompts directory
+func loadToolPrompt(toolName string) string {
+	cfg := GetConfig()
+	if cfg.PromptsDir == "" {
+		return ""
+	}
+
+	promptFile := filepath.Join(cfg.PromptsDir, toolName+".md")
+	content, err := os.ReadFile(promptFile)
+	if err != nil {
+		return ""
+	}
+
+	return string(content)
+}
 
 // GetToolManager returns the singleton tool manager
 func GetToolManager() *ToolManager {
@@ -154,16 +172,7 @@ func RegisterDefaultTools() error {
 	questionTool := &Tool{
 		Name:           "question",
 		ShouldStopLoop: false,
-		Description: `Use this tool when you need to ask the user questions during execution. This allows you to:
-1. Gather user preferences or requirements
-2. Clarify ambiguous instructions
-3. Get decisions on implementation choices as you work
-4. Offer choices to the user about what direction to take.
-
-Usage notes:
-- When custom is enabled (default), a "Type your own answer" option is added automatically; don't include "Other" or catch-all options
-- Answers are returned as arrays of labels; set multiple: true to allow selecting more than one
-- If you recommend a specific option, make that the first option in the list and add "(Recommended)" at the end of the label`,
+		Description:    loadToolPrompt("question"),
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -320,28 +329,7 @@ Usage notes:
 	showNavigationTool := &Tool{
 		Name:           "show_navigation",
 		ShouldStopLoop: true,
-		Description: `Display a navigation button for user to navigate to various locations.
-
-Use this tool when you want to provide a button that allows users to navigate to:
-- Tasks (route: task.detail with param id)
-- Projects (route: project.index with param projectId)
-- Project list (route: projects.index)
-- Home (route: home) - all task list, higher priority than upcoming page
-- Favourite task list (route: project.index with param projectId = -1)
-- Upcomming task list (route: tasks.range with param showNulls=true)
-
-The button will display a label and optionally a title showing the target (e.g., task title, project title).
-
-Parameters:
-- route_name (required): The name of route to navigate to
-- params (optional): Route parameters (e.g., id for task, projectId for project)
-- label (required): The button label text (e.g., taskid,projectid)
-- title (optional): The title of the target entity to display after the label (e.g., taskid: task title, projectid: project title)
-
-Example usage:
-- Show task button: route_name="task.detail", params={"id": 123}, label="查看任务123", title="任务123:写报告"
-- Navigate to project: route_name="project.index", params={"projectId": 456}, label="查看项目456", title="项目456:盘古计划"
-- Navigate to home: route_name="home", label="回到主页"`,
+		Description:    loadToolPrompt("show_navigation"),
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -428,11 +416,7 @@ Example usage:
 	replyTaskTool := &Tool{
 		Name:           "message_reply",
 		ShouldStopLoop: true,
-		Description: `Call this tool when you have completed your work and want to respond to the user. This is the ONLY tool that ends the conversation.
-
-This tool sends your response to the user.
-
-IMPORTANT: You MUST use this tool to end the conversation. Do not provide text responses without calling this tool.`,
+		Description:    loadToolPrompt("message_reply"),
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -531,35 +515,7 @@ IMPORTANT: You MUST use this tool to end the conversation. Do not provide text r
 	assignTaskTool := &Tool{
 		Name:           "assign_task",
 		ShouldStopLoop: true,
-		Description: `Assign a task to a staff member or the user himself. Use this when user wants to assign work or a task to someone.
-
-The system context contains information of subordinate staffs and the user, including:
-- User ID, Username, Name, and Project ID for each subordinate
-
-Priority determination (based on user's tone/phrasing):
-- HIGH priority: When user says "马上", "立即", "尽快", "urgent", "immediately", etc.
-- MEDIUM priority (default): Normal tone without urgency indicators
-- LOW priority: When user says "有空", "有时间", "不急", "when convenient", "no rush", etc.
-
-Due date calculation:
-- If user specifies a time expression (e.g., "today", "tomorrow", "下周五", "2024-12-25"), use that expression
-- If NO time expression is specified, use priority-based calculation:
-  * HIGH priority: 1 day from now
-  * MEDIUM priority: 3 days from now
-  * LOW priority: 7 days from now
-
-Task properties:
-- Start date: Now (current time)
-- IsFavorite: true (favorited by default)
-- Subscription: Subscribed to task notifications
-注意:填充time_expression时,指定语言为英语
-
-Example usage:
-- "让小王马上写报告" -> HIGH priority, no time_expr, due in 1 day
-- "叫李四有空的时候整理文档" -> LOW priority, no time_expr, due in 7 days
-- "给张三安排个任务，明天截止" -> MEDIUM priority, time_expr="tomorrow"
-- "让小王下周五提交报告" -> MEDIUM priority, time_expr="Friday in next week"
-- "给李四分配任务,2小时后完成" -> HIGH priority, time_expr="two hours later"`,
+		Description:    loadToolPrompt("assign_task"),
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{

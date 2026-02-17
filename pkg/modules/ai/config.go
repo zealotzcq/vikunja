@@ -35,6 +35,9 @@ type Config struct {
 	// System Prompt File (path to file containing the system prompt)
 	SystemPromptFile string `mapstructure:"system_prompt_file"`
 	SystemPrompt     string
+
+	// Prompts Directory (path to directory containing tool prompt files)
+	PromptsDir string `mapstructure:"prompts_dir"`
 }
 
 var (
@@ -134,6 +137,12 @@ func LoadConfig() (*Config, error) {
 		}
 		if config.LLMLogPath == "" {
 			config.LLMLogPath = "llmlog"
+		}
+		if viper.IsSet("ai.prompts_dir") {
+			config.PromptsDir = viper.GetString("ai.prompts_dir")
+		}
+		if config.PromptsDir == "" {
+			config.PromptsDir = "./prompts"
 		}
 
 		err = nil

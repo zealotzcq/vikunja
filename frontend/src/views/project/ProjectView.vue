@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, ref, shallowReactive, watch, watchEffect} from 'vue'
+import {computed, ref, shallowReactive, watch, watchEffect, onMounted} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 
 import {useBaseStore} from '@/stores/base'
@@ -135,12 +135,16 @@ const {checkAndRefreshTasks, shouldRefresh} = useProjectTaskRefresh(computed(() 
 	title: currentProject.value?.title || '',
 })))
 
+const lastCheckedProjectId = ref(0)
+
 watch(
 	() => loadedProjectId.value,
 	async (loadedId) => {
-		console.log('[frontend ProjectView] loadedProjectId changed:', loadedId, 'targetProjectId:', props.projectId)
-		if (loadedId !== 0 && loadedId === props.projectId) {
+		console.log('[frontend ProjectView] loadedProjectId changed:', loadedId, 'targetProjectId:', props.projectId, 'lastCheckedProjectId:', lastCheckedProjectId.value)
+
+		if (loadedId !== 0 && loadedId === props.projectId && loadedId !== lastCheckedProjectId.value) {
 			console.log('[frontend ProjectView] Project loaded, checking for task refresh...')
+			lastCheckedProjectId.value = loadedId
 			try {
 				const didRefresh = await checkAndRefreshTasks()
 				if (didRefresh) {
@@ -154,22 +158,6 @@ watch(
 		}
 	},
 	{immediate: true},
-)
-
-watch(
-	shouldRefresh,
-	async (needRefresh) => {
-		console.log('[frontend ProjectView] shouldRefresh changed:', needRefresh)
-		if (needRefresh && loadedProjectId.value === props.projectId) {
-			console.log('[frontend ProjectView] shouldRefresh is true and project loaded, triggering refresh...')
-			try {
-				await checkAndRefreshTasks()
-				console.log(`[frontend ProjectView] Tasks refreshed for project ${props.projectId}`)
-			} catch (error) {
-				console.error('[frontend ProjectView] Error refreshing tasks:', error)
-			}
-		}
-	},
 )
 
 watchEffect(() => baseStore.setCurrentProjectViewId(props.viewId))

@@ -153,6 +153,7 @@ watch(
 			}
 		}
 	},
+	{immediate: true},
 )
 
 watch(

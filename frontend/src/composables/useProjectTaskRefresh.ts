@@ -95,12 +95,20 @@ export function useProjectTaskRefresh(project: Ref<{id: number, title: string}>)
 			console.log('[frontend] No refresh pattern, shouldRefresh = false')
 			return false
 		}
+
+		if (refreshPattern.value === '#0#') {
+			console.log('[frontend] #0# pattern, should always refresh = true')
+			return true
+		}
+
 		if (!lastRefreshTime.value) {
 			console.log('[frontend] No last refresh time, shouldRefresh = true')
 			return true
 		}
 		const should = shouldRefreshBasedOnPattern(refreshPattern.value, lastRefreshTime.value, dayjs(now.value))
-		console.log('[frontend] shouldRefreshBasedOnPattern:', should, 'pattern:', refreshPattern.value)
+		if (should) {
+			console.log('[frontend] shouldRefreshBasedOnPattern:', should, 'pattern:', refreshPattern.value)
+		}
 		return should
 	})
 

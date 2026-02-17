@@ -1,6 +1,7 @@
 import {computed, Ref} from 'vue'
 import {useNow} from '@vueuse/core'
 import dayjs from 'dayjs'
+import {getToken} from '@/helpers/auth'
 
 type RefreshPattern = '#0#' | '#1#' | '#2#' | '#3#'
 
@@ -121,11 +122,19 @@ export function useProjectTaskRefresh(project: Ref<{id: number, title: string}>)
 			}
 			console.log('[frontend] Sending refresh request:', requestBody)
 
+			const token = getToken()
+			console.log('[frontend] Auth token exists:', !!token)
+
+			const headers: Record<string, string> = {
+				'Content-Type': 'application/json',
+			}
+			if (token) {
+				headers['Authorization'] = `Bearer ${token}`
+			}
+
 			const response = await fetch(`/api/v1/projects/${project.value.id}/refresh-tasks`, {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
+				headers,
 				body: JSON.stringify(requestBody),
 			})
 

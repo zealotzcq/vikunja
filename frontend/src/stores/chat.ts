@@ -15,7 +15,63 @@ export const useChatStore = defineStore('chat', () => {
 	const router = useRouter()
 	const isMobile = ref(false)
 	const isAvailable = ref(false)
-	const isOpen = ref(localStorage.getItem('chatAssistantOpen') === 'true')
+
+	// Chat open state management with daily reset per user
+	interface ChatOpenState {
+		isOpen: boolean
+		date: string // YYYY-MM-DD format
+		userId: number | string
+	}
+
+	function getStorageKey(userId: number | undefined): string {
+		const today = new Date().toISOString().split('T')[0]!
+		return `chatAssistantOpenState_${userId}_${today}`
+	}
+
+	function getChatOpenState(): ChatOpenState | null {
+		const userId = authStore.authUser?.id
+		if (!userId) return null
+
+		const key = getStorageKey(userId)
+		const stored = localStorage.getItem(key)
+		if (stored) {
+			try {
+				return JSON.parse(stored) as ChatOpenState
+			} catch {
+				return null
+			}
+		}
+		return null
+	}
+
+	function saveChatOpenState(state: ChatOpenState) {
+		const userId = authStore.authUser?.id
+		if (!userId) return
+
+		const key = getStorageKey(userId)
+		localStorage.setItem(key, JSON.stringify(state))
+	}
+
+	function shouldAutoOpen(): boolean {
+		// If user is not logged in, don't auto-open
+		if (!authStore.authUser) return false
+
+		const state = getChatOpenState()
+		const today = new Date().toISOString().split('T')[0]!
+
+		// First time today - auto open
+		if (!state) return true
+
+		// Different user or different date - auto open
+		if (state.userId !== authStore.authUser.id || state.date !== today) {
+			return true
+		}
+
+		// Otherwise, use stored state
+		return state.isOpen
+	}
+
+	const isOpen = ref(shouldAutoOpen())
 	const messages = ref<IChatMessage[]>([])
 	const isLoading = ref(false)
 	const error = ref<string | null>(null)
@@ -24,6 +80,24 @@ export const useChatStore = defineStore('chat', () => {
 
 	const chatService = new ChatService()
 	let eventSource: EventSource | null = null
+
+	// Save state when isOpen changes
+	watch(isOpen, (newVal) => {
+		const userId = authStore.authUser?.id
+		if (!userId) return
+
+		const today = new Date().toISOString().split('T')[0]!
+		saveChatOpenState({
+			isOpen: newVal,
+			date: today,
+			userId,
+		})
+		if (newVal) {
+			connectSSE()
+		} else {
+			disconnectSSE()
+		}
+	})
 
 	function getProcessedRefreshMessages(): Set<string> {
 		const stored = localStorage.getItem('vikunja-chat-processed-refresh')
@@ -47,9 +121,6 @@ export const useChatStore = defineStore('chat', () => {
 
 	function setMobile(value: boolean) {
 		isMobile.value = value
-		if (value && isOpen.value === false && authStore.authUser !== null && isAvailable.value) {
-			isOpen.value = true
-		}
 	}
 
 	watch(() => companyStore.currentCompanyId, async (newCompanyId) => {
@@ -188,9 +259,6 @@ export const useChatStore = defineStore('chat', () => {
 				}
 			}
 
-			if (isMobile.value && isOpen.value === false) {
-				isOpen.value = true
-			}
 		} catch (err) {
 			const errObj = err as {response?: {status: number}}
 			console.error('[Chat] Failed to load chat history:', err)
@@ -299,17 +367,8 @@ export const useChatStore = defineStore('chat', () => {
 
 	function toggleOpen() {
 		isOpen.value = !isOpen.value
-		localStorage.setItem('chatAssistantOpen', String(isOpen.value))
+		// State is automatically saved by the watch above
 	}
-
-	watch(isOpen, (newVal) => {
-		localStorage.setItem('chatAssistantOpen', String(newVal))
-		if (newVal) {
-			connectSSE()
-		} else {
-			disconnectSSE()
-		}
-	}, {immediate: true})
 
 	return {
 		isMobile,

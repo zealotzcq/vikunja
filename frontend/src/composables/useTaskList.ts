@@ -11,6 +11,7 @@ import {error} from '@/message'
 import type {IProject} from '@/modelTypes/IProject'
 import {useAuthStore} from '@/stores/auth'
 import type {IProjectView} from '@/modelTypes/IProjectView'
+import {useChatStore} from '@/stores/chat'
 
 export type Order = 'asc' | 'desc' | 'none'
 
@@ -140,6 +141,12 @@ export function useTaskList(
 
 		loadTasks()
 	}, { immediate: true })
+
+	// Listen for chat store refresh trigger to reload task list
+	const chatStore = useChatStore()
+	watch(() => chatStore.homeRefreshTrigger, () => {
+		loadTasks()
+	})
 
 	return {
 		tasks,

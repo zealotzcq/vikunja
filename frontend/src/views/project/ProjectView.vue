@@ -16,6 +16,7 @@ import ProjectKanban from '@/components/project/views/ProjectKanban.vue'
 
 import {DEFAULT_PROJECT_VIEW_SETTINGS} from '@/modelTypes/IProjectView'
 import {saveProjectToHistory} from '@/modules/projectHistory'
+import {useProjectTaskRefresh} from '@/composables/useProjectTaskRefresh'
 
 const props = defineProps<{
 	projectId: number,
@@ -128,6 +129,47 @@ watchEffect(() => {
 	}
 })
 watchEffect(() => saveProjectView(props.projectId, props.viewId))
+
+const {checkAndRefreshTasks, shouldRefresh} = useProjectTaskRefresh(computed(() => ({
+	id: props.projectId,
+	title: currentProject.value?.title || '',
+})))
+
+watch(
+	() => loadedProjectId.value,
+	async (loadedId) => {
+		console.log('[frontend ProjectView] loadedProjectId changed:', loadedId, 'targetProjectId:', props.projectId)
+		if (loadedId !== 0 && loadedId === props.projectId) {
+			console.log('[frontend ProjectView] Project loaded, checking for task refresh...')
+			try {
+				const didRefresh = await checkAndRefreshTasks()
+				if (didRefresh) {
+					console.log(`[frontend ProjectView] Tasks refreshed for project ${props.projectId}`)
+				} else {
+					console.log(`[frontend ProjectView] No refresh needed for project ${props.projectId}`)
+				}
+			} catch (error) {
+				console.error('[frontend ProjectView] Error refreshing tasks:', error)
+			}
+		}
+	},
+)
+
+watch(
+	shouldRefresh,
+	async (needRefresh) => {
+		console.log('[frontend ProjectView] shouldRefresh changed:', needRefresh)
+		if (needRefresh && loadedProjectId.value === props.projectId) {
+			console.log('[frontend ProjectView] shouldRefresh is true and project loaded, triggering refresh...')
+			try {
+				await checkAndRefreshTasks()
+				console.log(`[frontend ProjectView] Tasks refreshed for project ${props.projectId}`)
+			} catch (error) {
+				console.error('[frontend ProjectView] Error refreshing tasks:', error)
+			}
+		}
+	},
+)
 
 watchEffect(() => baseStore.setCurrentProjectViewId(props.viewId))
 </script>

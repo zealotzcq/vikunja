@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"code.vikunja.io/api/pkg/i18n"
 	"code.vikunja.io/api/pkg/modules/chat_session"
 )
 
@@ -338,8 +339,13 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 		}
 	}
 
+	lang := agentCtx.Language
+	if lang == "" {
+		lang = "en"
+	}
+
 	return &AgentResponse{
-		Content:          "I apologize, but I couldn't complete your request. Please try again.",
+		Content:          i18n.T(lang, "ai.error.cannot_complete"),
 		ExecutionSteps:   agentCtx.ExecutionSteps,
 		TokensUsed:       agentCtx.TokensUsed,
 		ButtonNavigation: agentCtx.ButtonNavigation,

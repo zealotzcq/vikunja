@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"code.vikunja.io/api/pkg/db"
+	"code.vikunja.io/api/pkg/i18n"
 	"code.vikunja.io/api/pkg/models"
 	"code.vikunja.io/api/pkg/modules/chat_session"
 	"code.vikunja.io/api/pkg/user"
@@ -311,9 +312,9 @@ func RegisterDefaultTools() error {
 			ctx.WaitingForAnswer = true
 
 			return &ToolExecutionResult{
-				Result: "Question sent to user",
+				Result: i18n.T(ctx.Language, "ai.tool.question_sent"),
 				StopCommand: &ToolStopCommand{
-					Response: "I need some information from you to proceed",
+					Response: i18n.T(ctx.Language, "ai.tool.need_info"),
 					Metadata: map[string]interface{}{
 						"question": true,
 					},
@@ -404,7 +405,7 @@ func RegisterDefaultTools() error {
 			}
 
 			return &ToolExecutionResult{
-				Result: "好的",
+				Result: i18n.T(ctx.Language, "ai.tool.ok"),
 			}, nil
 		},
 	}
@@ -624,8 +625,8 @@ func RegisterDefaultTools() error {
 				if !ok || len(projects) == 0 {
 					if targetStaff.UserID == ctx.UserID {
 						defaultProject := &models.Project{
-							Title:       "个人任务",
-							Description: "默认个人任务项目",
+							Title:       i18n.T(ctx.Language, "ai.tool.default_project.title"),
+							Description: i18n.T(ctx.Language, "ai.tool.default_project.description"),
 							OwnerID:     ctx.UserID,
 						}
 						if err := defaultProject.Create(s, authUser); err != nil {
@@ -697,15 +698,25 @@ func RegisterDefaultTools() error {
 				displayName = targetStaff.Username
 			}
 
-			response := fmt.Sprintf("已成功为 %s 分配任务：%s\n", displayName, taskTitle)
-			response += fmt.Sprintf("- 优先级：%s\n", map[string]string{"high": "高", "medium": "中", "low": "低"}[priority])
-			if timeExpressionUsed {
-				response += fmt.Sprintf("- 截止日期：%s (根据时间表达式设定)\n", dueDate.Format("2006-01-02 15:04"))
-			} else {
-				response += fmt.Sprintf("- 截止日期：%s (根据优先级设定)\n", dueDate.Format("2006-01-02"))
+			priorityMap := map[string]string{
+				"high":   i18n.T(ctx.Language, "ai.tool.assign_task.priority_high"),
+				"medium": i18n.T(ctx.Language, "ai.tool.assign_task.priority_medium"),
+				"low":    i18n.T(ctx.Language, "ai.tool.assign_task.priority_low"),
 			}
 
-			label := "查看任务"
+			response := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.assign_task.success"), displayName, taskTitle)
+			response += "\n"
+			response += fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.assign_task.priority_label"), priorityMap[priority])
+			response += "\n"
+			if timeExpressionUsed {
+				response += fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.assign_task.due_date_time"), dueDate.Format("2006-01-02 15:04"))
+				response += "\n"
+			} else {
+				response += fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.assign_task.due_date_priority"), dueDate.Format("2006-01-02"))
+				response += "\n"
+			}
+
+			label := i18n.T(ctx.Language, "ai.tool.assign_task.view_task")
 			if task.ID > 0 {
 				label += fmt.Sprintf(" %d", task.ID)
 			}

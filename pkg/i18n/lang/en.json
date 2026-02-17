@@ -158,5 +158,64 @@
         "since_hours": "one hour|%[1]d hours",
         "since_minutes": "one minute|%[1]d minutes",
         "list_last_separator": "and"
+    },
+    "ai": {
+        "tool": {
+            "question_sent": "Question sent to user",
+            "need_info": "I need some information from you to proceed",
+            "ok": "OK",
+            "default_project": {
+                "title": "Personal Tasks",
+                "description": "Default personal task project"
+            },
+            "assign_task": {
+                "success": "Successfully assigned task to %[1]s: %[2]s",
+                "priority_label": "- Priority: %[1]s",
+                "priority_high": "high",
+                "priority_medium": "medium",
+                "priority_low": "low",
+                "due_date_time": "- Due date: %[1]s (set by time expression)",
+                "due_date_priority": "- Due date: %[1]s (set by priority)",
+                "view_task": "View Task",
+                "staff_no_project": "Staff member %[1]s does not have an associated project"
+            },
+            "skills_no_available": "<available_skills>  No skills available  </available_skills>",
+            "skill_format": "   <skill>     <name>%[1]s</name>     <description>%[2]s</description>   </skill> "
+        },
+        "navigation": {
+            "navigating_to": "Navigating to %[1]s",
+            "to_project_list": "Navigating to project list",
+            "to_project_number": "Navigate to project %[1]d",
+            "to_task_list": "Navigate to task list",
+            "to_task_number": "Navigate to task %[1]d",
+            "to_team_list": "Navigate to team list",
+            "to_team_number": "Navigate to team %[1]d",
+            "to_labels_list": "Navigate to labels list",
+            "to_favorites": "View favorite tasks",
+            "to_home": "Go to home page",
+            "to_upcoming": "View upcoming tasks (including tasks without dates)"
+        },
+        "help": {
+            "greeting": "Hello! I'm your AI assistant. I can help you:",
+            "view_projects": "View projects",
+            "view_tasks": "View tasks",
+            "view_teams": "View teams",
+            "view_labels": "View labels",
+            "view_favorites": "View favorites",
+            "go_home": "Go to home",
+            "example_project": "\"project 123\" to navigate to a specific project",
+            "example_task": "\"task 456\" to navigate to a specific task",
+            "example_team": "\"team 789\" to navigate to a specific team",
+            "example_upcoming": "\"upcoming\" to view tasks including those without dates",
+            "closing": "Tell me what you'd like to do, and I'll do my best to help you."
+        },
+        "error": {
+            "cannot_complete": "I apologize, but I couldn't complete your request. Please try again."
+        },
+        "mock": {
+            "help_response": "I'm your AI assistant, I can help you:\n• Navigate to different pages (projects, tasks, teams, labels)\n• Create and manage tasks\n• Search content\n• View favorites\n\nWhat would you like to do?",
+            "create_task_help": "I can help you create a task. Please tell me:\n1. What is the task title?\n2. Which project would you like to add it to?\n3. Any description?",
+            "default_response": "I understand your request. Let me help you handle this. Please provide more details so I can better assist you."
+        }
     }
 }

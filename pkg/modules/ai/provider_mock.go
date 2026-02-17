@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"code.vikunja.io/api/pkg/i18n"
 )
 
 // MockLLMProvider implements LLMProvider for testing and development
@@ -17,13 +19,7 @@ func (p *MockLLMProvider) Generate(ctx context.Context, prompt string) (string, 
 	lowerPrompt := strings.ToLower(prompt)
 
 	if strings.Contains(lowerPrompt, "help") || strings.Contains(lowerPrompt, "帮助") {
-		return `我是您的 AI 助手，可以帮助您：
-• 导航到不同页面（项目、任务、团队、标签）
-• 创建和管理任务
-• 搜索内容
-• 查看收藏
-
-您想做什么呢？`, nil
+		return i18n.T("en", "ai.mock.help_response"), nil
 	}
 
 	if strings.Contains(lowerPrompt, "project") || strings.Contains(lowerPrompt, "项目") {
@@ -37,10 +33,7 @@ INPUT: {"route_name": "projects.index", "params": {}}`, nil
 
 	if strings.Contains(lowerPrompt, "task") || strings.Contains(lowerPrompt, "任务") {
 		if strings.Contains(lowerPrompt, "create") || strings.Contains(lowerPrompt, "创建") {
-			return `我可以帮您创建任务。请告诉我：
-1. 任务的标题是什么？
-2. 您希望添加到哪个项目？
-3. 有什么描述吗？`, nil
+			return i18n.T("en", "ai.mock.create_task_help"), nil
 		}
 		if strings.Contains(lowerPrompt, "456") {
 			return `TOOL: navigate
@@ -97,7 +90,7 @@ INPUT: {"route_name": "tasks.range", "params": {"showNulls": true}}`, nil
 INPUT: {"query": "%s", "type": "tasks"}`, query), nil
 	}
 
-	return `我理解您的请求。让我帮您处理这个问题。请提供更多详细信息，这样我可以更好地帮助您。`, nil
+	return i18n.T("en", "ai.mock.default_response"), nil
 }
 
 func (p *MockLLMProvider) GenerateWithTools(ctx context.Context, prompt string, tools []map[string]interface{}) (string, error) {

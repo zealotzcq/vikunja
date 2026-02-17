@@ -146,12 +146,71 @@
 			}
 		}
 	},
-	"time": {
+		"time": {
 		"since_years": "一年|%[1]d年",
 		"since_weeks": "一周|%[1]d 周",
 		"since_days": "一天|%[1]d 天",
 		"since_hours": "一小时|%[1]d 小时",
 		"since_minutes": "一分钟|%[1]d 分钟",
 		"list_last_separator": "和"
+	},
+	"ai": {
+		"tool": {
+			"question_sent": "已向用户发送问题",
+			"need_info": "我需要一些信息才能继续",
+			"ok": "好的",
+			"default_project": {
+				"title": "个人任务",
+				"description": "默认个人任务项目"
+			},
+			"assign_task": {
+				"success": "已成功为 %[1]s 分配任务：%[2]s",
+				"priority_label": "- 优先级：%[1]s",
+				"priority_high": "高",
+				"priority_medium": "中",
+				"priority_low": "低",
+				"due_date_time": "- 截止日期：%[1]s（根据时间表达式设定）",
+				"due_date_priority": "- 截止日期：%[1]s（根据优先级设定）",
+				"view_task": "查看任务",
+				"staff_no_project": "员工 %[1]s 没有关联的项目"
+			},
+			"skills_no_available": "<available_skills>  没有可用的技能  </available_skills>",
+			"skill_format": "   <skill>     <name>%[1]s</name>     <description>%[2]s</description>   </skill> "
+		},
+		"navigation": {
+			"navigating_to": "正在%[1]s",
+			"to_project_list": "正在为您导航到项目列表",
+			"to_project_number": "跳转到项目 %[1]d",
+			"to_task_list": "跳转到任务列表",
+			"to_task_number": "跳转到任务 %[1]d",
+			"to_team_list": "跳转到团队列表",
+			"to_team_number": "跳转到团队 %[1]d",
+			"to_labels_list": "跳转到标签列表",
+			"to_favorites": "查看收藏的任务",
+			"to_home": "返回首页",
+			"to_upcoming": "查看即将到来的任务（包含无日期任务）"
+		},
+		"help": {
+			"greeting": "您好！我是您的 AI 助手。我可以帮您：",
+			"view_projects": "查看项目",
+			"view_tasks": "查看任务",
+			"view_teams": "查看团队",
+			"view_labels": "查看标签",
+			"view_favorites": "查看收藏",
+			"go_home": "返回首页",
+			"example_project": "\"项目 123\" 跳转到特定项目",
+			"example_task": "\"任务 456\" 跳转到特定任务",
+			"example_team": "\"团队 789\" 跳转到特定团队",
+			"example_upcoming": "\"即将到来\" 查看包含无日期的任务",
+			"closing": "您可以告诉我您想做什么，我会尽力帮助您。"
+		},
+		"error": {
+			"cannot_complete": "抱歉，我无法完成您的请求。请再试一次。"
+		},
+		"mock": {
+			"help_response": "我是您的 AI 助手，可以帮助您：\n• 导航到不同页面（项目、任务、团队、标签）\n• 创建和管理任务\n• 搜索内容\n• 查看收藏\n\n您想做什么呢？",
+			"create_task_help": "我可以帮您创建任务。请告诉我：\n1. 任务的标题是什么？\n2. 您希望添加到哪个项目？\n3. 有什么描述吗？",
+			"default_response": "我理解您的请求。让我帮您处理这个问题。请提供更多详细信息，这样我可以更好地帮助您。"
+		}
 	}
 }

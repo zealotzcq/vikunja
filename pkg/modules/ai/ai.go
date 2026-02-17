@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"code.vikunja.io/api/pkg/i18n"
 	"code.vikunja.io/api/pkg/modules/chat_session"
 )
 
@@ -18,7 +19,7 @@ func GenerateResponse(userContent string, routeName string, routeParams map[stri
 
 	// Check for navigation commands first
 	if navInfo := extractNavigationCommand(lowerContent, routeName); navInfo != nil {
-		return fmt.Sprintf("正在%s", navInfo.Message), map[string]interface{}{
+		return fmt.Sprintf(i18n.T("en", "ai.navigation.navigating_to"), navInfo.Message), map[string]interface{}{
 			"route_name": navInfo.RouteName,
 			"params":     navInfo.Params,
 		}, true
@@ -90,7 +91,7 @@ func extractNavigationCommand(userContent, currentRoute string) *NavigationInfo 
 	// Project navigation
 	if (strings.Contains(userContent, "project") || strings.Contains(userContent, "项目")) && projectNumber > 0 {
 		return &NavigationInfo{
-			Message:   fmt.Sprintf("跳转到项目 %d", projectNumber),
+			Message:   fmt.Sprintf(i18n.T("en", "ai.navigation.to_project_number"), projectNumber),
 			RouteName: "project.index",
 			Params:    map[string]interface{}{"projectId": projectNumber},
 		}
@@ -98,7 +99,7 @@ func extractNavigationCommand(userContent, currentRoute string) *NavigationInfo 
 
 	if strings.Contains(userContent, "project") || strings.Contains(userContent, "项目") {
 		return &NavigationInfo{
-			Message:   "正在为您导航到项目列表",
+			Message:   i18n.T("en", "ai.navigation.to_project_list"),
 			RouteName: "projects.index",
 			Params:    nil,
 		}
@@ -107,7 +108,7 @@ func extractNavigationCommand(userContent, currentRoute string) *NavigationInfo 
 	// Task navigation
 	if (strings.Contains(userContent, "task") || strings.Contains(userContent, "任务")) && taskNumber > 0 {
 		return &NavigationInfo{
-			Message:   fmt.Sprintf("跳转到任务 %d", taskNumber),
+			Message:   fmt.Sprintf(i18n.T("en", "ai.navigation.to_task_number"), taskNumber),
 			RouteName: "task.detail",
 			Params:    map[string]interface{}{"id": taskNumber},
 		}
@@ -115,7 +116,7 @@ func extractNavigationCommand(userContent, currentRoute string) *NavigationInfo 
 
 	if strings.Contains(userContent, "task") || strings.Contains(userContent, "任务") {
 		return &NavigationInfo{
-			Message:   "跳转到任务列表",
+			Message:   i18n.T("en", "ai.navigation.to_task_list"),
 			RouteName: "tasks.range",
 			Params:    nil,
 		}
@@ -124,7 +125,7 @@ func extractNavigationCommand(userContent, currentRoute string) *NavigationInfo 
 	// Team navigation
 	if (strings.Contains(userContent, "team") || strings.Contains(userContent, "团队")) && teamNumber > 0 {
 		return &NavigationInfo{
-			Message:   fmt.Sprintf("跳转到团队 %d", teamNumber),
+			Message:   fmt.Sprintf(i18n.T("en", "ai.navigation.to_team_number"), teamNumber),
 			RouteName: "teams.edit",
 			Params:    map[string]interface{}{"id": teamNumber},
 		}
@@ -132,7 +133,7 @@ func extractNavigationCommand(userContent, currentRoute string) *NavigationInfo 
 
 	if strings.Contains(userContent, "team") || strings.Contains(userContent, "团队") {
 		return &NavigationInfo{
-			Message:   "跳转到团队列表",
+			Message:   i18n.T("en", "ai.navigation.to_team_list"),
 			RouteName: "teams.index",
 			Params:    nil,
 		}
@@ -141,7 +142,7 @@ func extractNavigationCommand(userContent, currentRoute string) *NavigationInfo 
 	// Label navigation
 	if strings.Contains(userContent, "label") || strings.Contains(userContent, "标签") {
 		return &NavigationInfo{
-			Message:   "跳转到标签列表",
+			Message:   i18n.T("en", "ai.navigation.to_labels_list"),
 			RouteName: "labels.index",
 			Params:    nil,
 		}
@@ -150,7 +151,7 @@ func extractNavigationCommand(userContent, currentRoute string) *NavigationInfo 
 	// Favorites navigation
 	if strings.Contains(userContent, "favorite") || strings.Contains(userContent, "收藏") {
 		return &NavigationInfo{
-			Message:   "查看收藏的任务",
+			Message:   i18n.T("en", "ai.navigation.to_favorites"),
 			RouteName: "project.index",
 			Params:    map[string]interface{}{"projectId": -1},
 		}
@@ -160,7 +161,7 @@ func extractNavigationCommand(userContent, currentRoute string) *NavigationInfo 
 	if strings.Contains(userContent, "home") || strings.Contains(userContent, "主页") ||
 		strings.Contains(userContent, "首页") || strings.Contains(userContent, "概览") {
 		return &NavigationInfo{
-			Message:   "返回首页",
+			Message:   i18n.T("en", "ai.navigation.to_home"),
 			RouteName: "home",
 			Params:    nil,
 		}
@@ -170,7 +171,7 @@ func extractNavigationCommand(userContent, currentRoute string) *NavigationInfo 
 	if strings.Contains(userContent, "upcoming") || strings.Contains(userContent, "即将到来") ||
 		strings.Contains(userContent, "即将进行") {
 		return &NavigationInfo{
-			Message:   "查看即将到来的任务（包含无日期任务）",
+			Message:   i18n.T("en", "ai.navigation.to_upcoming"),
 			RouteName: "tasks.range",
 			Params:    map[string]interface{}{"showNulls": true},
 		}
@@ -181,22 +182,56 @@ func extractNavigationCommand(userContent, currentRoute string) *NavigationInfo 
 
 // generateHelpMessage generates the default help message
 func generateHelpMessage() string {
-	return `您好！我是您的 AI 助手。我可以帮您：
+	var sb strings.Builder
 
-• 查看项目
-• 查看任务
-• 查看团队
-• 查看标签
-• 查看收藏
-• 返回首页
+	sb.WriteString(i18n.T("en", "ai.help.greeting"))
+	sb.WriteString("\n\n")
 
-您也可以直接输入：
-• "项目 123" 跳转到特定项目
-• "任务 456" 跳转到特定任务
-• "团队 789" 跳转到特定团队
-• "即将到来" 查看包含无日期的任务
+	sb.WriteString("• ")
+	sb.WriteString(i18n.T("en", "ai.help.view_projects"))
+	sb.WriteString("\n")
 
-您可以告诉我您想做什么，我会尽力帮助您。`
+	sb.WriteString("• ")
+	sb.WriteString(i18n.T("en", "ai.help.view_tasks"))
+	sb.WriteString("\n")
+
+	sb.WriteString("• ")
+	sb.WriteString(i18n.T("en", "ai.help.view_teams"))
+	sb.WriteString("\n")
+
+	sb.WriteString("• ")
+	sb.WriteString(i18n.T("en", "ai.help.view_labels"))
+	sb.WriteString("\n")
+
+	sb.WriteString("• ")
+	sb.WriteString(i18n.T("en", "ai.help.view_favorites"))
+	sb.WriteString("\n")
+
+	sb.WriteString("• ")
+	sb.WriteString(i18n.T("en", "ai.help.go_home"))
+	sb.WriteString("\n\n")
+
+	sb.WriteString("You can also directly enter:\n")
+
+	sb.WriteString("• ")
+	sb.WriteString(i18n.T("en", "ai.help.example_project"))
+	sb.WriteString("\n")
+
+	sb.WriteString("• ")
+	sb.WriteString(i18n.T("en", "ai.help.example_task"))
+	sb.WriteString("\n")
+
+	sb.WriteString("• ")
+	sb.WriteString(i18n.T("en", "ai.help.example_team"))
+	sb.WriteString("\n")
+
+	sb.WriteString("• ")
+	sb.WriteString(i18n.T("en", "ai.help.example_upcoming"))
+	sb.WriteString("\n\n")
+
+	sb.WriteString(i18n.T("en", "ai.help.closing"))
+
+	return sb.String()
 }
 
 // parseInt safely parses a string to int

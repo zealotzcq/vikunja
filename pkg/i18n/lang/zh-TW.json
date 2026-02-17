@@ -151,12 +151,71 @@
 			}
 		}
 	},
-	"time": {
+		"time": {
 		"since_years": "一年｜%[1]d 年",
 		"since_weeks": "一周｜%[1]d 周",
 		"since_days": "一天｜%[1]d 天",
 		"since_hours": "一小時｜%[1]d 小時",
 		"since_minutes": "一分鐘｜%[1]d 分鐘",
 		"list_last_separator": "且"
+	},
+	"ai": {
+		"tool": {
+			"question_sent": "已向使用者發送問題",
+			"need_info": "我需要一些資訊才能繼續",
+			"ok": "好的",
+			"default_project": {
+				"title": "個人任務",
+				"description": "預設個人任務專案"
+			},
+			"assign_task": {
+				"success": "已成功為 %[1]s 分配任務：%[2]s",
+				"priority_label": "- 優先級：%[1]s",
+				"priority_high": "高",
+				"priority_medium": "中",
+				"priority_low": "低",
+				"due_date_time": "- 截止日期：%[1]s（根據時間表達式設定）",
+				"due_date_priority": "- 截止日期：%[1]s（根據優先級設定）",
+				"view_task": "查看任務",
+				"staff_no_project": "員工 %[1]s 沒有關聯的專案"
+			},
+			"skills_no_available": "<available_skills>  沒有可用的技能  </available_skills>",
+			"skill_format": "   <skill>     <name>%[1]s</name>     <description>%[2]s</description>   </skill> "
+		},
+		"navigation": {
+			"navigating_to": "正在%[1]s",
+			"to_project_list": "正在為您導航到專案列表",
+			"to_project_number": "跳轉到專案 %[1]d",
+			"to_task_list": "跳轉到任務列表",
+			"to_task_number": "跳轉到任務 %[1]d",
+			"to_team_list": "跳轉到團隊列表",
+			"to_team_number": "跳轉到團隊 %[1]d",
+			"to_labels_list": "跳轉到標籤列表",
+			"to_favorites": "查看收藏的任務",
+			"to_home": "返回首頁",
+			"to_upcoming": "查看即將到來的任務（包含無日期任務）"
+		},
+		"help": {
+			"greeting": "您好！我是您的 AI 助手。我可以幫您：",
+			"view_projects": "查看專案",
+			"view_tasks": "查看任務",
+			"view_teams": "查看團隊",
+			"view_labels": "查看標籤",
+			"view_favorites": "查看收藏",
+			"go_home": "返回首頁",
+			"example_project": "\"專案 123\" 跳轉到特定專案",
+			"example_task": "\"任務 456\" 跳轉到特定任務",
+			"example_team": "\"團隊 789\" 跳轉到特定團隊",
+			"example_upcoming": "\"即將到來\" 查看包含無日期的任務",
+			"closing": "您可以告訴我您想做什麼，我會盡力幫助您。"
+		},
+		"error": {
+			"cannot_complete": "抱歉，我無法完成您的請求。請再試一次。"
+		},
+		"mock": {
+			"help_response": "我是您的 AI 助手，可以幫您：\n• 導航到不同頁面（專案、任務、團隊、標籤）\n• 建立和管理任務\n• 搜尋內容\n• 查看收藏\n\n您想做什麼呢？",
+			"create_task_help": "我可以幫您建立任務。請告訴我：\n1. 任務的標題是什麼？\n2. 您希望加入到哪個專案？\n3. 有什麼描述嗎？",
+			"default_response": "我理解您的請求。讓我幫您處理這個問題。請提供更多詳細資訊，這樣我可以更好地幫助您。"
+		}
 	}
 }

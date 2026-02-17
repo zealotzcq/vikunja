@@ -1,7 +1,8 @@
-import {computed, Ref} from 'vue'
+import {computed, type Ref} from 'vue'
 import {useNow} from '@vueuse/core'
 import dayjs from 'dayjs'
 import {getToken} from '@/helpers/auth'
+import {useChatStore} from '@/stores/chat'
 
 type RefreshPattern = '#0#' | '#1#' | '#2#' | '#3#'
 
@@ -42,32 +43,32 @@ function extractRefreshPattern(title: string): RefreshPattern | null {
 
 function shouldRefreshBasedOnPattern(pattern: RefreshPattern, lastRefreshTime: dayjs.Dayjs, now: dayjs.Dayjs): boolean {
 	switch (pattern) {
-	case '#0#':
-		return true
-	case '#1#':
-		return !lastRefreshTime.isSame(now, 'day')
-	case '#2#':
-		return !lastRefreshTime.isSame(now, 'week')
-	case '#3#':
-		return !lastRefreshTime.isSame(now, 'month')
-	default:
-		return false
+		case '#0#':
+			return true
+		case '#1#':
+			return !lastRefreshTime.isSame(now, 'day')
+		case '#2#':
+			return !lastRefreshTime.isSame(now, 'week')
+		case '#3#':
+			return !lastRefreshTime.isSame(now, 'month')
+		default:
+			return false
 	}
 }
 
 function getPeriodStartTime(pattern: RefreshPattern): dayjs.Dayjs {
 	const now = dayjs()
 	switch (pattern) {
-	case '#0#':
-		return now.add(1, 'day').startOf('day')
-	case '#1#':
-		return now.startOf('day')
-	case '#2#':
-		return now.startOf('week')
-	case '#3#':
-		return now.startOf('month')
-	default:
-		return now.startOf('day')
+		case '#0#':
+			return now.add(1, 'day').startOf('day')
+		case '#1#':
+			return now.startOf('day')
+		case '#2#':
+			return now.startOf('week')
+		case '#3#':
+			return now.startOf('month')
+		default:
+			return now.startOf('day')
 	}
 }
 
@@ -160,6 +161,10 @@ export function useProjectTaskRefresh(project: Ref<{id: number, title: string}>)
 			const storedTime = dayjs(now.value)
 			updateStoredRefreshTime(project.value.id, storedTime, refreshPattern.value)
 			console.log('[frontend] Updated stored refresh time to:', storedTime.format(), '(pattern:', refreshPattern.value + ')')
+
+			// Trigger frontend task list refresh
+			const chatStore = useChatStore()
+			chatStore.homeRefreshTrigger = Date.now()
 		} catch (error) {
 			console.error('[frontend] Error refreshing tasks:', error)
 			throw error

@@ -1,6 +1,6 @@
 import {ref, watch} from 'vue'
 import {defineStore, acceptHMRUpdate} from 'pinia'
-import {useRouter} from 'vue-router'
+import {useRouter, type RouteParamsRaw} from 'vue-router'
 
 import type {IChatMessage} from '@/modelTypes/IChatMessage'
 import {saveChatHistory} from '@/composables/useChatHistory'
@@ -30,7 +30,7 @@ export const useChatStore = defineStore('chat', () => {
 	}
 
 	function getChatOpenState(): ChatOpenState | null {
-		const userId = authStore.authUser?.id
+		const userId = authStore.info?.id
 		if (!userId) return null
 
 		const key = getStorageKey(userId)
@@ -46,7 +46,7 @@ export const useChatStore = defineStore('chat', () => {
 	}
 
 	function saveChatOpenState(state: ChatOpenState) {
-		const userId = authStore.authUser?.id
+		const userId = authStore.info?.id
 		if (!userId) return
 
 		const key = getStorageKey(userId)
@@ -55,7 +55,7 @@ export const useChatStore = defineStore('chat', () => {
 
 	function shouldAutoOpen(): boolean {
 		// If user is not logged in, don't auto-open
-		if (!authStore.authUser) return false
+		if (!authStore.info) return false
 
 		const state = getChatOpenState()
 		const today = new Date().toISOString().split('T')[0]!
@@ -64,7 +64,7 @@ export const useChatStore = defineStore('chat', () => {
 		if (!state) return true
 
 		// Different user or different date - auto open
-		if (state.userId !== authStore.authUser.id || state.date !== today) {
+		if (state.userId !== authStore.info.id || state.date !== today) {
 			return true
 		}
 
@@ -84,7 +84,7 @@ export const useChatStore = defineStore('chat', () => {
 
 	// Save state when isOpen changes
 	watch(isOpen, (newVal) => {
-		const userId = authStore.authUser?.id
+		const userId = authStore.info?.id
 		if (!userId) return
 
 		const today = new Date().toISOString().split('T')[0]!
@@ -205,10 +205,10 @@ export const useChatStore = defineStore('chat', () => {
 			const response = await chatService.getHistory(companyStore.currentCompanyId)
 			isAvailable.value = true
 
-			const newMessages = response.messages.map(msg => ({
+			const newMessages: IChatMessage[] = response.messages.map(msg => ({
 				id: msg.id,
-				type: msg.type || (msg.role === 'user' ? 'user_input' : 'assistant_response'),
-				role: msg.role,
+				type: (msg.type || (msg.role === 'user' ? 'user_input' : 'assistant_response')) as IChatMessage['type'],
+				role: msg.role as IChatMessage['role'],
 				content: msg.content,
 				timestamp: msg.timestamp * 1000,
 				navigationCommand: msg.navigationCommand,
@@ -233,7 +233,7 @@ export const useChatStore = defineStore('chat', () => {
 				if (lastMessage.type === 'assistant_response' && lastMessage.navigationCommand) {
 					router.push({
 						name: lastMessage.navigationCommand.routeName,
-						params: lastMessage.navigationCommand.params,
+						params: lastMessage.navigationCommand.params as RouteParamsRaw,
 					})
 					if (isMobile.value) {
 						isOpen.value = false
@@ -255,7 +255,7 @@ export const useChatStore = defineStore('chat', () => {
 						addProcessedRefreshMessage(lastMessage.id)
 						router.push({
 							name: lastMessage.buttonNavigation.routeName,
-							params: lastMessage.buttonNavigation.params,
+							params: lastMessage.buttonNavigation.params as RouteParamsRaw,
 						})
 						if (isMobile.value) {
 							isOpen.value = false
@@ -282,7 +282,7 @@ export const useChatStore = defineStore('chat', () => {
 	async function executeButtonNavigation(routeName: string, params?: Record<string, unknown>) {
 		router.push({
 			name: routeName,
-			params: params,
+			params: params as RouteParamsRaw,
 		})
 		if (isMobile.value) {
 			isOpen.value = false

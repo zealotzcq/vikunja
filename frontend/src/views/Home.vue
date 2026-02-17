@@ -64,6 +64,7 @@ import {useDaytimeSalutation} from '@/composables/useDaytimeSalutation'
 import {useProjectStore} from '@/stores/projects'
 import {useAuthStore} from '@/stores/auth'
 import {useChatStore} from '@/stores/chat'
+import type {IProject} from '@/modelTypes/IProject'
 
 const salutation = useDaytimeSalutation()
 
@@ -73,28 +74,37 @@ const chatStore = useChatStore()
 const route = useRoute()
 const router = useRouter()
 
-const projectHistory = computed(() => {
+const projectHistory = computed<IProject[]>(() => {
 	// If we don't check this, it tries to load the project background right after logging out	
 	if(!authStore.authenticated) {
 		return []
 	}
 	
-	return getHistory()
-		.map(l => projectStore.projects[l.id])
-		.filter(l => Boolean(l))
+	const history: IProject[] = []
+	getHistory().forEach(l => {
+		const project = projectStore.projects[l.id]
+		if (project) {
+			history.push(project as IProject)
+		}
+	})
+	return history
 })
 
 const tasksLoaded = ref(false)
 
-const deletionScheduledAt = computed(() => parseDateOrNull(authStore.info?.deletionScheduledAt))
+const deletionScheduledAt = computed(() => {
+	const date = authStore.info?.deletionScheduledAt
+	return date ? parseDateOrNull(date) : null
+})
 
 // Extract label IDs from query parameter
-const labelIds = computed(() => {
+const labelIds = computed((): string[] | undefined => {
 	const labelsParam = route.query.labels
 	if (!labelsParam) {
 		return undefined
 	}
-	return Array.isArray(labelsParam) ? labelsParam : [labelsParam]
+	const labels = Array.isArray(labelsParam) ? labelsParam : [labelsParam]
+	return labels.filter((l): l is string => typeof l === 'string')
 })
 
 // This is to reload the tasks list after adding a new task through the global task add.

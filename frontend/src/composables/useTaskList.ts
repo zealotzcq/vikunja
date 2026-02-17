@@ -37,12 +37,12 @@ const SORT_BY_DEFAULT: SortBy = {
 // This makes sure an id sort order is always sorted last.
 // When tasks would be sorted first by id and then by whatever else was specified, the id sort takes
 // precedence over everything else, making any other sort columns pretty useless.
-function formatSortOrder(sortBy, params) {
+function formatSortOrder(sortBy: SortBy, params: TaskFilterParams): TaskFilterParams {
 	let hasIdFilter = false
-	const sortKeys = Object.keys(sortBy)
-	for (const s of sortKeys) {
-		if (s === 'id') {
-			sortKeys.splice(s, 1)
+	const sortKeys = Object.keys(sortBy) as (keyof SortBy)[]
+	for (let i = 0; i < sortKeys.length; i++) {
+		if (sortKeys[i] === 'id') {
+			sortKeys.splice(i, 1)
 			hasIdFilter = true
 			break
 		}
@@ -50,8 +50,8 @@ function formatSortOrder(sortBy, params) {
 	if (hasIdFilter) {
 		sortKeys.push('id')
 	}
-	params.sort_by = sortKeys
-	params.order_by = sortKeys.map(s => sortBy[s])
+	params.sort_by = sortKeys as TaskFilterParams['sort_by']
+	params.order_by = sortKeys.map(s => sortBy[s]).filter((o): o is Order => o !== undefined) as TaskFilterParams['order_by']
 
 	return params
 }
@@ -75,8 +75,8 @@ export function useTaskList(
 	const filter = useRouteQuery('filter')
 	const s = useRouteQuery('s')
 
-	watch(filter, v => { params.value.filter = v ?? '' }, { immediate: true })
-	watch(s, v => { params.value.s = v ?? '' }, { immediate: true })
+	watch(filter, v => { params.value.filter = Array.isArray(v) ? v[0] ?? '' : v ?? '' }, { immediate: true })
+	watch(s, v => { params.value.s = Array.isArray(v) ? v[0] ?? '' : v ?? '' }, { immediate: true })
 
 	watch(() => params.value.filter, v => { filter.value = v || undefined })
 	watch(() => params.value.s, v => { s.value = v || undefined })
@@ -113,7 +113,7 @@ export function useTaskList(
 				expand: expandGetter(),
 			},
 			page.value,
-		]
+		] as const
 	})
 
 	const taskCollectionService = shallowReactive(new TaskCollectionService())
@@ -126,7 +126,8 @@ export function useTaskList(
 			tasks.value = []
 		}
 		try {
-			tasks.value = await taskCollectionService.getAll(...getAllTasksParams.value)
+			const [model, params, pageNum] = getAllTasksParams.value
+			tasks.value = await taskCollectionService.getAll(model as unknown as ITask, params, pageNum)
 		} catch (e) {
 			error(e)
 		}

@@ -15,6 +15,7 @@ export const useChatStore = defineStore('chat', () => {
 	const router = useRouter()
 	const isMobile = ref(false)
 	const isAvailable = ref(false)
+	const homeRefreshTrigger = ref(0)
 
 	// Chat open state management with daily reset per user
 	interface ChatOpenState {
@@ -244,9 +245,13 @@ export const useChatStore = defineStore('chat', () => {
 				const isButtonType = lastMessage.type === 'button_navigation' || (lastMessage.type === 'assistant_response' && lastMessage.buttonNavigation)
 
 				if (isButtonType && lastMessage.buttonNavigation && !processed.has(lastMessage.id)) {
-					const shouldAutoNavigate = !lastMessage.buttonNavigation.routeName.startsWith('task.detail')
+					const isTaskDetail = lastMessage.buttonNavigation.routeName.startsWith('task.detail')
 
-					if (shouldAutoNavigate) {
+					if (isTaskDetail) {
+						// Task detail navigation - trigger home refresh
+						homeRefreshTrigger.value = Date.now()
+					} else {
+						// Other navigation - auto navigate
 						addProcessedRefreshMessage(lastMessage.id)
 						router.push({
 							name: lastMessage.buttonNavigation.routeName,
@@ -378,6 +383,7 @@ export const useChatStore = defineStore('chat', () => {
 		isLoading,
 		error,
 		hasPendingResponse,
+		homeRefreshTrigger,
 		sendMessage,
 		clearMessages,
 		toggleOpen,

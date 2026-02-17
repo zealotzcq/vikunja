@@ -47,7 +47,7 @@
 </template>
 
 <script lang="ts" setup>
-import {ref, computed} from 'vue'
+import {ref, computed, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 
 import Message from '@/components/misc/Message.vue'
@@ -63,11 +63,13 @@ import {useDaytimeSalutation} from '@/composables/useDaytimeSalutation'
 
 import {useProjectStore} from '@/stores/projects'
 import {useAuthStore} from '@/stores/auth'
+import {useChatStore} from '@/stores/chat'
 
 const salutation = useDaytimeSalutation()
 
 const authStore = useAuthStore()
 const projectStore = useProjectStore()
+const chatStore = useChatStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -102,6 +104,11 @@ const showTasksKey = ref(0)
 function updateTaskKey() {
 	showTasksKey.value++
 }
+
+// Watch for chat store refresh trigger to reload task list
+watch(() => chatStore.homeRefreshTrigger, () => {
+	updateTaskKey()
+})
 
 function handleClearLabelFilter() {
 	const query = {...route.query}

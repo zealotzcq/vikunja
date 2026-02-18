@@ -172,8 +172,8 @@ func (a *Agent) createLLMProvider() (LLMProvider, error) {
 	}
 }
 
-// ProcessMessage processes a user message and returns the agent's response
-func (a *Agent) ProcessMessage(ctx context.Context, agentCtx *AgentContext, message string) (*AgentResponse, error) {
+// ProcessMessage processes a user message and returns the agent's responses
+func (a *Agent) ProcessMessage(ctx context.Context, agentCtx *AgentContext, message string) (*AgentMultiResponse, error) {
 	a.mu.RLock()
 	initialized := a.initialized
 	a.mu.RUnlock()
@@ -191,17 +191,17 @@ func (a *Agent) ProcessMessage(ctx context.Context, agentCtx *AgentContext, mess
 		}
 	}
 
-	response, messages, err := a.runAgentLoop(ctx, agentCtx, message)
+	responses, messages, err := a.runAgentLoop(ctx, agentCtx, message)
 	if err != nil {
 		return nil, fmt.Errorf("agent execution failed: %w", err)
 	}
 
 	agentCtx.MessageHistory = append(agentCtx.MessageHistory, messages...)
 
-	return response, nil
+	return responses, nil
 }
 
-func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMessage string) (*AgentResponse, []Message, error) {
+func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMessage string) (*AgentMultiResponse, []Message, error) {
 	maxIterations := a.config.MaxIterations
 
 	messages := a.buildMessages(agentCtx)
@@ -242,8 +242,11 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 			}
 		}
 
-		// Process tool calls
-		for _, toolCall := range providerResponse.ToolCalls {
+		// Process tool calls - execute ALL tool calls before checking stop conditions
+		var hasStopCommand bool
+		var agentResponses []*AgentResponse
+
+		for toolCallIndex, toolCall := range providerResponse.ToolCalls {
 			if toolCall.Name == "" {
 				GetLLMLogger().LogExchange("agent", "", fmt.Sprintf("Warning: Skipping tool call with empty name, ID: %s, arguments: %v", toolCall.ID, toolCall.Arguments))
 				continue
@@ -279,6 +282,11 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 					executionResult.StopCommand = &ToolStopCommand{
 						Response: executionResult.Result,
 					}
+				}
+
+				// Track if any tool wants to stop
+				if executionResult.StopCommand != nil {
+					hasStopCommand = true
 				}
 			}
 
@@ -318,22 +326,43 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 
 			messagesToSave = append(messagesToSave, assistantMsg, toolResultMsg)
 
-			if executionResult != nil && executionResult.StopCommand != nil {
-				metadata := executionResult.StopCommand.Metadata
-				if metadata == nil {
-					metadata = make(map[string]interface{})
+			// Create a response for each tool call that has a result or button navigation
+			if executionResult != nil {
+				response := &AgentResponse{
+					ExecutionSteps: agentCtx.ExecutionSteps,
+					TokensUsed:     agentCtx.TokensUsed,
 				}
-				metadata["execution_steps"] = agentCtx.ExecutionSteps
-				metadata["tokens_used"] = agentCtx.TokensUsed
 
-				return &AgentResponse{
-					Content:          executionResult.StopCommand.Response,
-					NavigationInfo:   agentCtx.NavigationInfo,
-					ShouldNavigate:   agentCtx.ShouldNavigate,
-					ExecutionSteps:   agentCtx.ExecutionSteps,
-					TokensUsed:       agentCtx.TokensUsed,
-					Metadata:         metadata,
-					ButtonNavigation: agentCtx.ButtonNavigation,
+				if executionResult.StopCommand != nil {
+					response.Content = executionResult.StopCommand.Response
+					response.Metadata = executionResult.StopCommand.Metadata
+					if response.Metadata == nil {
+						response.Metadata = make(map[string]interface{})
+					}
+				} else if executionResult.Result != "" {
+					response.Content = executionResult.Result
+				}
+
+				if agentCtx.ButtonNavigation != nil {
+					response.ButtonNavigation = &chat_session.ButtonNavigation{
+						RouteName: agentCtx.ButtonNavigation.RouteName,
+						Params:    agentCtx.ButtonNavigation.Params,
+						Label:     agentCtx.ButtonNavigation.Label,
+						Title:     agentCtx.ButtonNavigation.Title,
+					}
+					agentCtx.ButtonNavigation = nil
+				}
+
+				if response.Content != "" || response.ButtonNavigation != nil {
+					agentResponses = append(agentResponses, response)
+				}
+			}
+
+			// Only exit loop after processing the LAST tool call with a stop command
+			isLastToolCall := toolCallIndex == len(providerResponse.ToolCalls)-1
+			if hasStopCommand && isLastToolCall {
+				return &AgentMultiResponse{
+					Responses: agentResponses,
 				}, messagesToSave, nil
 			}
 		}
@@ -344,11 +373,15 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMe
 		lang = "en"
 	}
 
-	return &AgentResponse{
-		Content:          i18n.T(lang, "ai.error.cannot_complete"),
-		ExecutionSteps:   agentCtx.ExecutionSteps,
-		TokensUsed:       agentCtx.TokensUsed,
-		ButtonNavigation: agentCtx.ButtonNavigation,
+	return &AgentMultiResponse{
+		Responses: []*AgentResponse{
+			{
+				Content:          i18n.T(lang, "ai.error.cannot_complete"),
+				ExecutionSteps:   agentCtx.ExecutionSteps,
+				TokensUsed:       agentCtx.TokensUsed,
+				ButtonNavigation: agentCtx.ButtonNavigation,
+			},
+		},
 	}, messagesToSave, nil
 }
 
@@ -454,6 +487,11 @@ type AgentResponse struct {
 	TokensUsed       int                            `json:"tokens_used"`
 	Metadata         map[string]interface{}         `json:"metadata,omitempty"`
 	ButtonNavigation *chat_session.ButtonNavigation `json:"button_navigation,omitempty"`
+}
+
+// AgentMultiResponse represents multiple agent responses for parallel tool calls
+type AgentMultiResponse struct {
+	Responses []*AgentResponse `json:"responses"`
 }
 
 // Reset resets the agent state

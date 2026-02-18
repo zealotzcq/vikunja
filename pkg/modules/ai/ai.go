@@ -70,7 +70,17 @@ func GenerateAgentResponse(ctx context.Context, userID int64, userContent string
 
 	log.Printf("[AI] AgentContext created - History messages: %d", len(agentCtx.MessageHistory))
 
-	return agent.ProcessMessage(ctx, agentCtx, userContent)
+	multiResponse, err := agent.ProcessMessage(ctx, agentCtx, userContent)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return first response for backward compatibility
+	if len(multiResponse.Responses) > 0 {
+		return multiResponse.Responses[0], nil
+	}
+
+	return nil, fmt.Errorf("no response from agent")
 }
 
 // NavigationInfo contains navigation command details

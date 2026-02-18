@@ -374,135 +374,124 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 		return
 	}
 
-	assistantMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
-	var navigationCommand *chat_session.NavigationCommand
-	if agentResponse.ShouldNavigate && agentResponse.NavigationInfo != nil {
-		navigationCommand = &chat_session.NavigationCommand{
-			RouteName: agentResponse.NavigationInfo.RouteName,
-			Params:    agentResponse.NavigationInfo.Params,
-			Label:     agentResponse.Content,
+	// Handle multiple responses from parallel tool calls
+	for _, response := range agentResponse.Responses {
+		assistantMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
+
+		metadata := make(map[string]interface{})
+		if len(response.ExecutionSteps) > 0 {
+			metadata["execution_steps"] = response.ExecutionSteps
 		}
-	}
+		if response.TokensUsed > 0 {
+			metadata["tokens_used"] = response.TokensUsed
+		}
 
-	metadata := make(map[string]interface{})
-	if len(agentResponse.ExecutionSteps) > 0 {
-		metadata["execution_steps"] = agentResponse.ExecutionSteps
-	}
-	if agentResponse.TokensUsed > 0 {
-		metadata["tokens_used"] = agentResponse.TokensUsed
-	}
+		hasQuestion := false
+		var questionData string
 
-	hasQuestion := false
-	var questionData string
+		for _, step := range response.ExecutionSteps {
+			if step.Action == "question" {
+				hasQuestion = true
 
-	for _, step := range agentResponse.ExecutionSteps {
-		if step.Action == "question" {
-			hasQuestion = true
-
-			var result map[string]interface{}
-			if err := json.Unmarshal([]byte(step.Input), &result); err == nil {
-				if questions, ok := result["questions"]; ok {
-					questionsJSON, _ := json.Marshal(questions)
-					questionData = string(questionsJSON)
+				var result map[string]interface{}
+				if err := json.Unmarshal([]byte(step.Input), &result); err == nil {
+					if questions, ok := result["questions"]; ok {
+						questionsJSON, _ := json.Marshal(questions)
+						questionData = string(questionsJSON)
+					}
 				}
 			}
 		}
-	}
 
-	// Save tool calls and tool results to session (including question tool calls)
-	questionToolCallID := ""
-	for _, step := range agentResponse.ExecutionSteps {
-		// Use step.Action and step.Input directly (new structured format)
-		toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
+		// Save tool calls and tool results to session (including question tool calls)
+		questionToolCallID := ""
+		for _, step := range response.ExecutionSteps {
+			// Use step.Action and step.Input directly (new structured format)
+			toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
 
-		// If this is a question tool call, save the ID for later use
-		if step.Action == "question" {
-			questionToolCallID = toolCallID
+			// If this is a question tool call, save the ID for later use
+			if step.Action == "question" {
+				questionToolCallID = toolCallID
+			}
+
+			// Save tool call message
+			toolCallMsg := chat_session.Message{
+				ID:        toolCallID,
+				Type:      "tool_call",
+				Role:      "assistant",
+				Content:   step.Thought,
+				ToolName:  step.Action,
+				ToolInput: step.Input,
+				Timestamp: time.Now().Unix(),
+				CompanyID: req.CompanyID,
+			}
+			if err := chat_session.GetDefault().AddMessage(userID, req.CompanyID, toolCallMsg); err != nil {
+			}
+
+			// Save tool result message with ToolCallID referencing tool call
+			toolResultMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
+			toolResultMsg := chat_session.Message{
+				ID:         toolResultMsgID,
+				Type:       "tool_result",
+				Role:       "tool",
+				ToolName:   step.Action,
+				ToolOutput: step.Output,
+				ToolCallID: toolCallID,
+				Timestamp:  time.Now().Unix(),
+				CompanyID:  req.CompanyID,
+			}
+			if err := chat_session.GetDefault().AddMessage(userID, req.CompanyID, toolResultMsg); err != nil {
+			}
 		}
 
-		// Save tool call message
-		toolCallMsg := chat_session.Message{
-			ID:        toolCallID,
-			Type:      "tool_call",
-			Role:      "assistant",
-			Content:   step.Thought,
-			ToolName:  step.Action,
-			ToolInput: step.Input,
-			Timestamp: time.Now().Unix(),
-			CompanyID: req.CompanyID,
-		}
-		if err := chat_session.GetDefault().AddMessage(userID, req.CompanyID, toolCallMsg); err != nil {
+		// Save question message if there was a question tool call
+		if hasQuestion && questionData != "" {
+			questionMessage := chat_session.Message{
+				ID:           fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+				Type:         "question",
+				Role:         "assistant",
+				Content:      "",
+				QuestionData: questionData,
+				Timestamp:    time.Now().Unix(),
+				CompanyID:    req.CompanyID,
+				ToolCallID:   questionToolCallID,
+			}
+			chat_session.GetDefault().AddMessage(userID, req.CompanyID, questionMessage)
+			continue
 		}
 
-		// Save tool result message with ToolCallID referencing tool call
-		toolResultMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
-		toolResultMsg := chat_session.Message{
-			ID:         toolResultMsgID,
-			Type:       "tool_result",
-			Role:       "tool",
-			ToolName:   step.Action,
-			ToolOutput: step.Output,
-			ToolCallID: toolCallID,
-			Timestamp:  time.Now().Unix(),
-			CompanyID:  req.CompanyID,
+		// Save assistant response message
+		if response.Content != "" {
+			assistantMessage := chat_session.Message{
+				ID:        assistantMsgID,
+				Type:      "assistant_response",
+				Role:      "assistant",
+				Content:   response.Content,
+				Timestamp: time.Now().Unix(),
+				Metadata:  metadata,
+				CompanyID: req.CompanyID,
+			}
+			chat_session.GetDefault().AddMessage(userID, req.CompanyID, assistantMessage)
 		}
-		if err := chat_session.GetDefault().AddMessage(userID, req.CompanyID, toolResultMsg); err != nil {
+
+		// Save button navigation as separate message if exists
+		if response.ButtonNavigation != nil {
+			buttonNavMsg := chat_session.Message{
+				ID:        fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+				Type:      "button_navigation",
+				Role:      "assistant",
+				Content:   "",
+				Timestamp: time.Now().Unix(),
+				ButtonNavigation: &chat_session.ButtonNavigation{
+					RouteName: response.ButtonNavigation.RouteName,
+					Params:    response.ButtonNavigation.Params,
+					Label:     response.ButtonNavigation.Label,
+					Title:     response.ButtonNavigation.Title,
+				},
+				CompanyID: req.CompanyID,
+			}
+			chat_session.GetDefault().AddMessage(userID, req.CompanyID, buttonNavMsg)
 		}
-	}
-
-	// Save question message if there was a question tool call
-	if hasQuestion && questionData != "" {
-		questionMessage := chat_session.Message{
-			ID:           fmt.Sprintf("msg_%d", time.Now().UnixNano()),
-			Type:         "question",
-			Role:         "assistant",
-			Content:      "",
-			QuestionData: questionData,
-			Timestamp:    time.Now().Unix(),
-			CompanyID:    req.CompanyID,
-			ToolCallID:   questionToolCallID,
-		}
-		chat_session.GetDefault().AddMessage(userID, req.CompanyID, questionMessage)
-		return
-	}
-
-	// Save assistant response message
-
-	var buttonNavigation *chat_session.ButtonNavigation
-	if agentResponse.ButtonNavigation != nil {
-		buttonNavigation = &chat_session.ButtonNavigation{
-			RouteName: agentResponse.ButtonNavigation.RouteName,
-			Params:    agentResponse.ButtonNavigation.Params,
-			Label:     agentResponse.ButtonNavigation.Label,
-			Title:     agentResponse.ButtonNavigation.Title,
-		}
-	}
-
-	assistantMessage := chat_session.Message{
-		ID:                assistantMsgID,
-		Type:              "assistant_response",
-		Role:              "assistant",
-		Content:           agentResponse.Content,
-		Timestamp:         time.Now().Unix(),
-		NavigationCommand: navigationCommand,
-		Metadata:          metadata,
-		CompanyID:         req.CompanyID,
-	}
-
-	chat_session.GetDefault().AddMessage(userID, req.CompanyID, assistantMessage)
-
-	// Save button navigation as separate message if exists
-	if buttonNavigation != nil {
-		buttonNavMsg := chat_session.Message{
-			ID:               fmt.Sprintf("msg_%d", time.Now().UnixNano()),
-			Type:             "button_navigation",
-			Role:             "assistant",
-			Content:          "",
-			Timestamp:        time.Now().Unix(),
-			ButtonNavigation: buttonNavigation,
-			CompanyID:        req.CompanyID,
-		}
-		chat_session.GetDefault().AddMessage(userID, req.CompanyID, buttonNavMsg)
 	}
 }
 
@@ -625,122 +614,118 @@ func processQuestionAnswerAsync(ctx context.Context, userID, companyID int64, an
 		return
 	}
 
-	assistantMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
-	var navigationCommand *chat_session.NavigationCommand
-	if agentResponse.ShouldNavigate && agentResponse.NavigationInfo != nil {
-		navigationCommand = &chat_session.NavigationCommand{
-			RouteName: agentResponse.NavigationInfo.RouteName,
-			Params:    agentResponse.NavigationInfo.Params,
-			Label:     agentResponse.Content,
+	// Handle multiple responses from parallel tool calls
+	for _, response := range agentResponse.Responses {
+		metadata := make(map[string]interface{})
+		if len(response.ExecutionSteps) > 0 {
+			metadata["execution_steps"] = response.ExecutionSteps
 		}
-	}
+		if response.TokensUsed > 0 {
+			metadata["tokens_used"] = response.TokensUsed
+		}
 
-	metadata := make(map[string]interface{})
-	if len(agentResponse.ExecutionSteps) > 0 {
-		metadata["execution_steps"] = agentResponse.ExecutionSteps
-	}
-	if agentResponse.TokensUsed > 0 {
-		metadata["tokens_used"] = agentResponse.TokensUsed
-	}
+		hasQuestion := false
+		var questionData string
 
-	hasQuestion := false
-	var questionData string
+		for _, step := range response.ExecutionSteps {
+			if step.Action == "question" {
+				hasQuestion = true
 
-	for _, step := range agentResponse.ExecutionSteps {
-		if step.Action == "question" {
-			hasQuestion = true
-
-			var result map[string]interface{}
-			if err := json.Unmarshal([]byte(step.Input), &result); err == nil {
-				if questions, ok := result["questions"]; ok {
-					questionsJSON, _ := json.Marshal(questions)
-					questionData = string(questionsJSON)
+				var result map[string]interface{}
+				if err := json.Unmarshal([]byte(step.Input), &result); err == nil {
+					if questions, ok := result["questions"]; ok {
+						questionsJSON, _ := json.Marshal(questions)
+						questionData = string(questionsJSON)
+					}
 				}
 			}
 		}
-	}
 
-	questionToolCallID := ""
-	for _, step := range agentResponse.ExecutionSteps {
-		toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
+		questionToolCallID := ""
+		for _, step := range response.ExecutionSteps {
+			toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
 
-		// If this is a question tool call, save the ID for later use
-		if step.Action == "question" {
-			questionToolCallID = toolCallID
+			// If this is a question tool call, save the ID for later use
+			if step.Action == "question" {
+				questionToolCallID = toolCallID
+			}
+
+			toolCallMsg := chat_session.Message{
+				ID:        toolCallID,
+				Type:      "tool_call",
+				Role:      "assistant",
+				Content:   step.Thought,
+				ToolName:  step.Action,
+				ToolInput: step.Input,
+				Timestamp: time.Now().Unix(),
+				CompanyID: companyID,
+			}
+			if err := chat_session.GetDefault().AddMessage(userID, companyID, toolCallMsg); err != nil {
+			}
+
+			toolResultMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
+			toolResultMsg := chat_session.Message{
+				ID:         toolResultMsgID,
+				Type:       "tool_result",
+				Role:       "tool",
+				ToolName:   step.Action,
+				ToolOutput: step.Output,
+				ToolCallID: toolCallID,
+				Timestamp:  time.Now().Unix(),
+				CompanyID:  companyID,
+			}
+			if err := chat_session.GetDefault().AddMessage(userID, companyID, toolResultMsg); err != nil {
+			}
 		}
 
-		toolCallMsg := chat_session.Message{
-			ID:        toolCallID,
-			Type:      "tool_call",
-			Role:      "assistant",
-			Content:   step.Thought,
-			ToolName:  step.Action,
-			ToolInput: step.Input,
-			Timestamp: time.Now().Unix(),
-			CompanyID: companyID,
-		}
-		if err := chat_session.GetDefault().AddMessage(userID, companyID, toolCallMsg); err != nil {
+		// Save question message if there was a question tool call
+		if hasQuestion && questionData != "" {
+			questionMessage := chat_session.Message{
+				ID:           fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+				Type:         "question",
+				Role:         "assistant",
+				Content:      "",
+				QuestionData: questionData,
+				Timestamp:    time.Now().Unix(),
+				CompanyID:    companyID,
+				ToolCallID:   questionToolCallID,
+			}
+			chat_session.GetDefault().AddMessage(userID, companyID, questionMessage)
+			continue
 		}
 
-		toolResultMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
-		toolResultMsg := chat_session.Message{
-			ID:         toolResultMsgID,
-			Type:       "tool_result",
-			Role:       "tool",
-			ToolName:   step.Action,
-			ToolOutput: step.Output,
-			ToolCallID: toolCallID,
-			Timestamp:  time.Now().Unix(),
-			CompanyID:  companyID,
+		// Save assistant response message
+		if response.Content != "" {
+			assistantMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
+			assistantMessage := chat_session.Message{
+				ID:        assistantMsgID,
+				Type:      "assistant_response",
+				Role:      "assistant",
+				Content:   response.Content,
+				Timestamp: time.Now().Unix(),
+				Metadata:  metadata,
+				CompanyID: companyID,
+			}
+			chat_session.GetDefault().AddMessage(userID, companyID, assistantMessage)
 		}
-		if err := chat_session.GetDefault().AddMessage(userID, companyID, toolResultMsg); err != nil {
+
+		// Save button navigation as separate message if exists
+		if response.ButtonNavigation != nil {
+			buttonNavMsg := chat_session.Message{
+				ID:        fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+				Type:      "button_navigation",
+				Role:      "assistant",
+				Content:   "",
+				Timestamp: time.Now().Unix(),
+				ButtonNavigation: &chat_session.ButtonNavigation{
+					RouteName: response.ButtonNavigation.RouteName,
+					Params:    response.ButtonNavigation.Params,
+					Label:     response.ButtonNavigation.Label,
+					Title:     response.ButtonNavigation.Title,
+				},
+				CompanyID: companyID,
+			}
+			chat_session.GetDefault().AddMessage(userID, companyID, buttonNavMsg)
 		}
-	}
-
-	// Save question message if there was a question tool call
-	if hasQuestion && questionData != "" {
-		questionMessage := chat_session.Message{
-			ID:           fmt.Sprintf("msg_%d", time.Now().UnixNano()),
-			Type:         "question",
-			Role:         "assistant",
-			Content:      "",
-			QuestionData: questionData,
-			Timestamp:    time.Now().Unix(),
-			CompanyID:    companyID,
-			ToolCallID:   questionToolCallID,
-		}
-		chat_session.GetDefault().AddMessage(userID, companyID, questionMessage)
-		return
-	}
-
-	assistantMessage := chat_session.Message{
-		ID:                assistantMsgID,
-		Type:              "assistant_response",
-		Role:              "assistant",
-		Content:           agentResponse.Content,
-		Timestamp:         time.Now().Unix(),
-		NavigationCommand: navigationCommand,
-		Metadata:          metadata,
-		CompanyID:         companyID,
-	}
-
-	chat_session.GetDefault().AddMessage(userID, companyID, assistantMessage)
-
-	// Save button navigation as separate message if exists
-	if agentResponse.ButtonNavigation != nil {
-		buttonNavMsg := chat_session.Message{
-			ID:        fmt.Sprintf("msg_%d", time.Now().UnixNano()),
-			Type:      "button_navigation",
-			Role:      "assistant",
-			Content:   "",
-			Timestamp: time.Now().Unix(),
-			ButtonNavigation: &chat_session.ButtonNavigation{
-				RouteName: agentResponse.ButtonNavigation.RouteName,
-				Params:    agentResponse.ButtonNavigation.Params,
-				Label:     agentResponse.ButtonNavigation.Label,
-			},
-			CompanyID: companyID,
-		}
-		chat_session.GetDefault().AddMessage(userID, companyID, buttonNavMsg)
 	}
 }

@@ -1,3 +1,19 @@
+// Vikunja is a to-do list application to facilitate your life.
+// Copyright 2018-present Vikunja and contributors. All rights reserved.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package chat_session
 
 import (
@@ -70,10 +86,17 @@ type ButtonNavigation struct {
 	Title     string                 `json:"title,omitempty"`
 }
 
+// SessionProcessor represents a session with its lock and pending messages
+type SessionProcessor struct {
+	mu              sync.Mutex
+	pendingMessages []Message
+}
+
 // Manager manages chat sessions in memory
 type Manager struct {
-	mu        sync.RWMutex
-	listeners map[string][]chan Message
+	mu                sync.RWMutex
+	listeners         map[string][]chan Message
+	sessionProcessors map[string]*SessionProcessor
 }
 
 var defaultManager = &Manager{}
@@ -183,7 +206,9 @@ func (m *Manager) createNewSessionWithoutLock(userID, companyID int64) (*ChatSes
 		return nil, fmt.Errorf("failed to load current user: %w", err)
 	}
 
-	allStaff := append(subordinateStaff, SubordinateStaffInfo{
+	allStaff := make([]SubordinateStaffInfo, 0, len(subordinateStaff)+1)
+	allStaff = append(allStaff, subordinateStaff...)
+	allStaff = append(allStaff, SubordinateStaffInfo{
 		UserID:    currentUser.ID,
 		Username:  currentUser.Username,
 		Name:      currentUser.Name,
@@ -206,6 +231,20 @@ func (m *Manager) createNewSessionWithoutLock(userID, companyID int64) (*ChatSes
 	}
 
 	return &session, nil
+}
+
+// GetOrCreateSessionWithoutLock gets or creates session without acquiring lock
+func (m *Manager) GetOrCreateSessionWithoutLock(userID, companyID int64) (*ChatSession, error) {
+	session, err := m.getExistingSession(userID, companyID)
+	if err != nil {
+		return nil, err
+	}
+
+	if session != nil {
+		return session, nil
+	}
+
+	return m.createNewSessionWithoutLock(userID, companyID)
 }
 
 // GetOrCreateSession gets an existing session for a user or creates a new one
@@ -250,8 +289,8 @@ func (m *Manager) UnregisterListener(userID, companyID int64, listener chan Mess
 	}
 }
 
-// notifyListeners notifies all registered listeners of a new message
-func (m *Manager) notifyListeners(userID, companyID int64, msg Message) {
+// NotifyListeners notifies all registered listeners of a new message
+func (m *Manager) NotifyListeners(userID, companyID int64, msg Message) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	key := fmt.Sprintf("%d:%d", userID, companyID)
@@ -296,7 +335,7 @@ func (m *Manager) AddMessage(userID, companyID int64, msg Message) error {
 
 	// Release lock before notifying listeners to avoid deadlock
 	m.mu.Unlock()
-	m.notifyListeners(userID, companyID, notifyMsg)
+	m.NotifyListeners(userID, companyID, notifyMsg)
 
 	return nil
 }
@@ -343,6 +382,85 @@ func (m *Manager) CleanupExpiredSessions() error {
 	}
 
 	return nil
+}
+
+// getSessionProcessor gets or creates a session processor for a session
+func (m *Manager) getSessionProcessor(userID, companyID int64) *SessionProcessor {
+	key := getSessionKey(userID, companyID)
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.sessionProcessors == nil {
+		m.sessionProcessors = make(map[string]*SessionProcessor)
+	}
+
+	processor, exists := m.sessionProcessors[key]
+	if !exists {
+		processor = &SessionProcessor{
+			pendingMessages: make([]Message, 0),
+		}
+		m.sessionProcessors[key] = processor
+	}
+
+	return processor
+}
+
+// saveMessageToSession saves a message to session without acquiring locks
+// This should only be called from goroutine that holds the session lock
+func (m *Manager) SaveMessageToSession(userID, companyID int64, msg Message) error {
+	session, err := m.GetOrCreateSessionWithoutLock(userID, companyID)
+	if err != nil {
+		return fmt.Errorf("failed to get session: %w", err)
+	}
+
+	updatedSession := *session
+	updatedSession.Messages = append(updatedSession.Messages, msg)
+	updatedSession.ExpiresAt = time.Now().Add(sessionTTL)
+
+	sessionKey := getSessionKey(userID, companyID)
+	if err := keyvalue.Put(sessionKey, updatedSession); err != nil {
+		return fmt.Errorf("failed to update session: %w", err)
+	}
+
+	return nil
+}
+
+// pushPendingMessage pushes a message to the pending queue
+func (m *Manager) PushPendingMessage(userID, companyID int64, msg Message) {
+	processor := m.getSessionProcessor(userID, companyID)
+
+	processor.mu.Lock()
+	processor.pendingMessages = append(processor.pendingMessages, msg)
+	processor.mu.Unlock()
+
+	fmt.Printf("[Chat] Pushed pending message: userID=%d, companyID=%d, msgType=%s, msgID=%s, pendingCount=%d\n",
+		userID, companyID, msg.Type, msg.ID, len(processor.pendingMessages))
+}
+
+// popAllPendingMessages pops all pending messages from the queue and returns the lock
+func (m *Manager) PopAllPendingMessages(userID, companyID int64) (*sync.Mutex, []Message) {
+	processor := m.getSessionProcessor(userID, companyID)
+
+	fmt.Printf("[Chat] Acquiring session lock: userID=%d, companyID=%d\n", userID, companyID)
+	processor.mu.Lock()
+	fmt.Printf("[Chat] Session lock acquired: userID=%d, companyID=%d\n", userID, companyID)
+
+	messages := make([]Message, len(processor.pendingMessages))
+	copy(messages, processor.pendingMessages)
+	processor.pendingMessages = processor.pendingMessages[:0]
+
+	fmt.Printf("[Chat] Popped pending messages: userID=%d, companyID=%d, count=%d\n",
+		userID, companyID, len(messages))
+
+	return &processor.mu, messages
+}
+
+// releaseSessionLock releases the session lock
+func (m *Manager) ReleaseSessionLock(mu *sync.Mutex) {
+	fmt.Printf("[Chat] Releasing session lock\n")
+	mu.Unlock()
+	fmt.Printf("[Chat] Session lock released\n")
 }
 
 // GetDefault returns the default session manager

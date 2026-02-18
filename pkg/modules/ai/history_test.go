@@ -65,6 +65,18 @@ func TestGenerateAgentResponseWithHistory(t *testing.T) {
 		}
 	}
 
+	currentMessage := chat_session.Message{
+		ID:        "msg_4",
+		Role:      "user",
+		Content:   "What tasks do I have?",
+		Timestamp: time.Now().Unix(),
+		CompanyID: companyID,
+	}
+
+	if err := chat_session.GetDefault().AddMessage(userID, companyID, currentMessage); err != nil {
+		t.Fatalf("Failed to add current message to session: %v", err)
+	}
+
 	session, err := chat_session.GetDefault().GetOrCreateSession(userID, companyID)
 	if err != nil {
 		t.Fatalf("Failed to get session: %v", err)
@@ -88,7 +100,6 @@ func TestGenerateAgentResponseWithHistory(t *testing.T) {
 	response, err := agent.ProcessMessage(
 		context.Background(),
 		agentCtx,
-		"What tasks do I have?",
 	)
 
 	if err != nil {
@@ -99,7 +110,11 @@ func TestGenerateAgentResponseWithHistory(t *testing.T) {
 		t.Fatal("Response should not be nil")
 	}
 
-	if response.Content == "" {
+	if len(response.Responses) == 0 {
+		t.Error("Should have at least one response")
+	}
+
+	if response.Responses[0].Content == "" {
 		t.Error("Response content should not be empty")
 	}
 

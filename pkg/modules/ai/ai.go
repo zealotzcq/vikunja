@@ -70,7 +70,8 @@ func GenerateAgentResponse(ctx context.Context, userID int64, userContent string
 
 	log.Printf("[AI] AgentContext created - History messages: %d", len(agentCtx.MessageHistory))
 
-	multiResponse, err := agent.ProcessMessage(ctx, agentCtx, userContent)
+	// Note: userContent is deprecated and ignored, all messages should be in session
+	multiResponse, err := agent.ProcessMessage(ctx, agentCtx)
 	if err != nil {
 		return nil, err
 	}

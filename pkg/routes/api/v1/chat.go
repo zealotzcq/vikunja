@@ -123,11 +123,10 @@ func SendMessage(c *echo.Context) error {
 		CompanyID: req.CompanyID,
 	}
 
-	if err := chat_session.GetDefault().AddMessage(userID, req.CompanyID, userMessage); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to save message: %v", err))
-	}
+	chat_session.GetDefault().PushPendingMessage(userID, req.CompanyID, userMessage)
 
-	go processUserMessageAsync(context.Background(), userID, userMsgID, req)
+	fmt.Printf("[Chat] Starting goroutine for user message: userID=%d, companyID=%d\n", userID, req.CompanyID)
+	go processPendingMessagesAsync(context.Background(), userID, req.CompanyID, req)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"id":        userMsgID,
@@ -273,11 +272,44 @@ func GetChatHistory(c *echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
-// processUserMessageAsync processes a user message asynchronously
-func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string, req *SendMessageRequest) {
+// processPendingMessagesAsync processes all pending messages for a session
+func processPendingMessagesAsync(ctx context.Context, userID, companyID int64, req *SendMessageRequest) {
+	fmt.Printf("[Chat] processPendingMessagesAsync started: userID=%d, companyID=%d\n", userID, companyID)
+
+	mu, pendingMessages := chat_session.GetDefault().PopAllPendingMessages(userID, companyID)
+
+	if len(pendingMessages) == 0 {
+		fmt.Printf("[Chat] No pending messages, exiting: userID=%d, companyID=%d\n", userID, companyID)
+		chat_session.GetDefault().ReleaseSessionLock(mu)
+		return
+	}
+
+	fmt.Printf("[Chat] Processing %d pending messages: userID=%d, companyID=%d\n", len(pendingMessages), userID, companyID)
+
+	// Save all pending messages to session
+	for _, msg := range pendingMessages {
+		fmt.Printf("[Chat] Saving message to session: type=%s, id=%s\n", msg.Type, msg.ID)
+		if err := chat_session.GetDefault().SaveMessageToSession(userID, companyID, msg); err != nil {
+		}
+	}
+
+	// Notify listeners once after saving all messages
+	for _, msg := range pendingMessages {
+		chat_session.GetDefault().NotifyListeners(userID, companyID, msg)
+	}
+
+	// Call agent once to process all messages
+	processAgentInternal(ctx, userID, companyID, req)
+
+	fmt.Printf("[Chat] All pending messages processed: userID=%d, companyID=%d\n", userID, companyID)
+	chat_session.GetDefault().ReleaseSessionLock(mu)
+}
+
+// processAgentInternal processes agent internally (assumes lock is held)
+func processAgentInternal(ctx context.Context, userID, companyID int64, req *SendMessageRequest) {
 	routeName := ""
 	var routeParams map[string]interface{}
-	if req.PageInfo != nil {
+	if req != nil && req.PageInfo != nil {
 		routeName = req.PageInfo.RouteName
 		routeParams = req.PageInfo.Params
 	}
@@ -294,7 +326,7 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 
 	agentCtx := &ai.AgentContext{
 		UserID:         userID,
-		CompanyID:      req.CompanyID,
+		CompanyID:      companyID,
 		CurrentRoute:   routeName,
 		RouteParams:    routeParams,
 		SessionData:    make(map[string]interface{}),
@@ -302,38 +334,29 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 		Language:       u.Language,
 	}
 
-	session, err := chat_session.GetDefault().GetOrCreateSession(userID, req.CompanyID)
+	session, err := chat_session.GetDefault().GetOrCreateSessionWithoutLock(userID, companyID)
 	if err != nil {
 		return
 	}
 
 	agentCtx.SubordinateStaff = session.SubordinateStaff
 
+	// Build message history from session (including all messages)
 	for _, msg := range session.Messages {
-		// Skip the current user message we're processing (it will be added separately)
-		if msg.ID == userMsgID {
-			continue
-		}
-
 		switch msg.Type {
 		case "user_input":
-			// User input message
 			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
 				Role:    msg.Role,
 				Content: msg.Content,
 			})
 
 		case "assistant_response":
-			// Final assistant response to user
 			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
 				Role:    msg.Role,
 				Content: msg.Content,
 			})
 
 		case "tool_call":
-			// Tool call from assistant
-			// Convert to proper OpenAI tool_calls format
-			// Skip if tool name is empty (old/corrupted data)
 			if msg.ToolName == "" {
 				continue
 			}
@@ -352,9 +375,6 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 			})
 
 		case "tool_result":
-			// Result from tool execution
-			// Format as tool message with tool output
-			// ToolCallID should reference the corresponding tool call
 			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
 				Role:       msg.Role,
 				Content:    msg.ToolOutput,
@@ -362,19 +382,15 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 			})
 
 		case "question_answer":
-			// Skip question_answer messages
-			// These are saved to the session but not used in the agent's message history
-			// They represent answers to questions and are already handled through the question/answer flow
 			continue
 		}
 	}
 
-	agentResponse, err := agent.ProcessMessage(ctx, agentCtx, req.Message)
+	agentResponse, err := agent.ProcessMessage(ctx, agentCtx)
 	if err != nil {
 		return
 	}
 
-	// Handle multiple responses from parallel tool calls
 	for _, response := range agentResponse.Responses {
 		assistantMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
 
@@ -403,18 +419,14 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 			}
 		}
 
-		// Save tool calls and tool results to session (including question tool calls)
 		questionToolCallID := ""
 		for _, step := range response.ExecutionSteps {
-			// Use step.Action and step.Input directly (new structured format)
 			toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
 
-			// If this is a question tool call, save the ID for later use
 			if step.Action == "question" {
 				questionToolCallID = toolCallID
 			}
 
-			// Save tool call message
 			toolCallMsg := chat_session.Message{
 				ID:        toolCallID,
 				Type:      "tool_call",
@@ -423,12 +435,12 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 				ToolName:  step.Action,
 				ToolInput: step.Input,
 				Timestamp: time.Now().Unix(),
-				CompanyID: req.CompanyID,
+				CompanyID: companyID,
 			}
-			if err := chat_session.GetDefault().AddMessage(userID, req.CompanyID, toolCallMsg); err != nil {
+			if err := chat_session.GetDefault().SaveMessageToSession(userID, companyID, toolCallMsg); err != nil {
 			}
+			chat_session.GetDefault().NotifyListeners(userID, companyID, toolCallMsg)
 
-			// Save tool result message with ToolCallID referencing tool call
 			toolResultMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
 			toolResultMsg := chat_session.Message{
 				ID:         toolResultMsgID,
@@ -438,13 +450,13 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 				ToolOutput: step.Output,
 				ToolCallID: toolCallID,
 				Timestamp:  time.Now().Unix(),
-				CompanyID:  req.CompanyID,
+				CompanyID:  companyID,
 			}
-			if err := chat_session.GetDefault().AddMessage(userID, req.CompanyID, toolResultMsg); err != nil {
+			if err := chat_session.GetDefault().SaveMessageToSession(userID, companyID, toolResultMsg); err != nil {
 			}
+			chat_session.GetDefault().NotifyListeners(userID, companyID, toolResultMsg)
 		}
 
-		// Save question message if there was a question tool call
 		if hasQuestion && questionData != "" {
 			questionMessage := chat_session.Message{
 				ID:           fmt.Sprintf("msg_%d", time.Now().UnixNano()),
@@ -453,14 +465,15 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 				Content:      "",
 				QuestionData: questionData,
 				Timestamp:    time.Now().Unix(),
-				CompanyID:    req.CompanyID,
+				CompanyID:    companyID,
 				ToolCallID:   questionToolCallID,
 			}
-			chat_session.GetDefault().AddMessage(userID, req.CompanyID, questionMessage)
+			if err := chat_session.GetDefault().SaveMessageToSession(userID, companyID, questionMessage); err != nil {
+			}
+			chat_session.GetDefault().NotifyListeners(userID, companyID, questionMessage)
 			continue
 		}
 
-		// Save assistant response message
 		if response.Content != "" {
 			assistantMessage := chat_session.Message{
 				ID:        assistantMsgID,
@@ -469,12 +482,13 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 				Content:   response.Content,
 				Timestamp: time.Now().Unix(),
 				Metadata:  metadata,
-				CompanyID: req.CompanyID,
+				CompanyID: companyID,
 			}
-			chat_session.GetDefault().AddMessage(userID, req.CompanyID, assistantMessage)
+			if err := chat_session.GetDefault().SaveMessageToSession(userID, companyID, assistantMessage); err != nil {
+			}
+			chat_session.GetDefault().NotifyListeners(userID, companyID, assistantMessage)
 		}
 
-		// Save button navigation as separate message if exists
 		if response.ButtonNavigation != nil {
 			buttonNavMsg := chat_session.Message{
 				ID:        fmt.Sprintf("msg_%d", time.Now().UnixNano()),
@@ -488,12 +502,16 @@ func processUserMessageAsync(ctx context.Context, userID int64, userMsgID string
 					Label:     response.ButtonNavigation.Label,
 					Title:     response.ButtonNavigation.Title,
 				},
-				CompanyID: req.CompanyID,
+				CompanyID: companyID,
 			}
-			chat_session.GetDefault().AddMessage(userID, req.CompanyID, buttonNavMsg)
+			if err := chat_session.GetDefault().SaveMessageToSession(userID, companyID, buttonNavMsg); err != nil {
+			}
+			chat_session.GetDefault().NotifyListeners(userID, companyID, buttonNavMsg)
 		}
 	}
 }
+
+// processQuestionAnswerInternal processes a question answer internally (assumes lock is held)
 
 // SubmitQuestionAnswer handles submitting an answer to a question
 func SubmitQuestionAnswer(c *echo.Context) error {
@@ -528,204 +546,14 @@ func SubmitQuestionAnswer(c *echo.Context) error {
 		CompanyID: req.CompanyID,
 	}
 
-	if err := chat_session.GetDefault().AddMessage(userID, req.CompanyID, answerMessage); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to save answer: %v", err))
-	}
+	chat_session.GetDefault().PushPendingMessage(userID, req.CompanyID, answerMessage)
 
-	go processQuestionAnswerAsync(context.Background(), userID, req.CompanyID, answerContent)
+	fmt.Printf("[Chat] Starting goroutine for question answer: userID=%d, companyID=%d\n", userID, req.CompanyID)
+	go processPendingMessagesAsync(context.Background(), userID, req.CompanyID, nil)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"id":        answerMsgID,
 		"status":    "processing",
 		"timestamp": time.Now().Unix(),
 	})
-}
-
-// processQuestionAnswerAsync processes a question answer asynchronously
-func processQuestionAnswerAsync(ctx context.Context, userID, companyID int64, answer string) {
-	session, err := chat_session.GetDefault().GetOrCreateSession(userID, companyID)
-	if err != nil {
-		return
-	}
-
-	agent, err := ai.GetAgent()
-	if err != nil {
-		return
-	}
-
-	u, err := user.GetUserByID(db.NewSession(), userID)
-	if err != nil {
-		return
-	}
-
-	agentCtx := &ai.AgentContext{
-		UserID:         userID,
-		CompanyID:      companyID,
-		SessionData:    make(map[string]interface{}),
-		MessageHistory: []ai.Message{},
-		Language:       u.Language,
-	}
-
-	agentCtx.SubordinateStaff = session.SubordinateStaff
-
-	for _, msg := range session.Messages {
-		switch msg.Type {
-		case "user_input":
-			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
-				Role:    msg.Role,
-				Content: msg.Content,
-			})
-		case "assistant_response":
-			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
-				Role:    msg.Role,
-				Content: msg.Content,
-			})
-		case "tool_call":
-			if msg.ToolName == "" {
-				continue
-			}
-			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
-				Role:    msg.Role,
-				Content: msg.Content,
-				ToolCalls: []ai.ToolCallInfo{
-					{
-						ID:        msg.ID,
-						Type:      "function",
-						Name:      msg.ToolName,
-						Arguments: msg.ToolInput,
-					},
-				},
-			})
-		case "tool_result":
-			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
-				Role:       msg.Role,
-				Content:    msg.ToolOutput,
-				ToolCallID: msg.ToolCallID,
-			})
-		case "question_answer":
-			// Skip question_answer messages - they are already passed as the 'answer' parameter to ProcessMessage
-			// Including them here would cause the same message to be added twice to the LLM's messages array
-			continue
-		}
-	}
-
-	agentResponse, err := agent.ProcessMessage(ctx, agentCtx, answer)
-	if err != nil {
-		return
-	}
-
-	// Handle multiple responses from parallel tool calls
-	for _, response := range agentResponse.Responses {
-		metadata := make(map[string]interface{})
-		if len(response.ExecutionSteps) > 0 {
-			metadata["execution_steps"] = response.ExecutionSteps
-		}
-		if response.TokensUsed > 0 {
-			metadata["tokens_used"] = response.TokensUsed
-		}
-
-		hasQuestion := false
-		var questionData string
-
-		for _, step := range response.ExecutionSteps {
-			if step.Action == "question" {
-				hasQuestion = true
-
-				var result map[string]interface{}
-				if err := json.Unmarshal([]byte(step.Input), &result); err == nil {
-					if questions, ok := result["questions"]; ok {
-						questionsJSON, _ := json.Marshal(questions)
-						questionData = string(questionsJSON)
-					}
-				}
-			}
-		}
-
-		questionToolCallID := ""
-		for _, step := range response.ExecutionSteps {
-			toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
-
-			// If this is a question tool call, save the ID for later use
-			if step.Action == "question" {
-				questionToolCallID = toolCallID
-			}
-
-			toolCallMsg := chat_session.Message{
-				ID:        toolCallID,
-				Type:      "tool_call",
-				Role:      "assistant",
-				Content:   step.Thought,
-				ToolName:  step.Action,
-				ToolInput: step.Input,
-				Timestamp: time.Now().Unix(),
-				CompanyID: companyID,
-			}
-			if err := chat_session.GetDefault().AddMessage(userID, companyID, toolCallMsg); err != nil {
-			}
-
-			toolResultMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
-			toolResultMsg := chat_session.Message{
-				ID:         toolResultMsgID,
-				Type:       "tool_result",
-				Role:       "tool",
-				ToolName:   step.Action,
-				ToolOutput: step.Output,
-				ToolCallID: toolCallID,
-				Timestamp:  time.Now().Unix(),
-				CompanyID:  companyID,
-			}
-			if err := chat_session.GetDefault().AddMessage(userID, companyID, toolResultMsg); err != nil {
-			}
-		}
-
-		// Save question message if there was a question tool call
-		if hasQuestion && questionData != "" {
-			questionMessage := chat_session.Message{
-				ID:           fmt.Sprintf("msg_%d", time.Now().UnixNano()),
-				Type:         "question",
-				Role:         "assistant",
-				Content:      "",
-				QuestionData: questionData,
-				Timestamp:    time.Now().Unix(),
-				CompanyID:    companyID,
-				ToolCallID:   questionToolCallID,
-			}
-			chat_session.GetDefault().AddMessage(userID, companyID, questionMessage)
-			continue
-		}
-
-		// Save assistant response message
-		if response.Content != "" {
-			assistantMsgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
-			assistantMessage := chat_session.Message{
-				ID:        assistantMsgID,
-				Type:      "assistant_response",
-				Role:      "assistant",
-				Content:   response.Content,
-				Timestamp: time.Now().Unix(),
-				Metadata:  metadata,
-				CompanyID: companyID,
-			}
-			chat_session.GetDefault().AddMessage(userID, companyID, assistantMessage)
-		}
-
-		// Save button navigation as separate message if exists
-		if response.ButtonNavigation != nil {
-			buttonNavMsg := chat_session.Message{
-				ID:        fmt.Sprintf("msg_%d", time.Now().UnixNano()),
-				Type:      "button_navigation",
-				Role:      "assistant",
-				Content:   "",
-				Timestamp: time.Now().Unix(),
-				ButtonNavigation: &chat_session.ButtonNavigation{
-					RouteName: response.ButtonNavigation.RouteName,
-					Params:    response.ButtonNavigation.Params,
-					Label:     response.ButtonNavigation.Label,
-					Title:     response.ButtonNavigation.Title,
-				},
-				CompanyID: companyID,
-			}
-			chat_session.GetDefault().AddMessage(userID, companyID, buttonNavMsg)
-		}
-	}
 }

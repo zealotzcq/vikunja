@@ -173,7 +173,7 @@ func (a *Agent) createLLMProvider() (LLMProvider, error) {
 }
 
 // ProcessMessage processes a user message and returns the agent's responses
-func (a *Agent) ProcessMessage(ctx context.Context, agentCtx *AgentContext, message string) (*AgentMultiResponse, error) {
+func (a *Agent) ProcessMessage(ctx context.Context, agentCtx *AgentContext) (*AgentMultiResponse, error) {
 	a.mu.RLock()
 	initialized := a.initialized
 	a.mu.RUnlock()
@@ -191,7 +191,7 @@ func (a *Agent) ProcessMessage(ctx context.Context, agentCtx *AgentContext, mess
 		}
 	}
 
-	responses, messages, err := a.runAgentLoop(ctx, agentCtx, message)
+	responses, messages, err := a.runAgentLoop(ctx, agentCtx)
 	if err != nil {
 		return nil, fmt.Errorf("agent execution failed: %w", err)
 	}
@@ -201,16 +201,10 @@ func (a *Agent) ProcessMessage(ctx context.Context, agentCtx *AgentContext, mess
 	return responses, nil
 }
 
-func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext, userMessage string) (*AgentMultiResponse, []Message, error) {
+func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext) (*AgentMultiResponse, []Message, error) {
 	maxIterations := a.config.MaxIterations
 
 	messages := a.buildMessages(agentCtx)
-
-	// Add user message only once at the beginning
-	messages = append(messages, Message{
-		Role:    "user",
-		Content: userMessage,
-	})
 
 	// Track which messages to save to history (excluding system prompt)
 	messagesToSave := make([]Message, 0)

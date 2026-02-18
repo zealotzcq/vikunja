@@ -5,6 +5,7 @@ Use this tool when you need to ask the user questions during execution. This all
 4. Offer choices to the user about what direction to take.
 
 Usage notes:
+- IMPORTANT: The `questions` parameter MUST be an array, NOT an object. Format: {"questions": [{"question": "...", "header": "...", "options": [...]}]}
 - When custom is enabled (default), a "Type your own answer" option is added automatically; don't include "Other" or catch-all options
 - Answers are returned as arrays of labels; set multiple: true to allow selecting more than one
 - If you recommend a specific option, make that the first option in the list and add "(Recommended)" at the end of the label

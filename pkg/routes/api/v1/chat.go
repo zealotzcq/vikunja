@@ -382,7 +382,10 @@ func processAgentInternal(ctx context.Context, userID, companyID int64, req *Sen
 			})
 
 		case "question_answer":
-			continue
+			agentCtx.MessageHistory = append(agentCtx.MessageHistory, ai.Message{
+				Role:    "user",
+				Content: msg.Content,
+			})
 		}
 	}
 

@@ -179,6 +179,33 @@
                 "view_task": "View Task",
                 "staff_no_project": "Staff member %[1]s does not have an associated project"
             },
+            "add_subordinate": {
+                "error_username_required": "username is required",
+                "error_company_required": "Current user is not in a company",
+                "error_not_creator": "Only company creator can add subordinates",
+                "error_user_not_exist": "User '%s' does not exist",
+                "error_add_to_company": "Failed to add user to company: %v",
+                "error_create_project": "Failed to create project: %v",
+                "error_share_project": "Failed to share project with user: %v",
+                "error_create_relation": "Failed to create subordinate relation: %v",
+                "error_update_nickname": "Failed to update user nickname: %v",
+                "error_commit": "Failed to commit transaction: %v",
+                "error_db_session": "Failed to create database session",
+                "error_start_transaction": "Failed to start transaction: %v",
+                "success_already_subordinate": "The user '%s' is already a subordinate with project ID %d",
+                "response_already_subordinate": "The user '%s' is already a subordinate",
+                "success": "Successfully added '%s' as subordinate. A shared project (ID: %d) has been created for task management.",
+                "project_title": "to %[1]s"
+            },
+            "update_nickname": {
+                "error_username_required": "username is required",
+                "error_nickname_required": "nickname is required",
+                "error_user_not_exist": "User '%s' does not exist",
+                "error_company_required": "Current user is not in a company",
+                "error_not_creator": "Only company creator can update member nicknames.",
+                "error_update": "Failed to update nickname: %v",
+                "success": "Successfully updated nickname from '%s' to '%s' for user '%s'"
+            },
             "skills_no_available": "<available_skills>  No skills available  </available_skills>",
             "skill_format": "   <skill>     <name>%[1]s</name>     <description>%[2]s</description>   </skill> "
         },

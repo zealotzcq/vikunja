@@ -1,6 +1,5 @@
 import type { PluralizationRule } from 'vue-i18n'
 import { createI18n } from 'vue-i18n'
-import langEN from './lang/en.json'
 
 import { loadDayJsLocale } from '@/i18n/useDayjsLanguageSync.ts'
 import dayjs from 'dayjs'
@@ -56,7 +55,6 @@ export function isRTLLanguage(locale: SupportedLocale): boolean {
 	return RTL_LANGUAGES.includes(locale as typeof RTL_LANGUAGES[number])
 }
 
-// we load all messages async
 export const i18n = createI18n({
 	fallbackLocale: DEFAULT_LANGUAGE,
 	legacy: false,
@@ -78,10 +76,8 @@ export const i18n = createI18n({
 			return 2
 		},
 	},
-	messages: {
-		[DEFAULT_LANGUAGE]: langEN,
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	} as Record<SupportedLocale, any>,
+	messages: {} as Record<SupportedLocale, any>,
 })
 
 export async function setLanguage(lang: SupportedLocale): Promise<SupportedLocale | undefined> {
@@ -89,12 +85,10 @@ export async function setLanguage(lang: SupportedLocale): Promise<SupportedLocal
 		throw new Error('language is empty')
 	}
 
-	// do not change language to the current one
 	if (i18n.global.locale.value === lang) {
 		return
 	}
 
-	// If the language hasn't been loaded yet
 	if (!i18n.global.availableLocales.includes(lang)) {
 		try {
 			const messages = await import(`./lang/${lang}.json`)
@@ -104,7 +98,7 @@ export async function setLanguage(lang: SupportedLocale): Promise<SupportedLocal
 			return setLanguage(getBrowserLanguage())
 		}
 	}
-	
+
 	await loadDayJsLocale(lang)
 
 	i18n.global.locale.value = lang
@@ -122,3 +116,7 @@ export function getBrowserLanguage(): SupportedLocale {
 
 	return language || DEFAULT_LANGUAGE
 }
+
+void import(`./lang/${DEFAULT_LANGUAGE}.json`).then(messages => {
+	i18n.global.setLocaleMessage(DEFAULT_LANGUAGE, messages.default)
+})

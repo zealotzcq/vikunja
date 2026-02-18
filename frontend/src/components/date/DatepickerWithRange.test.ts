@@ -3,9 +3,8 @@ import {mount} from '@vue/test-utils'
 import {setActivePinia, createPinia} from 'pinia'
 import {createI18n} from 'vue-i18n'
 import DatepickerWithRange from './DatepickerWithRange.vue'
-import en from '@/i18n/lang/en.json'
 
-const i18n = createI18n({legacy: false, locale: 'en', messages: {en}})
+const i18n = createI18n({legacy: false, locale: 'en', messages: {}})
 
 function mountPicker() {
 	return mount(DatepickerWithRange, {

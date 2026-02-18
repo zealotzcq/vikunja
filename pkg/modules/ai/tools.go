@@ -11,8 +11,10 @@ import (
 	"sync"
 	"time"
 
+	"code.vikunja.io/api/pkg/company"
 	"code.vikunja.io/api/pkg/db"
 	"code.vikunja.io/api/pkg/i18n"
+	"code.vikunja.io/api/pkg/log"
 	"code.vikunja.io/api/pkg/models"
 	"code.vikunja.io/api/pkg/modules/chat_session"
 	"code.vikunja.io/api/pkg/user"
@@ -749,6 +751,293 @@ func RegisterDefaultTools() error {
 
 	if err := tm.RegisterTool(assignTaskTool); err != nil {
 		return fmt.Errorf("failed to register assign_task tool: %w", err)
+	}
+
+	addSubordinateTool := &Tool{
+		Name:           "add_subordinate",
+		ShouldStopLoop: true,
+		Description:    loadToolPrompt("add_subordinate"),
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"username": map[string]interface{}{
+					"type":        "string",
+					"description": "The username of the user to add as subordinate (required)",
+				},
+				"nickname": map[string]interface{}{
+					"type":        "string",
+					"description": "The display name/nickname for the user (optional, will be used to update user settings)",
+				},
+			},
+			"required": []string{"username"},
+		},
+		Execute: func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) {
+			username, ok := params["username"].(string)
+			if !ok || username == "" {
+				return &ToolExecutionResult{
+					Error: i18n.T(ctx.Language, "ai.tool.add_subordinate.error_username_required"),
+				}, fmt.Errorf("username is required")
+			}
+
+			nickname, _ := params["nickname"].(string)
+
+			s := db.NewSession()
+			if s == nil {
+				return &ToolExecutionResult{
+					Error: i18n.T(ctx.Language, "ai.tool.add_subordinate.error_db_session"),
+				}, fmt.Errorf("failed to create database session")
+			}
+			defer s.Close()
+
+			if err := s.Begin(); err != nil {
+				return &ToolExecutionResult{
+					Error: fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.add_subordinate.error_start_transaction"), err),
+				}, fmt.Errorf("failed to start transaction: %w", err)
+			}
+
+			authUser := &user.User{ID: ctx.UserID}
+
+			if ctx.CompanyID == 0 {
+				s.Rollback()
+				return &ToolExecutionResult{
+					Error: i18n.T(ctx.Language, "ai.tool.add_subordinate.error_company_required"),
+				}, fmt.Errorf("user is not in a company")
+			}
+
+			userRole := company.GetUserRole(s, ctx.UserID, ctx.CompanyID)
+			if userRole != "creator" {
+				s.Rollback()
+				return &ToolExecutionResult{
+					Error: i18n.T(ctx.Language, "ai.tool.add_subordinate.error_not_creator"),
+				}, fmt.Errorf("user is not a company creator")
+			}
+
+			log.Debugf("Looking up user with username: '%s' (len=%d)", username, len(username))
+			targetUser, err := user.GetUserByUsername(s, username)
+			if err != nil {
+				log.Debugf("User lookup failed: %v", err)
+				s.Rollback()
+				return &ToolExecutionResult{
+					Error: fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.add_subordinate.error_user_not_exist"), username),
+				}, fmt.Errorf("user does not exist: %w", err)
+			}
+			log.Debugf("Found user: ID=%d, Username='%s', Name='%s'", targetUser.ID, targetUser.Username, targetUser.Name)
+
+			targetUserRole := company.GetUserRole(s, targetUser.ID, ctx.CompanyID)
+			if targetUserRole == "" {
+				if err := company.AddStaffToCompany(s, ctx.CompanyID, targetUser.ID, "staff"); err != nil {
+					s.Rollback()
+					return &ToolExecutionResult{
+						Error: fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.add_subordinate.error_add_to_company"), err),
+					}, fmt.Errorf("failed to add user to company: %w", err)
+				}
+			}
+
+			relation := &company.CompanyRelation{}
+			has, err := s.Where("company_id = ? AND superior_user_id = ? AND subordinate_user_id = ?", ctx.CompanyID, ctx.UserID, targetUser.ID).Get(relation)
+			if err != nil {
+				s.Rollback()
+				return &ToolExecutionResult{
+					Error: fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.add_subordinate.error_create_relation"), err),
+				}, fmt.Errorf("failed to check existing relation: %w", err)
+			}
+			if has {
+				s.Rollback()
+				displayName := nickname
+				if displayName == "" {
+					displayName = targetUser.Username
+				}
+				return &ToolExecutionResult{
+					Result: fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.add_subordinate.success_already_subordinate"), displayName, relation.ProjectID),
+					StopCommand: &ToolStopCommand{
+						Response: fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.add_subordinate.response_already_subordinate"), displayName),
+					},
+				}, nil
+			}
+
+			projectTitle := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.add_subordinate.project_title"), username)
+			project := &models.Project{
+				Title:   projectTitle,
+				OwnerID: ctx.UserID,
+			}
+			if err := project.Create(s, authUser); err != nil {
+				s.Rollback()
+				return &ToolExecutionResult{
+					Error: fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.add_subordinate.error_create_project"), err),
+				}, fmt.Errorf("failed to create project: %w", err)
+			}
+
+			projectUser := &models.ProjectUser{
+				ProjectID:  project.ID,
+				Username:   username,
+				Permission: models.PermissionWrite,
+			}
+			if err := projectUser.Create(s, authUser); err != nil {
+				s.Rollback()
+				return &ToolExecutionResult{
+					Error: fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.add_subordinate.error_share_project"), err),
+				}, fmt.Errorf("failed to share project: %w", err)
+			}
+
+			newRelation := &company.CompanyRelation{
+				CompanyID:         ctx.CompanyID,
+				SuperiorUserID:    ctx.UserID,
+				SubordinateUserID: targetUser.ID,
+				ProjectID:         project.ID,
+			}
+			_, err = s.Insert(newRelation)
+			if err != nil {
+				s.Rollback()
+				return &ToolExecutionResult{
+					Error: fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.add_subordinate.error_create_relation"), err),
+				}, fmt.Errorf("failed to create relation: %w", err)
+			}
+
+			if nickname != "" {
+				targetUser.Name = nickname
+				targetUser.DiscoverableByName = true
+				targetUser.DiscoverableByEmail = true
+				if _, err := user.UpdateUser(s, targetUser, false); err != nil {
+					s.Rollback()
+					return &ToolExecutionResult{
+						Error: fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.add_subordinate.error_update_nickname"), err),
+					}, fmt.Errorf("failed to update user: %w", err)
+				}
+			}
+
+			if err := s.Commit(); err != nil {
+				return &ToolExecutionResult{
+					Error: fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.add_subordinate.error_commit"), err),
+				}, fmt.Errorf("failed to commit: %w", err)
+			}
+
+			displayName := nickname
+			if displayName == "" {
+				displayName = targetUser.Username
+			}
+
+			response := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.add_subordinate.success"), displayName, project.ID)
+
+			return &ToolExecutionResult{
+				Result: response,
+				StopCommand: &ToolStopCommand{
+					Response: response,
+					Metadata: map[string]interface{}{
+						"subordinate_user_id": targetUser.ID,
+						"project_id":          project.ID,
+						"company_id":          ctx.CompanyID,
+					},
+				},
+			}, nil
+		},
+	}
+
+	if err := tm.RegisterTool(addSubordinateTool); err != nil {
+		return fmt.Errorf("failed to register add_subordinate tool: %w", err)
+	}
+
+	if err := tm.RegisterTool(addSubordinateTool); err != nil {
+		return fmt.Errorf("failed to register add_subordinate tool: %w", err)
+	}
+
+	updateNicknameTool := &Tool{
+		Name:           "update_nickname",
+		ShouldStopLoop: true,
+		Description:    loadToolPrompt("update_nickname"),
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"username": map[string]interface{}{
+					"type":        "string",
+					"description": "The username of the user whose nickname to update (required)",
+				},
+				"nickname": map[string]interface{}{
+					"type":        "string",
+					"description": "The new nickname/display name to set for the user (required)",
+				},
+			},
+			"required": []string{"username", "nickname"},
+		},
+		Execute: func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) {
+			username, ok := params["username"].(string)
+			if !ok || username == "" {
+				return &ToolExecutionResult{
+					Error: i18n.T(ctx.Language, "ai.tool.update_nickname.error_username_required"),
+				}, fmt.Errorf("username is required")
+			}
+
+			nickname, ok := params["nickname"].(string)
+			if !ok || nickname == "" {
+				return &ToolExecutionResult{
+					Error: i18n.T(ctx.Language, "ai.tool.update_nickname.error_nickname_required"),
+				}, fmt.Errorf("nickname is required")
+			}
+
+			s := db.NewSession()
+			if s == nil {
+				return &ToolExecutionResult{
+					Error: i18n.T(ctx.Language, "ai.tool.add_subordinate.error_db_session"),
+				}, fmt.Errorf("failed to create database session")
+			}
+			defer s.Close()
+
+			log.Debugf("Looking up user with username: '%s' (len=%d)", username, len(username))
+			targetUser, err := user.GetUserByUsername(s, username)
+			if err != nil {
+				log.Debugf("User lookup failed: %v", err)
+				return &ToolExecutionResult{
+					Error: fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.update_nickname.error_user_not_exist"), username),
+				}, fmt.Errorf("user does not exist: %w", err)
+			}
+			log.Debugf("Found user: ID=%d, Username='%s', Name='%s'", targetUser.ID, targetUser.Username, targetUser.Name)
+
+			if ctx.CompanyID == 0 {
+				return &ToolExecutionResult{
+					Error: i18n.T(ctx.Language, "ai.tool.update_nickname.error_company_required"),
+				}, fmt.Errorf("user is not in a company")
+			}
+
+			currentUserRole := company.GetUserRole(s, ctx.UserID, ctx.CompanyID)
+			if currentUserRole != "creator" {
+				return &ToolExecutionResult{
+					Error: i18n.T(ctx.Language, "ai.tool.update_nickname.error_not_creator"),
+				}, fmt.Errorf("only company creator can update member nicknames")
+			}
+
+			oldName := targetUser.Name
+			if oldName == "" {
+				oldName = targetUser.Username
+			}
+
+			targetUser.Name = nickname
+			targetUser.DiscoverableByName = true
+			targetUser.DiscoverableByEmail = true
+
+			_, err = user.UpdateUser(s, targetUser, false)
+			if err != nil {
+				return &ToolExecutionResult{
+					Error: fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.update_nickname.error_update"), err),
+				}, fmt.Errorf("failed to update nickname: %w", err)
+			}
+
+			response := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.update_nickname.success"), oldName, nickname, username)
+
+			return &ToolExecutionResult{
+				Result: response,
+				StopCommand: &ToolStopCommand{
+					Response: response,
+					Metadata: map[string]interface{}{
+						"user_id":      targetUser.ID,
+						"old_nickname": oldName,
+						"new_nickname": nickname,
+					},
+				},
+			}, nil
+		},
+	}
+
+	if err := tm.RegisterTool(updateNicknameTool); err != nil {
+		return fmt.Errorf("failed to register update_nickname tool: %w", err)
 	}
 
 	return nil

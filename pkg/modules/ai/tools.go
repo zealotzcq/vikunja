@@ -1020,7 +1020,7 @@ func RegisterDefaultTools() error {
 				}, fmt.Errorf("failed to update nickname: %w", err)
 			}
 
-			response := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.update_nickname.success"), oldName, nickname, username)
+			response := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.update_nickname.success"), username, oldName, nickname)
 
 			return &ToolExecutionResult{
 				Result: response,

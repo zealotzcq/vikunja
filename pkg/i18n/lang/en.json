@@ -204,7 +204,7 @@
                 "error_company_required": "Current user is not in a company",
                 "error_not_creator": "Only company creator can update member nicknames.",
                 "error_update": "Failed to update nickname: %v",
-                "success": "Successfully updated nickname from '%s' to '%s' for user '%s'"
+                "success": "Successfully updated nickname for user '%s' from '%s' to '%s' "
             },
             "skills_no_available": "<available_skills>  No skills available  </available_skills>",
             "skill_format": "   <skill>     <name>%[1]s</name>     <description>%[2]s</description>   </skill> "

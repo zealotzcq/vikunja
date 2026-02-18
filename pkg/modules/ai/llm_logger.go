@@ -41,44 +41,6 @@ func (l *LLMLogger) nextCounter() uint64 {
 	return l.counter
 }
 
-func (l *LLMLogger) LogRequest(provider, prompt string) error {
-	if !l.enabled {
-		return nil
-	}
-
-	timestamp := time.Now().Format("20060102_150405_000")
-	counter := l.nextCounter()
-	filename := fmt.Sprintf("%s_req_%s_%04d.json", provider, timestamp, counter)
-
-	requestData := parseJSON(prompt)
-
-	if l.briefMode {
-		if reqMap, ok := requestData.(map[string]interface{}); ok {
-			if requestInner, ok := reqMap["request"].(map[string]interface{}); ok {
-				delete(requestInner, "tools")
-			}
-		}
-	}
-
-	return l.writeJSONLog(filename, map[string]interface{}{
-		"request": requestData,
-	})
-}
-
-func (l *LLMLogger) LogResponse(provider, response string) error {
-	if !l.enabled {
-		return nil
-	}
-
-	timestamp := time.Now().Format("20060102_150405_000")
-	counter := l.nextCounter()
-	filename := fmt.Sprintf("%s_resp_%s_%04d.json", provider, timestamp, counter)
-
-	return l.writeJSONLog(filename, map[string]interface{}{
-		"response": parseJSON(response),
-	})
-}
-
 func (l *LLMLogger) LogExchange(provider, request, response string) error {
 	if !l.enabled {
 		return nil
@@ -88,8 +50,16 @@ func (l *LLMLogger) LogExchange(provider, request, response string) error {
 	counter := l.nextCounter()
 	filename := fmt.Sprintf("%s_%s_%04d.json", provider, timestamp, counter)
 
+	requestData := parseJSON(request)
+
+	if l.briefMode && request != "" {
+		if reqMap, ok := requestData.(map[string]interface{}); ok {
+			delete(reqMap, "tools")
+		}
+	}
+
 	return l.writeJSONLog(filename, map[string]interface{}{
-		"request":  parseJSON(request),
+		"request":  requestData,
 		"response": parseJSON(response),
 	})
 }

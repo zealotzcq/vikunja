@@ -9,7 +9,7 @@ Priority determination (based on user's tone/phrasing):
 - LOW priority: When user says "有空", "有时间", "不急", "when convenient", "no rush", etc.
 
 Due date calculation:
-- If user specifies a time expression (e.g., "today", "tomorrow", "下周五", "2024-12-25"), use that expression
+- If user specifies a time expression (e.g., "today", "tomorrow", "2024-12-25"), use that expression
 - If NO time expression is specified, use priority-based calculation:
   * HIGH priority: 1 day from now
   * MEDIUM priority: 3 days from now

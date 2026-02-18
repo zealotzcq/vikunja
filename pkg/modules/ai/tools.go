@@ -338,7 +338,7 @@ func RegisterDefaultTools() error {
 			"properties": map[string]interface{}{
 				"route_name": map[string]interface{}{
 					"type":        "string",
-					"description": "The route name to navigate to (e.g., task.detail, project.index, teams.edit, labels.index, tasks.range, projects.index, teams.index, home)",
+					"description": "The route name to navigate to (e.g., task.detail, project.index, tasks.range, projects.index, home)",
 				},
 				"params": map[string]interface{}{
 					"type":        "object",

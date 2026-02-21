@@ -39,69 +39,74 @@
 				</svg>
 			</button>
 		</div>
-		<div
-			ref="titleCellRef"
-			class="table-cell cell-title"
-			:class="{ 'done': localTask.done }"
-			@click="openTask"
-		>
-			{{ localTask.title }}
-		</div>
-		<div
-			class="table-cell cell-priority"
-			@click.stop
-		>
-			<span
-				class="priority-text"
-				:class="`priority-${localTask.priority}`"
+		<div class="table-cell cell-content">
+			<div
+				ref="titleCellRef"
+				class="task-title"
+				:class="{ 'done': localTask.done }"
+				@click="openTask"
 			>
-				{{ getPriorityText(localTask.priority) }}
-			</span>
-		</div>
-		<div
-			class="table-cell cell-percent"
-			@click.stop
-		>
-			<div class="percent-bar">
-				<div
-					class="percent-fill"
-					:style="{ width: localTask.percentDone + '%' }"
-				/>
+				{{ localTask.title }}
 			</div>
-			<span class="percent-text">{{ localTask.percentDone || 0 }}%</span>
-		</div>
-		<div
-			class="table-cell cell-start"
-			@click.stop
-		>
-			{{ localTask.startDate ? formatDays(localTask.startDate) : '-' }}
-		</div>
-		<div
-			class="table-cell cell-due"
-			:class="{ 'overdue': isOverdue(localTask.dueDate) }"
-		>
-			<SimplePopup
-				v-if="localTask.dueDate && !localTask.done"
-				:open="showDeferPopup"
-				:popup-style="popupStyle"
-				@update:open="showDeferPopup = $event"
-			>
-				<template #trigger>
-					<BaseButton
-						class="due-date-btn"
-						@click.prevent.stop="handleDueDateClick"
+			<div ref="metaRowRef" class="task-meta">
+				<div v-if="mode === 'home'" class="meta-cell col-assignee">
+					<span v-if="localTask.assignees && localTask.assignees.length > 0 && localTask.assignees[0]?.username" class="assignee-name">
+						{{ localTask.assignees[0].name || localTask.assignees[0].username }}
+					</span>
+					<span v-else class="no-assignee">-</span>
+				</div>
+				<div
+					ref="priorityCellRef"
+					class="meta-cell"
+					:class="mode === 'home' ? 'col-priority' : 'col-priority-first'"
+				>
+					<span
+						class="priority-text"
+						:class="`priority-${localTask.priority}`"
 					>
-						{{ formatDays(localTask.dueDate) }}
-					</BaseButton>
-				</template>
-				<template #default>
-					<MobileDeferTask
-						v-model="localTask"
-						@update:modelValue="deferTaskUpdate"
-					/>
-				</template>
-			</SimplePopup>
-			<span v-else>{{ localTask.dueDate ? formatDays(localTask.dueDate) : '-' }}</span>
+						{{ getPriorityText(localTask.priority) }}
+					</span>
+				</div>
+				<div class="meta-cell col-percent">
+					<div class="percent-bar">
+						<div
+							class="percent-fill"
+							:style="{ width: localTask.percentDone + '%' }"
+						/>
+					</div>
+					<span class="percent-text">{{ localTask.percentDone || 0 }}%</span>
+				</div>
+				<div
+					class="meta-cell col-due"
+					:class="{ 'overdue': isOverdue(localTask.dueDate) }"
+				>
+					<SimplePopup
+						v-if="localTask.dueDate && !localTask.done"
+						:open="showDeferPopup"
+						:popup-style="popupStyle"
+						@update:open="showDeferPopup = $event"
+					>
+						<template #trigger>
+							<BaseButton
+								class="due-date-btn"
+								@click.prevent.stop="handleDueDateClick"
+							>
+								{{ formatDays(localTask.dueDate) }}
+							</BaseButton>
+						</template>
+						<template #default>
+							<MobileDeferTask
+								v-model="localTask"
+								@update:modelValue="deferTaskUpdate"
+							/>
+						</template>
+					</SimplePopup>
+					<span v-else>{{ localTask.dueDate ? formatDays(localTask.dueDate) : '-' }}</span>
+				</div>
+				<div v-if="mode === 'project'" class="meta-cell col-start">
+					{{ localTask.startDate ? formatDays(localTask.startDate) : '-' }}
+				</div>
+			</div>
 		</div>
 	</div>
 </template>
@@ -116,6 +121,7 @@ import BaseButton from '@/components/base/BaseButton.vue'
 
 const props = defineProps<{
   task: ITask;
+  mode: 'home' | 'project';
 }>()
 
 const emit = defineEmits<{
@@ -129,6 +135,8 @@ const localTask = ref<ITask>({} as ITask)
 const showDeferPopup = ref(false)
 const popupStyle = ref({ top: '0px', left: '0px', width: '0px' })
 const titleCellRef = ref<HTMLElement | null>(null)
+const metaRowRef = ref<HTMLElement | null>(null)
+const priorityCellRef = ref<HTMLElement | null>(null)
 
 watch(
 	() => props.task,
@@ -205,21 +213,21 @@ const handleDueDateClick = () => {
 }
 
 watch(showDeferPopup, async (newValue) => {
-	if (newValue && titleCellRef.value) {
-		await nextTick()
-		
-		const titleRect = titleCellRef.value.getBoundingClientRect()
-		const scrollY = window.scrollY || window.pageYOffset || 0
-		const scrollX = window.scrollX || window.pageXOffset || 0
+  if (newValue && priorityCellRef.value) {
+    await nextTick()
 
-		const menuTop = titleRect.top + scrollY
-		const menuLeft = titleRect.right + scrollX
+    const priorityRect = priorityCellRef.value.getBoundingClientRect()
+    const scrollY = window.scrollY || window.pageYOffset || 0
+    const scrollX = window.scrollX || window.pageXOffset || 0
 
-		popupStyle.value = {
-			top: `${menuTop}px`,
-			left: `${menuLeft}px`,
-		}
-	}
+    const menuTop = priorityRect.top + scrollY
+    const menuLeft = priorityRect.left + scrollX
+
+    popupStyle.value = {
+      top: `${menuTop}px`,
+      left: `${menuLeft}px`,
+    }
+  }
 })
 </script>
 
@@ -230,11 +238,14 @@ watch(showDeferPopup, async (newValue) => {
   padding: var(--spacing-sm) var(--spacing-md);
   align-items: center;
   position: relative;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--spacing-xs);
 }
 
 .table-cell {
   display: flex;
-  align-items: center;
   overflow: hidden;
 }
 
@@ -242,46 +253,116 @@ watch(showDeferPopup, async (newValue) => {
   width: 32px;
   flex-shrink: 0;
   justify-content: center;
+  padding-top: 4px;
 }
 
-.cell-title {
+.cell-content {
   flex: 1;
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  color: var(--color-text-primary);
-}
-
-.cell-priority {
-  width: 40px;
-  flex-shrink: 0;
-  justify-content: center;
-}
-
-.cell-percent {
-  width: 45px;
-  flex-shrink: 0;
-  justify-content: center;
+  display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
 }
 
-.cell-start {
-  width: 50px;
-  flex-shrink: 0;
+.task-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 4px 8px;
+  background: var(--color-background);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  box-shadow: var(--shadow-xs);
+}
+
+.task-title.done {
+  text-decoration: line-through;
+  color: var(--color-text-muted);
+  transition: color 0.3s ease, text-decoration 0.3s ease;
+}
+
+.task-meta {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.meta-cell {
+  display: flex;
+  align-items: center;
   justify-content: center;
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
 }
 
-.cell-due {
-  width: 50px;
-  flex-shrink: 0;
-  justify-content: center;
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
+.col-assignee {
+  flex: 1;
 }
 
-.cell-due.overdue {
+.assignee-name {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.no-assignee {
+  color: var(--color-text-muted);
+  opacity: 0.5;
+}
+
+.col-priority {
+  flex: 1;
+}
+
+.col-priority-first {
+  flex: 1;
+}
+
+.col-percent {
+  flex: 1;
+  position: relative;
+}
+
+.percent-bar {
+  width: 100%;
+  height: 24px;
+  background: #E5E7EB;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.percent-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 12px;
+  transition: width 0.3s ease;
+}
+
+.percent-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: var(--font-size-xs);
+  color: white;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+}
+
+.col-due {
+  flex: 1;
+}
+
+.col-start {
+  flex: 1;
+}
+
+.col-due.overdue {
   color: var(--color-error);
 }
 
@@ -310,7 +391,7 @@ watch(showDeferPopup, async (newValue) => {
 .priority-text.priority-4 { color: #DC2626; }
 
 .percent-bar {
-  width: 32px;
+  width: 40px;
   height: 6px;
   background: #E5E7EB;
   border-radius: 3px;
@@ -377,12 +458,6 @@ watch(showDeferPopup, async (newValue) => {
 .check-mark.visible {
   opacity: 1;
   stroke-dashoffset: 0;
-}
-
-.cell-title.done {
-  text-decoration: line-through;
-  color: var(--color-text-muted);
-  transition: color 0.3s ease, text-decoration 0.3s ease;
 }
 
 .table-row.task-done {

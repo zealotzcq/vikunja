@@ -33,20 +33,22 @@
 		>
 			<div class="table-header">
 				<div class="table-cell cell-check" />
-				<div class="table-cell cell-title">
-					任务
-				</div>
-				<div class="table-cell cell-priority">
-					优先
-				</div>
-				<div class="table-cell cell-percent">
-					进度
-				</div>
-				<div class="table-cell cell-start">
-					开始
-				</div>
-				<div class="table-cell cell-due">
-					截至
+				<div class="table-cell cell-content">
+					<div v-if="mode === 'home'" class="header-cell col-assignee">
+						人员
+					</div>
+					<div class="header-cell" :class="mode === 'home' ? 'col-priority' : 'col-priority-first'">
+						优先
+					</div>
+					<div class="header-cell col-percent">
+						进度
+					</div>
+					<div class="header-cell col-due">
+						截至
+					</div>
+					<div v-if="mode === 'project'" class="header-cell col-start">
+						开始
+					</div>
 				</div>
 			</div>
 			<transition-group name="task-list">
@@ -54,6 +56,7 @@
 					v-for="task in tasks"
 					:key="task.id"
 					:task="task"
+					:mode="mode"
 					@openTask="openTask"
 					@toggleTaskDone="toggleTaskDone"
 					@refresh="emit('refresh')"
@@ -71,6 +74,7 @@ import MobileTaskItem from './MobileTaskItem.vue'
 const props = defineProps<{
   tasks: ITask[];
   isLoading: boolean;
+  mode: 'home' | 'project';
 }>()
 
 const emit = defineEmits<{
@@ -160,41 +164,41 @@ const toggleTaskDone = (task: ITask) => {
   justify-content: center;
 }
 
-.cell-title {
+.cell-content {
   flex: 1;
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  color: var(--color-text-primary);
+  display: flex;
+  gap: var(--spacing-xs);
 }
 
-.cell-priority {
-  width: 40px;
-  flex-shrink: 0;
-  justify-content: center;
-}
-
-.cell-percent {
-  width: 45px;
-  flex-shrink: 0;
-  justify-content: center;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.cell-start {
-  width: 50px;
-  flex-shrink: 0;
-  justify-content: center;
+.cell-content .header-cell {
   font-size: var(--font-size-xs);
+  font-weight: 600;
   color: var(--color-text-muted);
+  text-align: center;
 }
 
-.cell-due {
-  width: 50px;
-  flex-shrink: 0;
-  justify-content: center;
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
+.col-assignee {
+  flex: 1;
+}
+
+.col-priority {
+  flex: 1;
+}
+
+.col-priority-first {
+  flex: 1;
+}
+
+.col-percent {
+  flex: 1;
+}
+
+.col-due {
+  flex: 1;
+}
+
+.col-start {
+  flex: 1;
 }
 
 .task-list-enter-active {

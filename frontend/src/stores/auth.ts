@@ -289,7 +289,13 @@ export const useAuthStore = defineStore('auth', () => {
 					.split('.')[1]
 					.replace(/-/g, '+')
 					.replace(/_/g, '/')
-				const info = new UserModel(JSON.parse(atob(base64)))
+				const binaryString = atob(base64)
+				const bytes = new Uint8Array(binaryString.length)
+				for (let i = 0; i < binaryString.length; i++) {
+					bytes[i] = binaryString.charCodeAt(i)
+				}
+				const jsonString = new TextDecoder('utf-8').decode(bytes)
+				const info = new UserModel(JSON.parse(jsonString))
 				const ts = Math.round((new Date()).getTime() / MILLISECONDS_A_SECOND)
 
 				isAuthenticated = info.exp >= ts

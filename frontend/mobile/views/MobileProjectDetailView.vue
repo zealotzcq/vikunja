@@ -18,6 +18,7 @@
 			<MobileTaskList
 				:tasks="tasksArray"
 				:is-loading="isLoading"
+				mode="project"
 				@openTask="openTask"
 				@toggleTaskDone="toggleTaskDone"
 				@refresh="loadProjectTasks"

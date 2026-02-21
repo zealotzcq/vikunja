@@ -133,6 +133,7 @@ export default defineComponent({
     };
 
     onMounted(() => {
+      authStore.checkAuth();
       document.addEventListener('click', handleClickOutside);
       companyStore.loadCompanies();
     });

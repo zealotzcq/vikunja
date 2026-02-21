@@ -21,16 +21,16 @@ import { ref, watch, computed } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 
 const props = defineProps<{
-	open: boolean
-	popupStyle?: {
-		top: string
-		left: string
-		width: string
-	}
-	clickPosition?: {
-		x: number
-		y: number
-	}
+  open: boolean
+  popupStyle?: {
+  	top: string
+  	left: string
+  	width?: string
+  }
+  clickPosition?: {
+  	x: number
+  	y: number
+  }
 }>()
 
 const emit = defineEmits<{
@@ -64,15 +64,15 @@ function toggle() {
 }
 
 const mergedStyle = computed(() => {
-	const style = props.popupStyle
+  const style = props.popupStyle
 
-	return {
-		position: 'fixed' as const,
-		zIndex: 100 as number,
-		top: style?.top || '0px',
-		left: style?.left || '0px',
-		width: 'auto',
-	}
+  return {
+  	position: 'fixed' as const,
+  	zIndex: 100 as number,
+  	top: style?.top || '0px',
+  	left: style?.left || '0px',
+  	width: style?.width || 'auto',
+  }
 })
 
 onClickOutside(menuRef, () => {

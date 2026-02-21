@@ -58,6 +58,7 @@
 				<MobileTaskList
 					:tasks="filteredTasks"
 					:is-loading="loading"
+					mode="home"
 					@openTask="goToTask"
 					@toggleTaskDone="toggleTaskDone"
 					@refresh="loadTasks"

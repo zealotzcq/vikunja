@@ -1,0 +1,151 @@
+/* Force 9:16 portrait mobile layout */
+
+.mobile-viewport {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Prevent horizontal scroll */
+.mobile-viewport * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Tablet and desktop: constrain to mobile size and center */
+@media (min-width: 768px) {
+  .mobile-viewport {
+    aspect-ratio: 9/16;
+    max-width: min(100vw, 56.25vh);
+    max-height: min(100vh, 177.78vw);
+    margin: 0 auto;
+    border-left: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Large screens: center and scale */
+@media (min-width: 1024px) {
+  .mobile-viewport {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 450px;
+    max-height: 800px;
+    aspect-ratio: 9/16;
+    border: 8px solid #1a1a1a;
+    border-radius: 40px;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  }
+
+  /* Add notch-like element */
+  .mobile-viewport::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 150px;
+    height: 30px;
+    background: #1a1a1a;
+    border-bottom-left-radius: 16px;
+    border-bottom-right-radius: 16px;
+    z-index: 1000;
+  }
+}
+
+/* Landscape mode on mobile: force portrait orientation by rotating the viewport */
+@media (orientation: landscape) and (max-width: 767px) {
+  body.mobile-route {
+    background: #1a1a1a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+  }
+
+  body.mobile-route .mobile-viewport {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(90deg);
+    transform-origin: center center;
+    width: 100vh;
+    height: 100vw;
+    max-width: 100vh;
+    max-height: 100vw;
+    aspect-ratio: 9/16;
+    z-index: 9999;
+    background: var(--color-background);
+    border: 8px solid #1a1a1a;
+    border-radius: 24px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Ensure body background matches when viewport is centered */
+@media (min-width: 768px) {
+  body.mobile-route {
+    background: var(--color-background);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+
+  body.mobile-route html,
+  body.mobile-route {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+}
+
+/* Prevent any form of landscape orientation */
+@media screen and (orientation: landscape) {
+  body.mobile-route html,
+  body.mobile-route {
+    width: 100vw !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+  }
+}
+
+/* Lock orientation hint for devices that support it */
+@media (orientation: landscape) and (max-width: 767px) {
+  .mobile-viewport::after {
+    content: '请旋转设备以获得最佳体验';
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-90deg);
+    font-size: var(--font-size-lg);
+    color: white;
+    text-align: center;
+    z-index: 9998;
+    pointer-events: none;
+    opacity: 0;
+    animation: none;
+  }
+}
+
+/* Smooth transitions for all viewport changes */
+.mobile-viewport {
+  transition: width var(--transition-slow), height var(--transition-slow), transform var(--transition-slow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-viewport {
+    transition: none;
+  }
+}

@@ -392,13 +392,18 @@ const router = createRouter({
 })
 
 export async function getAuthForRoute(to: RouteLocation, authStore) {
+	// Skip auth check for mobile routes - they have their own guards
+	if (typeof to.path === 'string' && to.path.startsWith('/mobile')) {
+		return
+	}
+
 	if (authStore.authUser || authStore.authLinkShare) {
 		return
 	}
-	
+
 	// Check if password reset token is in query params
 	const resetToken = to.query.userPasswordReset as string | undefined
-	
+
 	// Redirect to password reset page if we have a token stored
 	if (resetToken && to.name !== 'user.password-reset.reset') {
 		return {name: 'user.password-reset.reset', query: { userPasswordReset: resetToken }}
@@ -430,15 +435,15 @@ export async function getAuthForRoute(to: RouteLocation, authStore) {
 		'openid.auth',
 	].includes(to.name as string) &&
 		localStorage.getItem('emailConfirmToken') === null
-	
+
 	if (isValidUserAppRoute) {
 		saveLastVisited(to.name as string, to.params, to.query)
 	}
-	
+
 	if (isValidUserAppRoute) {
 		return {name: 'user.login'}
 	}
-	
+
 	if(localStorage.getItem('emailConfirmToken') !== null && to.name !== 'user.login') {
 		return {name: 'user.login', query: to.query}
 	}

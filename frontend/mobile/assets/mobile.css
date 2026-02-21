@@ -1,0 +1,33 @@
+/* Mobile styles - Design System Import */
+
+/* Import design system */
+@import '../styles/design-system.css';
+
+/* Import mobile viewport styles */
+@import '../styles/mobile-viewport.css';
+
+/* Override and extend design system for mobile specific needs */
+body.mobile-route {
+  margin: 0;
+  background: var(--color-background);
+  font-family: var(--font-family);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ensure smooth scrolling */
+body.mobile-route html {
+  scroll-behavior: smooth;
+}
+
+/* Prevent text selection on interactive elements */
+body.mobile-route button,
+body.mobile-route a {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Focus visible for accessibility */
+body.mobile-route *:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}

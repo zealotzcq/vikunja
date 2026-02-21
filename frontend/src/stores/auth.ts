@@ -444,7 +444,13 @@ export const useAuthStore = defineStore('auth', () => {
 		removeToken()
 		const loggedInVia = getLoggedInVia()
 		window.localStorage.clear() // Clear all settings and history we might have saved in local storage.
-		await router.push({name: 'user.login'})
+		// Redirect to mobile login if currently on mobile routes, otherwise to desktop login
+		const currentPath = router.currentRoute.value.path
+		if (currentPath.startsWith('/mobile')) {
+			await router.push('/mobile/login')
+		} else {
+			await router.push({name: 'user.login'})
+		}
 		await checkAuth()
 
 		// if configured, redirect to OIDC Provider on logout

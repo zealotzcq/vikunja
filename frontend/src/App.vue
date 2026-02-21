@@ -1,5 +1,11 @@
 <template>
-	<Ready>
+	<!-- Mobile routes: show with MobileReady component -->
+	<MobileReady v-if="isMobileRoute">
+		<RouterView />
+	</MobileReady>
+
+	<!-- Desktop routes: show with desktop layout -->
+	<Ready v-else>
 		<template v-if="authStore.authUser">
 			<AppHeader />
 			<ContentAuth />
@@ -11,9 +17,9 @@
 		>
 			<RouterView />
 		</NoAuthWrapper>
-		
+
 		<KeyboardShortcuts v-if="keyboardShortcutsActive" />
-		
+
 		<Teleport to="body">
 			<AddToHomeScreen />
 			<UpdateNotification />
@@ -25,7 +31,7 @@
 </template>
 
 <script lang="ts" setup>
-import {computed, watch} from 'vue'
+import {computed, watch, onMounted, onUnmounted} from 'vue'
 import {useRoute} from 'vue-router'
 import {useI18n} from 'vue-i18n'
 import isTouchDevice from 'is-touch-device'
@@ -39,6 +45,7 @@ import ContentAuth from '@/components/home/ContentAuth.vue'
 import ContentLinkShare from '@/components/home/ContentLinkShare.vue'
 import NoAuthWrapper from '@/components/misc/NoAuthWrapper.vue'
 import Ready from '@/components/misc/Ready.vue'
+import MobileReady from '../mobile/components/MobileReady.vue'
 
 import {DEFAULT_LANGUAGE, setLanguage} from '@/i18n'
 
@@ -58,6 +65,28 @@ const authStore = useAuthStore()
 const baseStore = useBaseStore()
 
 const route = useRoute()
+
+// Check if current route is a mobile route
+const isMobileRoute = computed(() => route.path.startsWith('/mobile'))
+
+// Track mobile route state for CSS selectors
+watch(isMobileRoute, (isMobile) => {
+  if (isMobile) {
+    document.body.classList.add('mobile-route')
+  } else {
+    document.body.classList.remove('mobile-route')
+  }
+})
+
+onMounted(() => {
+  if (isMobileRoute.value) {
+    document.body.classList.add('mobile-route')
+  }
+})
+
+onUnmounted(() => {
+  document.body.classList.remove('mobile-route')
+})
 
 useBodyClass('is-touch', isTouchDevice())
 useBodyClass('compact-mode', baseStore.compactMode)

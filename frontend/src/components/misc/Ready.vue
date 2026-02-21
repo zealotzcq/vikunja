@@ -41,19 +41,7 @@
 				@foundApi="baseStore.loadApp()"
 			/>
 		</NoAuthWrapper>
-	</section>
-	<CustomTransition name="fade">
-		<section
-			v-if="baseStore.loading"
-			class="vikunja-loading"
-		>
-			<Logo class="logo" />
-			<p>
-				<span class="loader-container is-loading-small is-loading" />
-				{{ $t('ready.loading') }}
-			</p>
-		</section>
-	</CustomTransition>
+	</section>	
 </template>
 
 <script lang="ts" setup>

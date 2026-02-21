@@ -190,6 +190,47 @@ export const useChatStore = defineStore('chat', () => {
 		}
 	}
 
+	function handleAutoNavigation(routeName: string, params?: Record<string, unknown>) {
+		console.log('[Chat] handleAutoNavigation:', { routeName, params, isMobile: isMobile.value })
+		if (isMobile.value) {
+			switch (routeName) {
+				case 'home':
+					console.log('[Chat] Navigating to mobile home')
+					router.push('/mobile/home')
+					break
+				case 'tasks.range':
+					console.log('[Chat] Navigating to mobile home (from tasks.range)')
+					router.push('/mobile/home')
+					break
+				case 'task.detail':
+					console.log('[Chat] Navigating to mobile task detail')
+					router.push(`/mobile/task/${params?.id || params?.taskId}`)
+					break
+				case 'project.view':
+				case 'project.index':
+					console.log('[Chat] Navigating to mobile project')
+					router.push(`/mobile/project/${params?.projectId}`)
+					break
+				case 'projects.index':
+					console.log('[Chat] Navigating to mobile projects')
+					router.push('/mobile/projects')
+					break
+				default:
+					console.log('[Chat] No mobile route for:', routeName)
+					break
+			}
+			if (routeName === 'task.detail') {
+				isOpen.value = false
+			}
+		} else {
+			console.log('[Chat] Navigating to desktop route:', routeName)
+			router.push({
+				name: routeName,
+				params: params as RouteParamsRaw,
+			})
+		}
+	}
+
 	async function loadChatHistory() {
 		if (isLoading.value) return
 		if (!authStore.authUser) {
@@ -231,13 +272,7 @@ export const useChatStore = defineStore('chat', () => {
 				}
 
 				if (lastMessage.type === 'assistant_response' && lastMessage.navigationCommand) {
-					router.push({
-						name: lastMessage.navigationCommand.routeName,
-						params: lastMessage.navigationCommand.params as RouteParamsRaw,
-					})
-					if (isMobile.value) {
-						isOpen.value = false
-					}
+					handleAutoNavigation(lastMessage.navigationCommand.routeName, lastMessage.navigationCommand.params)
 				}
 
 				const processed = getProcessedRefreshMessages()
@@ -253,13 +288,7 @@ export const useChatStore = defineStore('chat', () => {
 					} else {
 						// Other navigation - auto navigate
 						addProcessedRefreshMessage(lastMessage.id)
-						router.push({
-							name: lastMessage.buttonNavigation.routeName,
-							params: lastMessage.buttonNavigation.params as RouteParamsRaw,
-						})
-						if (isMobile.value) {
-							isOpen.value = false
-						}
+						handleAutoNavigation(lastMessage.buttonNavigation.routeName, lastMessage.buttonNavigation.params)
 					}
 				}
 			}
@@ -280,13 +309,7 @@ export const useChatStore = defineStore('chat', () => {
 	}
 
 	async function executeButtonNavigation(routeName: string, params?: Record<string, unknown>) {
-		router.push({
-			name: routeName,
-			params: params as RouteParamsRaw,
-		})
-		if (isMobile.value) {
-			isOpen.value = false
-		}
+		handleAutoNavigation(routeName, params)
 	}
 
 	async function submitQuestionAnswer(answer: string) {

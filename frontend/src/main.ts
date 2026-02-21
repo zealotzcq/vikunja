@@ -2,6 +2,7 @@ import {createApp} from 'vue'
 
 import pinia from './pinia'
 import router from './router'
+import { registerMobileRoutes } from '../mobile/router/dynamic'
 import App from './App.vue'
 import {error, success} from './message'
 
@@ -52,8 +53,10 @@ import Card from '@/components/misc/Card.vue'
 // We're loading the language before creating the app so that it won't fail to load when the user's 
 // language file is not yet loaded.
 const browserLanguage = getBrowserLanguage()
-setLanguage(browserLanguage).then(() => {
-	const app = createApp(App)
+ setLanguage(browserLanguage).then(async () => {
+ 	// Dynamically register mobile routes before mounting the app
+ 	await registerMobileRoutes(router as any)
+ 	const app = createApp(App)
 
 	app.use(Notifications)
 

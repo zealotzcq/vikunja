@@ -1,0 +1,115 @@
+/* Mobile global styles - reset for mobile routes */
+
+body.mobile-route *,
+body.mobile-route *::before,
+body.mobile-route *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body.mobile-route html,
+body.mobile-route {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body.mobile-route {
+  font-family: var(--font-family, 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--color-background, #F0FDFA);
+  font-size: var(--font-size-base, 16px);
+  line-height: 1.5;
+  color: var(--color-text-primary, #134E4A);
+  -webkit-tap-highlight-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.mobile-route #app {
+  height: 100%;
+  width: 100%;
+}
+
+body.mobile-route input,
+body.mobile-route button,
+body.mobile-route textarea,
+body.mobile-route select {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+body.mobile-route button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+body.mobile-route input,
+body.mobile-route textarea,
+body.mobile-route select {
+  outline: none;
+}
+
+/* Hide scrollbar but allow scrolling */
+body.mobile-route ::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+/* Prevent text selection on interactive elements */
+body.mobile-route button,
+body.mobile-route a {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Ensure touch targets are at least 44x44px */
+body.mobile-route button,
+body.mobile-route a,
+body.mobile-route input,
+body.mobile-route select,
+body.mobile-route textarea {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Focus visible styles */
+body.mobile-route *:focus-visible {
+  outline: 2px solid var(--color-primary, #0D9488);
+  outline-offset: 2px;
+}
+
+/* Smooth scrolling */
+body.mobile-route html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --color-border: #000000;
+    --color-text-primary: #000000;
+    --color-background: #FFFFFF;
+  }
+}

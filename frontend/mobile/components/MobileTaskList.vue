@@ -34,10 +34,22 @@
 			<div class="table-header">
 				<div class="table-cell cell-check" />
 				<div class="table-cell cell-content">
-					<div v-if="mode === 'home'" class="header-cell col-assignee">
+					<div
+						v-if="mode === 'project'"
+						class="header-cell col-start"
+					>
+						开始
+					</div>
+					<div
+						v-if="mode === 'home'"
+						class="header-cell col-assignee"
+					>
 						人员
 					</div>
-					<div class="header-cell" :class="mode === 'home' ? 'col-priority' : 'col-priority-first'">
+					<div
+						class="header-cell"
+						:class="mode === 'home' ? 'col-priority' : 'col-priority-first'"
+					>
 						优先
 					</div>
 					<div class="header-cell col-percent">
@@ -45,9 +57,6 @@
 					</div>
 					<div class="header-cell col-due">
 						截至
-					</div>
-					<div v-if="mode === 'project'" class="header-cell col-start">
-						开始
 					</div>
 				</div>
 			</div>

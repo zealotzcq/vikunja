@@ -48,12 +48,30 @@
 			>
 				{{ localTask.title }}
 			</div>
-			<div ref="metaRowRef" class="task-meta">
-				<div v-if="mode === 'home'" class="meta-cell col-assignee">
-					<span v-if="localTask.assignees && localTask.assignees.length > 0 && localTask.assignees[0]?.username" class="assignee-name">
+			<div
+				ref="metaRowRef"
+				class="task-meta"
+			>
+				<div
+					v-if="mode === 'project'"
+					class="meta-cell col-start"
+				>
+					{{ localTask.startDate ? formatDays(localTask.startDate) : '-' }}
+				</div>
+				<div
+					v-if="mode === 'home'"
+					class="meta-cell col-assignee"
+				>
+					<span
+						v-if="localTask.assignees && localTask.assignees.length > 0 && localTask.assignees[0]?.username"
+						class="assignee-name"
+					>
 						{{ localTask.assignees[0].name || localTask.assignees[0].username }}
 					</span>
-					<span v-else class="no-assignee">-</span>
+					<span
+						v-else
+						class="no-assignee"
+					>-</span>
 				</div>
 				<div
 					ref="priorityCellRef"
@@ -102,9 +120,6 @@
 						</template>
 					</SimplePopup>
 					<span v-else>{{ localTask.dueDate ? formatDays(localTask.dueDate) : '-' }}</span>
-				</div>
-				<div v-if="mode === 'project'" class="meta-cell col-start">
-					{{ localTask.startDate ? formatDays(localTask.startDate) : '-' }}
 				</div>
 			</div>
 		</div>
@@ -209,25 +224,28 @@ const handleDueDateClick = () => {
 		return
 	}
 
+	console.log('[MobileTaskItem] Due date clicked, showing popup for task:', localTask.value.id)
 	showDeferPopup.value = true
 }
 
 watch(showDeferPopup, async (newValue) => {
-  if (newValue && priorityCellRef.value) {
-    await nextTick()
+	console.log('[MobileTaskItem] showDeferPopup changed to:', newValue)
+	if (newValue && priorityCellRef.value) {
+		await nextTick()
 
-    const priorityRect = priorityCellRef.value.getBoundingClientRect()
-    const scrollY = window.scrollY || window.pageYOffset || 0
-    const scrollX = window.scrollX || window.pageXOffset || 0
+		const priorityRect = priorityCellRef.value.getBoundingClientRect()
+		const scrollY = window.scrollY || window.pageYOffset || 0
+		const scrollX = window.scrollX || window.pageXOffset || 0
 
-    const menuTop = priorityRect.top + scrollY
-    const menuLeft = priorityRect.left + scrollX
+		const menuTop = priorityRect.top + scrollY
+		const menuLeft = priorityRect.left + scrollX
 
-    popupStyle.value = {
-      top: `${menuTop}px`,
-      left: `${menuLeft}px`,
-    }
-  }
+		popupStyle.value = {
+			top: `${menuTop}px`,
+			left: `${menuLeft}px`,
+		}
+		console.log('[MobileTaskItem] Popup style set:', popupStyle.value)
+	}
 })
 </script>
 

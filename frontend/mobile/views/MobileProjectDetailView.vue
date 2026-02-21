@@ -27,11 +27,12 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted } from 'vue'
+import { defineComponent, ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useProjectStore } from '@/stores/projects'
 import { useTaskStore } from '@/stores/tasks'
 import type { ITask } from '@/modelTypes/ITask'
+import { useProjectTaskRefresh } from '@/composables/useProjectTaskRefresh'
 import MobileTaskList from '../components/MobileTaskList.vue'
 
 export default defineComponent({
@@ -60,6 +61,31 @@ export default defineComponent({
 			})
 		})
 
+		const loadedProjectId = ref(0)
+
+		const { checkAndRefreshTasks } = useProjectTaskRefresh(computed(() => ({
+			id: projectId.value,
+			title: project.value?.title || '',
+		})))
+
+		watch(
+			() => loadedProjectId.value,
+			async (loadedId) => {
+				if (loadedId !== 0 && loadedId === projectId.value && loadedId !== lastCheckedProjectId.value) {
+					lastCheckedProjectId.value = loadedId
+					try {
+						const didRefresh = await checkAndRefreshTasks()
+						if (didRefresh) {
+							await loadProjectTasks()
+						}
+					} catch (error) {
+						console.error('[mobile] Error refreshing tasks:', error)
+					}
+				}
+			},
+			{ immediate: true },
+		)
+
 		const openTask = (task: ITask) => {
 			if (!task || !task.title) {
 				console.error('Invalid task:', task)
@@ -81,13 +107,16 @@ export default defineComponent({
 				isLoading.value = true
 				await projectStore.loadProject(projectId.value)
 				await taskStore.loadTasks({}, projectId.value)
+				loadedProjectId.value = projectId.value
 			} catch (error) {
 				console.error('Failed to load project tasks:', error)
 			} finally {
 				isLoading.value = false
 			}
 		}
-    
+
+		const lastCheckedProjectId = ref(0)
+
 		onMounted(() => {
 			loadProjectTasks()
 		})
@@ -98,6 +127,7 @@ export default defineComponent({
 			isLoading,
 			openTask,
 			toggleTaskDone,
+			loadProjectTasks,
 		}
 	},
 })

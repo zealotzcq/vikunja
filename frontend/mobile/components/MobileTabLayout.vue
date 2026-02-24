@@ -185,7 +185,14 @@ export default defineComponent({
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   height: 56px;
+  min-height: 56px;
   box-shadow: var(--shadow-sm);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  width: 100%;
 }
 
 .header-left {
@@ -413,6 +420,22 @@ export default defineComponent({
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  padding-top: 56px;
+  padding-bottom: 64px;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .mobile-header {
+    position: static;
+  }
+
+  .layout-content {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
 }
 
 .layout-content.full-height {
@@ -444,6 +467,17 @@ export default defineComponent({
 
   .dropdown-arrow.rotate {
     transform: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .mobile-header {
+    position: static;
+  }
+
+  .layout-content {
+    padding-top: 0;
+    padding-bottom: 0;
   }
 }
 </style>

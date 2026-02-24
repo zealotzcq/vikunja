@@ -12,6 +12,9 @@ body.mobile-route {
   background: var(--color-background);
   font-family: var(--font-family);
   -webkit-tap-highlight-color: transparent;
+  height: 100dvh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* Ensure smooth scrolling */

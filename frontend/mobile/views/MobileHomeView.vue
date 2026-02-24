@@ -188,12 +188,16 @@ onMounted(() => {
   background: var(--color-background);
   height: 100%;
   overflow: hidden;
+  min-height: 0;
+  min-width: 0;
 }
 
 .home-content {
   flex: 1;
   overflow-y: auto;
   padding: var(--spacing-lg) var(--spacing-md);
+  min-height: 0;
+  min-width: 0;
 }
 
 .stats-section {

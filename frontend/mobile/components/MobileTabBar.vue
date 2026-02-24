@@ -68,12 +68,17 @@ export default defineComponent({
   justify-content: space-around;
   align-items: center;
   height: 64px;
+  min-height: 64px;
   padding: 0;
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
-  position: relative;
-  z-index: 10;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  width: 100%;
 }
 
 .tab-item {
@@ -138,6 +143,12 @@ export default defineComponent({
   .tab-icon,
   .tab-label {
     transition: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .mobile-tab-bar {
+    position: static;
   }
 }
 </style>

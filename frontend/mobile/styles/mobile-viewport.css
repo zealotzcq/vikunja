@@ -9,6 +9,14 @@
   position: relative;
 }
 
+@media (max-width: 767px) {
+  .mobile-viewport {
+    height: 100dvh;
+    height: 100vh;
+    min-height: 0;
+  }
+}
+
 /* Prevent horizontal scroll */
 .mobile-viewport * {
   max-width: 100%;

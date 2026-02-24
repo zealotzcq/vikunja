@@ -141,6 +141,8 @@ export default defineComponent({
   background: var(--color-background);
   height: 100%;
   overflow: hidden;
+  min-height: 0;
+  min-width: 0;
 }
 
 .project-header {
@@ -173,6 +175,8 @@ export default defineComponent({
   overflow-y: auto;
   padding: var(--spacing-md);
   padding-bottom: var(--spacing-md);
+  min-height: 0;
+  min-width: 0;
 }
 
 .tasks-content.is-loading {

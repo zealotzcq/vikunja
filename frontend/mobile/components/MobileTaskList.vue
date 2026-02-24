@@ -107,6 +107,9 @@ const toggleTaskDone = (task: ITask) => {
 .mobile-task-list {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
 }
 
 .empty-state {
@@ -116,7 +119,9 @@ const toggleTaskDone = (task: ITask) => {
   justify-content: center;
   padding: var(--spacing-2xl);
   text-align: center;
-  margin-top: 20%;
+  margin: 0;
+  flex: 1;
+  min-height: 0;
 }
 
 .empty-icon {

@@ -112,12 +112,16 @@ export default defineComponent({
   background: var(--color-background);
   height: 100%;
   overflow: hidden;
+  min-height: 0;
+  min-width: 0;
 }
 
 .projects-content {
   flex: 1;
   overflow-y: auto;
   padding: var(--spacing-lg) var(--spacing-md) calc(48px + var(--spacing-lg));
+  min-height: 0;
+  min-width: 0;
 }
 
 .projects-content.is-loading {

@@ -231,7 +231,8 @@ export default defineComponent({
       await chatStore.loadChatHistory();
       chatStore.setMobile(true);
       chatStore.isOpen = true;
-      scrollToBottom();
+      await nextTick();
+      setTimeout(scrollToBottom, 100);
     });
 
     onUnmounted(() => {
@@ -251,10 +252,17 @@ export default defineComponent({
     );
 
     function scrollToBottom() {
-      nextTick(() => {
+      const scroll = () => {
         if (messagesContainer.value) {
           messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
         }
+      };
+      nextTick(() => {
+        scroll();
+        requestAnimationFrame(scroll);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(scroll);
+        });
       });
     }
 
@@ -381,6 +389,7 @@ export default defineComponent({
   flex-direction: column;
   background: var(--color-background);
   height: 100%;
+  min-height: 0;
 }
 
 .chat-area {
@@ -390,6 +399,7 @@ export default defineComponent({
   overflow: hidden;
   position: relative;
   min-height: 0;
+  min-width: 0;
 }
 
 .status-message {
@@ -453,7 +463,10 @@ export default defineComponent({
   overflow-y: auto;
   gap: var(--spacing-sm);
   min-height: 0;
+  min-width: 0;
   align-content: flex-start;
+  flex-grow: 1;
+  flex-basis: 0;
 }
 
 .message {

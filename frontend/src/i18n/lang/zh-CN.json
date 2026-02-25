@@ -1262,7 +1262,11 @@
 		"clear": "清空消息",
 		"selectedOption": "已选择：{option}",
 		"processing": "小助理正在处理...",
-		"processingTool": "正在使用 {tool}..."
+		"processingTool": "正在使用 {tool}...",
+		"customInput": "自定义输入",
+		"customInputDescription": "手动输入您的答案",
+		"customInputTitle": "请输入您的答案",
+		"customInputPlaceholder": "在此输入您的答案..."
 	},
 	"about": {
 		"title": "关于",

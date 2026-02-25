@@ -80,6 +80,18 @@
                     {{ option.description }}
                   </div>
                 </button>
+                <button
+                  class="question-option custom-option"
+                  :class="{ disabled: isQuestionDisabled(msg) }"
+                  @click="!isQuestionDisabled(msg) && showCustomInput(question)"
+                >
+                  <div class="option-label">
+                    {{ $t('chatAssistant.customInput') }}
+                  </div>
+                  <div class="option-description">
+                    {{ $t('chatAssistant.customInputDescription') }}
+                  </div>
+                </button>
               </div>
             </div>
           </div>
@@ -127,6 +139,30 @@
         <Icon icon="arrow-up-from-bracket" />
       </button>
     </div>
+
+    <div v-if="showCustomInputModal" class="custom-input-modal" @click.self="closeCustomInput">
+      <div class="custom-input-content">
+        <h3 class="custom-input-title">{{ $t('chatAssistant.customInputTitle') }}</h3>
+        <textarea
+          v-model="customInputValue"
+          class="custom-input-textarea"
+          :placeholder="$t('chatAssistant.customInputPlaceholder')"
+          @keyup.enter.ctrl="confirmCustomInput"
+        />
+        <div class="custom-input-buttons">
+          <button class="custom-input-button cancel" @click="closeCustomInput">
+            {{ $t('misc.cancel') }}
+          </button>
+          <button
+            class="custom-input-button confirm"
+            @click="confirmCustomInput"
+            :disabled="!customInputValue.trim()"
+          >
+            {{ $t('misc.confirm') }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -154,6 +190,10 @@ export default defineComponent({
     const isProcessing = ref(false);
     const processingText = ref('');
     const sendDisabled = ref(false);
+    const showCustomInputModal = ref(false);
+    const customInputValue = ref('');
+    const currentQuestion = ref<IQuestion | null>(null);
+    let historyPollingTimer: number | null = null;
 
     const ANSWERED_TOOL_CALLS_KEY = 'vikunja-answered-tool-calls';
 
@@ -233,10 +273,27 @@ export default defineComponent({
       chatStore.isOpen = true;
       await nextTick();
       setTimeout(scrollToBottom, 100);
+
+      historyPollingTimer = window.setInterval(async () => {
+        if (chatStore.isOpen && chatStore.isAvailable) {
+          const previousLastMessageId = chatStore.messages.length > 0 ? chatStore.messages[chatStore.messages.length - 1].id : '';
+          await chatStore.loadChatHistory();
+          const currentLastMessageId = chatStore.messages.length > 0 ? chatStore.messages[chatStore.messages.length - 1].id : '';
+          
+          if (previousLastMessageId !== currentLastMessageId) {
+            await nextTick();
+            scrollToBottom();
+          }
+        }
+      }, 5000);
     });
 
     onUnmounted(() => {
       chatStore.isOpen = false;
+      if (historyPollingTimer !== null) {
+        clearInterval(historyPollingTimer);
+        historyPollingTimer = null;
+      }
     });
 
     watch(
@@ -333,6 +390,46 @@ export default defineComponent({
       await chatStore.submitQuestionAnswer(answer);
     }
 
+    function showCustomInput(question: IQuestion) {
+      currentQuestion.value = question;
+      customInputValue.value = '';
+      showCustomInputModal.value = true;
+    }
+
+    function closeCustomInput() {
+      showCustomInputModal.value = false;
+      customInputValue.value = '';
+      currentQuestion.value = null;
+    }
+
+    async function confirmCustomInput() {
+      if (!customInputValue.value.trim() || !currentQuestion.value) {
+        return;
+      }
+
+      const answer = customInputValue.value.trim();
+      const toolCallId = lastMessageWithQuestion.value?.toolCallID;
+
+      if (toolCallId) {
+        setToolCallAnswered(toolCallId);
+      }
+
+      const userMessageText = t('chatAssistant.selectedOption', { option: answer });
+      chatStore.addMessage({
+        id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+        type: 'user_input',
+        role: 'user',
+        content: userMessageText,
+        timestamp: Date.now(),
+      });
+
+      isProcessing.value = true;
+      processingText.value = t('chatAssistant.processing');
+
+      await chatStore.submitQuestionAnswer(answer);
+      closeCustomInput();
+    }
+
     watch(
       () => visibleMessages.value.length,
       () => {
@@ -377,6 +474,11 @@ export default defineComponent({
       handleEnter,
       clearMessages,
       handleQuestionOption,
+      showCustomInput,
+      closeCustomInput,
+      confirmCustomInput,
+      showCustomInputModal,
+      customInputValue,
       t,
     };
   },
@@ -628,6 +730,107 @@ export default defineComponent({
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
   line-height: 1.4;
+}
+
+.question-option.custom-option {
+  border-color: var(--color-primary);
+  background: var(--color-primary-lighter);
+}
+
+.custom-input-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--spacing-md);
+}
+
+.custom-input-content {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.custom-input-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+  font-family: var(--font-family);
+}
+
+.custom-input-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-family: var(--font-family);
+  resize: vertical;
+  background: var(--color-background);
+  color: var(--color-text-primary);
+  transition: border-color var(--transition-fast);
+}
+
+.custom-input-textarea:focus {
+  border-color: var(--color-primary);
+  outline: none;
+  background: var(--color-surface);
+}
+
+.custom-input-buttons {
+  display: flex;
+  gap: var(--spacing-sm);
+  justify-content: flex-end;
+}
+
+.custom-input-button {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  min-height: 40px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.custom-input-button.cancel {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.custom-input-button.cancel:hover {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.custom-input-button.confirm {
+  background: var(--color-primary);
+  color: white;
+}
+
+.custom-input-button.confirm:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.custom-input-button.confirm:disabled {
+  background: var(--color-primary-lighter);
+  color: var(--color-primary);
+  cursor: not-allowed;
 }
 
 .loading-message {

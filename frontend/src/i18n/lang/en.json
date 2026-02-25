@@ -1224,7 +1224,11 @@
     "clear": "Clear messages",
     "selectedOption": "Selected: {option}",
     "processing": "Assistant is processing...",
-    "processingTool": "Using {tool}..."
+    "processingTool": "Using {tool}...",
+    "customInput": "Custom Input",
+    "customInputDescription": "Enter your answer manually",
+    "customInputTitle": "Please enter your answer",
+    "customInputPlaceholder": "Enter your answer here..."
   },
   "date": {
     "altFormatLong": "j M Y, H:i",

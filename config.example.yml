@@ -42,21 +42,23 @@ ai:
     # 模型名称（如：llama2, mistral）
     # model: llama2
   # Agent 行为配置
-  max_iterations: 10
+  max_iterations: 5
+  # 最大对话轮数（保留最近的N轮对话，默认3）
+  max_conversation_turns: 3
   # LLM 日志记录（可选，默认：false）
   # 启用后将在 llm_log_path 目录下保存每次请求和响应
-  llm_log: false
-  # LLM 日志保存路径（可选，默认：llmlog）
-  # llm_log_path: llmlog
+  llm_log: true
+  # LLM 日志保存路径（可选，默认：llmlog，docker：/db/llmlog/）
+  llm_log_path: llmlog
   # LLM 日志简略模式（可选，默认：false）
   # 启用后保存请求时将不包含 tools 部分
-  # llm_log_brief_mode: false
-  temperature: 0.7
+  llm_log_brief_mode: false
+  temperature: 0.1
   # 启用的技能列表（空表示启用所有）
   enabled_skills: []
   # 启用的工具列表（空表示启用所有）
   enabled_tools: []
-  # 自定义系统提示词（可选）
-  # system_prompt: "your system prompt"
+  # 系统提示词文件路径（可选，默认：./soul.md,docker:/db/soul.md）
+  system_prompt_file: "./soul.md"
   # 工具提示词目录路径（可选，默认：./prompts,docker:/db/prompts/）
   prompts_dir: "./prompts"

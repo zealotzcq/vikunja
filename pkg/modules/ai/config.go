@@ -24,13 +24,14 @@ type Config struct {
 	OllamaModel   string `mapstructure:"model"`
 
 	// Agent Configuration
-	MaxIterations   int      `mapstructure:"max_iterations"`
-	Temperature     float64  `mapstructure:"temperature"`
-	EnabledSkills   []string `mapstructure:"enabled_skills"`
-	EnabledTools    []string `mapstructure:"enabled_tools"`
-	LLMLog          bool     `mapstructure:"llm_log"`
-	LLMLogPath      string   `mapstructure:"llm_log_path"`
-	LLMLogBriefMode bool     `mapstructure:"llm_log_brief_mode"`
+	MaxIterations        int      `mapstructure:"max_iterations"`
+	Temperature          float64  `mapstructure:"temperature"`
+	EnabledSkills        []string `mapstructure:"enabled_skills"`
+	EnabledTools         []string `mapstructure:"enabled_tools"`
+	LLMLog               bool     `mapstructure:"llm_log"`
+	LLMLogPath           string   `mapstructure:"llm_log_path"`
+	LLMLogBriefMode      bool     `mapstructure:"llm_log_brief_mode"`
+	MaxConversationTurns int      `mapstructure:"max_conversation_turns"`
 
 	// System Prompt File (path to file containing the system prompt)
 	SystemPromptFile string `mapstructure:"system_prompt_file"`
@@ -94,6 +95,9 @@ func LoadConfig() (*Config, error) {
 		if viper.IsSet("ai.llm_log_brief_mode") {
 			config.LLMLogBriefMode = viper.GetBool("ai.llm_log_brief_mode")
 		}
+		if viper.IsSet("ai.max_conversation_turns") {
+			config.MaxConversationTurns = viper.GetInt("ai.max_conversation_turns")
+		}
 
 		systemPromptFile := "./soul.md"
 		if viper.IsSet("ai.system_prompt_file") {
@@ -137,6 +141,9 @@ func LoadConfig() (*Config, error) {
 		}
 		if config.LLMLogPath == "" {
 			config.LLMLogPath = "llmlog"
+		}
+		if config.MaxConversationTurns == 0 {
+			config.MaxConversationTurns = 3
 		}
 		if viper.IsSet("ai.prompts_dir") {
 			config.PromptsDir = viper.GetString("ai.prompts_dir")

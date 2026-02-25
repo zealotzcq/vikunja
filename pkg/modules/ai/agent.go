@@ -457,11 +457,82 @@ func (a *Agent) buildMessages(agentCtx *AgentContext) []Message {
 		},
 	}
 
-	for _, msg := range agentCtx.MessageHistory {
+	filteredHistory := a.filterConversationHistory(agentCtx.MessageHistory, a.config.MaxConversationTurns)
+	for _, msg := range filteredHistory {
 		messages = append(messages, msg)
 	}
 
 	return messages
+}
+
+func (a *Agent) filterConversationHistory(history []Message, maxTurns int) []Message {
+	if len(history) == 0 || maxTurns <= 0 {
+		return []Message{}
+	}
+
+	type Turn struct {
+		userMessages      []Message
+		assistantMessages []Message
+	}
+
+	var turns []Turn
+
+	currentUserMessages := []Message{}
+	currentAssistantMessages := []Message{}
+	hasUserInput := false
+
+	for _, msg := range history {
+		if msg.Role == "user" {
+			if hasUserInput && len(currentAssistantMessages) > 0 {
+				turns = append(turns, Turn{
+					userMessages:      currentUserMessages,
+					assistantMessages: currentAssistantMessages,
+				})
+				currentUserMessages = []Message{msg}
+				currentAssistantMessages = []Message{}
+			} else {
+				currentUserMessages = append(currentUserMessages, msg)
+			}
+			hasUserInput = true
+		} else if msg.Role == "assistant" {
+			if hasUserInput {
+				currentAssistantMessages = append(currentAssistantMessages, msg)
+			}
+		}
+	}
+
+	if hasUserInput && len(currentUserMessages) > 0 {
+		turns = append(turns, Turn{
+			userMessages:      currentUserMessages,
+			assistantMessages: currentAssistantMessages,
+		})
+	}
+
+	var result []Message
+
+	lastTurnIndex := len(turns) - 1
+	if lastTurnIndex < 0 {
+		return result
+	}
+
+	startIndex := lastTurnIndex - (maxTurns - 1)
+	if startIndex < 0 {
+		startIndex = 0
+	}
+
+	shouldIncludeLastAssistant := len(turns) <= maxTurns
+
+	for i := startIndex; i < lastTurnIndex; i++ {
+		result = append(result, turns[i].userMessages...)
+		result = append(result, turns[i].assistantMessages...)
+	}
+
+	result = append(result, turns[lastTurnIndex].userMessages...)
+	if shouldIncludeLastAssistant {
+		result = append(result, turns[lastTurnIndex].assistantMessages...)
+	}
+
+	return result
 }
 
 func messagesToPrompt(messages []Message) string {

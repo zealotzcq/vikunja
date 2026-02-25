@@ -384,6 +384,23 @@ export const useChatStore = defineStore('chat', () => {
 		saveChatHistory(messages.value)
 	}
 
+	async function checkNewMessages(companyID: number | undefined, lastMessageId: string | undefined) {
+		if (!authStore.authUser) {
+			return { has_new: false, last_message_id: '' }
+		}
+		if (!companyStore.currentCompanyId) {
+			return { has_new: false, last_message_id: '' }
+		}
+
+		try {
+			const response = await chatService.checkNewMessages(companyID, lastMessageId)
+			return response
+		} catch (err) {
+			console.error('[Chat] Failed to check new messages:', err)
+			return { has_new: false, last_message_id: '' }
+		}
+	}
+
 	async function clearMessages() {
 		error.value = null
 		messages.value = []
@@ -417,6 +434,7 @@ export const useChatStore = defineStore('chat', () => {
 		executeButtonNavigation,
 		submitQuestionAnswer,
 		addMessage,
+		checkNewMessages,
 	}
 })
 

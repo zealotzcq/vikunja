@@ -648,6 +648,7 @@ func registerAPIRoutes(a *echo.Group) {
 	chat.POST("/submit-question-answer", apiv1.SubmitQuestionAnswer)
 	chat.GET("/session", apiv1.GetSession)
 	chat.GET("/history", apiv1.GetChatHistory)
+	chat.GET("/check-new", apiv1.CheckNewMessages)
 	chat.GET("/stream", apiv1.ChatStream)
 	chat.DELETE("/session", apiv1.ClearSession)
 

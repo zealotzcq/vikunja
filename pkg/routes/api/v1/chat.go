@@ -198,6 +198,56 @@ func ClearSession(c *echo.Context) error {
 	return c.JSON(http.StatusOK, models.Message{Message: "Session cleared successfully"})
 }
 
+// CheckNewMessages checks if there are new messages in the session
+func CheckNewMessages(c *echo.Context) error {
+	a, err := auth.GetAuthFromClaims(c)
+	if err != nil {
+		return err
+	}
+
+	if _, is := a.(*models.LinkSharing); is {
+		return echo.ErrForbidden
+	}
+
+	userID := a.GetID()
+
+	companyIDStr := c.QueryParam("company_id")
+	companyID, err := strconv.ParseInt(companyIDStr, 10, 64)
+	if err != nil || companyID <= 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "company_id is required and must be a positive integer")
+	}
+
+	if !isUserAllowedForChat(a, companyID) {
+		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
+	}
+
+	sessionData, err := chat_session.GetDefault().GetOrCreateSession(userID, companyID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to get session: %v", err))
+	}
+
+	lastMessageId := c.QueryParam("last_message_id")
+
+	var hasNew bool
+	currentLastMessageId := ""
+
+	if len(sessionData.Messages) > 0 {
+		latestMsg := sessionData.Messages[len(sessionData.Messages)-1]
+		currentLastMessageId = latestMsg.ID
+
+		if lastMessageId == "" {
+			hasNew = true
+		} else {
+			hasNew = latestMsg.ID != lastMessageId
+		}
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"has_new":         hasNew,
+		"last_message_id": currentLastMessageId,
+	})
+}
+
 // GetChatHistory retrieves the current user's chat history (filtered for frontend)
 func GetChatHistory(c *echo.Context) error {
 	a, err := auth.GetAuthFromClaims(c)
@@ -228,7 +278,7 @@ func GetChatHistory(c *echo.Context) error {
 
 	frontendMessages := []ChatMessage{}
 	for _, msg := range sessionData.Messages {
-		if msg.Type == "user_input" || msg.Type == "assistant_response" || msg.Type == "question" || msg.Type == "button_navigation" {
+		if msg.Type == "user_input" || msg.Type == "assistant_response" || msg.Type == "question" || msg.Type == "button_navigation" || msg.Type == "question_answer" {
 			var navigationCommand *NavigationCommand
 			if msg.NavigationCommand != nil {
 				navigationCommand = &NavigationCommand{

@@ -189,11 +189,12 @@ const lastMessageWithQuestion = computed(() => {
 })
 
 const visibleMessages = computed(() => {
-	return chatStore.messages.filter(msg => 
-		msg.type === 'user_input' || 
-		msg.type === 'assistant_response' || 
+	return chatStore.messages.filter(msg =>
+		msg.type === 'user_input' ||
+		msg.type === 'assistant_response' ||
 		msg.type === 'question' ||
-		msg.type === 'button_navigation',
+		msg.type === 'button_navigation' ||
+		msg.type === 'question_answer',
 	)
 })
 

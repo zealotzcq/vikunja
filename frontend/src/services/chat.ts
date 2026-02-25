@@ -74,6 +74,20 @@ export default class ChatService {
 		await this.http.delete(`/chat/session?company_id=${companyID}`)
 	}
 
+	async checkNewMessages(companyID?: number, lastMessageId?: string): Promise<{
+		has_new: boolean
+		last_message_id: string
+	}> {
+		const token = getToken()
+		if (!token) {
+			throw new Error('No authentication token available')
+		}
+
+		const lastIdParam = lastMessageId ? `&last_message_id=${encodeURIComponent(lastMessageId)}` : ''
+		const response = await this.http.get(`/chat/check-new?company_id=${companyID}${lastIdParam}`)
+		return response.data
+	}
+
 	async submitQuestionAnswer(
 		answer: string,
 		companyID: number | undefined = undefined,

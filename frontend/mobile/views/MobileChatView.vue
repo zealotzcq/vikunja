@@ -172,6 +172,7 @@ import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import Icon from '@/components/misc/Icon';
 import { useChatStore } from '@/stores/chat';
+import { useCompanyStore } from '@/stores/company';
 import type { IChatMessage, IQuestion, IQuestionOption } from '@/modelTypes/IChatMessage';
 
 export default defineComponent({
@@ -183,6 +184,7 @@ export default defineComponent({
     const route = useRoute();
     const { t } = useI18n({ useScope: 'global' });
     const chatStore = useChatStore();
+    const companyStore = useCompanyStore();
 
     const userInput = ref('');
     const messagesContainer = ref<HTMLElement | null>(null);
@@ -223,6 +225,17 @@ export default defineComponent({
       },
     );
 
+    watch(
+      () => chatStore.messages.length,
+      (newLength, oldLength) => {
+        if (oldLength === 0 && newLength > 0) {
+          nextTick(() => {
+            setTimeout(scrollToBottom, 100);
+          });
+        }
+      },
+    );
+
     const lastMessageWithQuestion = computed(() => {
       const answeredToolCalls = getAnsweredToolCalls();
       const messagesWithQuestions = chatStore.messages.filter(msg =>
@@ -238,7 +251,8 @@ export default defineComponent({
         msg.type === 'user_input' ||
         msg.type === 'assistant_response' ||
         msg.type === 'question' ||
-        msg.type === 'button_navigation',
+        msg.type === 'button_navigation' ||
+        msg.type === 'question_answer',
       );
     });
 
@@ -276,11 +290,12 @@ export default defineComponent({
 
       historyPollingTimer = window.setInterval(async () => {
         if (chatStore.isOpen && chatStore.isAvailable) {
-          const previousLastMessageId = chatStore.messages.length > 0 ? chatStore.messages[chatStore.messages.length - 1].id : '';
-          await chatStore.loadChatHistory();
-          const currentLastMessageId = chatStore.messages.length > 0 ? chatStore.messages[chatStore.messages.length - 1].id : '';
-          
-          if (previousLastMessageId !== currentLastMessageId) {
+          const previousLastMessageId = chatStore.messages.length > 0 ? chatStore.messages[chatStore.messages.length - 1]?.id ?? '' : '';
+
+          const result = await chatStore.checkNewMessages(companyStore.currentCompanyId ?? undefined, previousLastMessageId);
+
+          if (result.has_new) {
+            await chatStore.loadChatHistory();
             await nextTick();
             scrollToBottom();
           }
@@ -432,8 +447,12 @@ export default defineComponent({
 
     watch(
       () => visibleMessages.value.length,
-      () => {
-        scrollToBottom();
+      (newLength, oldLength) => {
+        if (oldLength === 0 && newLength > 0) {
+          setTimeout(scrollToBottom, 100);
+        } else {
+          scrollToBottom();
+        }
       },
     );
 

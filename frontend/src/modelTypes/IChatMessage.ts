@@ -1,5 +1,5 @@
 export type MessageRole = 'user' | 'assistant' | 'tool'
-export type MessageType = 'user_input' | 'tool_call' | 'tool_result' | 'assistant_response' | 'question' | 'button_navigation'
+export type MessageType = 'user_input' | 'tool_call' | 'tool_result' | 'assistant_response' | 'question' | 'button_navigation' | 'question_answer'
 
 export interface IChatMessage {
 	id: string

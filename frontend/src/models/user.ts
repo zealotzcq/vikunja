@@ -14,19 +14,21 @@ export async function fetchAvatarBlobUrl(user: IUser, size = 50) {
 		return ''
 	}
 	const key = `${user.username}-${size}`
-	
+
 	// Return cached URL if available
 	if (avatarCache.has(key)) {
 		return avatarCache.get(key) as string
 	}
-	
+
 	// If there's already a pending request for this avatar, wait for it
 	if (pendingRequests.has(key)) {
 		return await pendingRequests.get(key) as string
 	}
-	
+
 	// Create a new request
-	const requestPromise = avatarService.getBlobUrl(`/avatar/${user.username}?size=${size}`)
+	const encodedUsername = encodeURIComponent(user.username)
+	const avatarUrl = `/avatar/${encodedUsername}?size=${size}`
+	const requestPromise = avatarService.getBlobUrl(avatarUrl)
 		.then(url => {
 			avatarCache.set(key, url)
 			pendingRequests.delete(key)
@@ -34,9 +36,9 @@ export async function fetchAvatarBlobUrl(user: IUser, size = 50) {
 		})
 		.catch(error => {
 			pendingRequests.delete(key)
-			throw error
+			return '' as string
 		})
-	
+
 	pendingRequests.set(key, requestPromise)
 	return await requestPromise
 }

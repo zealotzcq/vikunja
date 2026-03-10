@@ -272,7 +272,11 @@ func (t *Task) addNewAssigneeByID(s *xorm.Session, newAssigneeID int64, project 
 		return err
 	}
 
-	doer, _ := user.GetFromAuth(auth)
+	doerAuth, _ := user.GetFromAuth(auth)
+	doer, err := user.GetUserByID(s, doerAuth.ID)
+	if err != nil {
+		return err
+	}
 	task, err := GetTaskSimple(s, &Task{ID: t.ID})
 	if err != nil {
 		return err

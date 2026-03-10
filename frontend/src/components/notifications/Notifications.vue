@@ -86,7 +86,7 @@
 </template>
 
 <script lang="ts" setup>
-import {computed, onMounted, onUnmounted, ref} from 'vue'
+import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
 import {useRouter, useRoute} from 'vue-router'
 
 import NotificationService from '@/services/notification'
@@ -165,8 +165,8 @@ function hidePopup(e) {
 	}
 }
 
-function to(n, index) {
-	const to = {
+function to(n: any, index: number) {
+	const to: { name: string; params: Record<string, number> } = {
 		name: '',
 		params: {},
 	}

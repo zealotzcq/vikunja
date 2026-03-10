@@ -87,7 +87,7 @@
 
 <script lang="ts" setup>
 import {computed, onMounted, onUnmounted, ref} from 'vue'
-import {useRouter} from 'vue-router'
+import {useRouter, useRoute} from 'vue-router'
 
 import NotificationService from '@/services/notification'
 import BaseButton from '@/components/base/BaseButton.vue'
@@ -106,6 +106,7 @@ const LOAD_NOTIFICATIONS_INTERVAL = 10000
 
 const authStore = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 const {t} = useI18n()
 
 const allNotifications = ref<INotification[]>([])
@@ -119,6 +120,10 @@ const notifications = computed(() => {
 	return allNotifications.value ? allNotifications.value.filter(n => n.name !== '') : []
 })
 const userInfo = computed(() => authStore.info)
+
+const isMobile = computed(() => {
+	return route.path.startsWith('/mobile/')
+})
 
 let interval: ReturnType<typeof setInterval>
 
@@ -166,24 +171,33 @@ function to(n, index) {
 		params: {},
 	}
 
+	const mobile = isMobile.value
+
 	switch (n.name) {
 		case names.TASK_COMMENT:
 		case names.TASK_ASSIGNED:
 		case names.TASK_REMINDER:
 		case names.TASK_MENTIONED:
-			to.name = 'task.detail'
-			to.params.id = n.notification.task.id
+			to.name = mobile ? 'MobileTaskDetail' : 'task.detail'
+			to.params[mobile ? 'taskId' : 'id'] = n.notification.task.id
 			break
 		case names.TASK_DELETED:
 			// Nothing
 			break
 		case names.PROJECT_CREATED:
-			to.name = 'task.index'
-			to.params.projectId = n.notification.project.id
+			if (mobile) {
+				to.name = 'MobileProjectDetail'
+				to.params.projectId = n.notification.project.id
+			} else {
+				to.name = 'task.index'
+				to.params.projectId = n.notification.project.id
+			}
 			break
 		case names.TEAM_MEMBER_ADDED:
-			to.name = 'teams.edit'
-			to.params.id = n.notification.team.id
+			if (!mobile) {
+				to.name = 'teams.edit'
+				to.params.id = n.notification.team.id
+			}
 			break
 	}
 

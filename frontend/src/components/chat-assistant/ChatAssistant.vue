@@ -135,6 +135,7 @@
 <script lang="ts" setup>
 import {ref, watch, nextTick, onMounted, onUnmounted, computed} from 'vue'
 import {useI18n} from 'vue-i18n'
+import {useRoute} from 'vue-router'
 
 import BaseButton from '@/components/base/BaseButton.vue'
 import Icon from '@/components/misc/Icon'
@@ -144,6 +145,7 @@ import type {IChatMessage, IQuestion, IQuestionOption} from '@/modelTypes/IChatM
 
 const {t} = useI18n({useScope: 'global'})
 const chatStore = useChatStore()
+const route = useRoute()
 
 const userInput = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
@@ -245,8 +247,8 @@ onUnmounted(() => {
 })
 
 function detectMobile() {
-	const isMobileDevice = typeof window !== 'undefined' && window.innerWidth < 768
-	chatStore.setMobile(isMobileDevice)
+	const isMobileApp = typeof window !== 'undefined' && route.path.startsWith('/mobile/')
+	chatStore.setMobile(isMobileApp)
 }
 
 function sendMessage() {

@@ -60,6 +60,7 @@
 import { defineComponent, ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useProjectStore } from '@/stores/projects';
+import { useCompanyStore } from '@/stores/company';
 import type { IProject } from '@/modelTypes/IProject';
 
 export default defineComponent({
@@ -67,16 +68,38 @@ export default defineComponent({
   setup() {
     const router = useRouter();
     const projectStore = useProjectStore();
+    const companyStore = useCompanyStore();
     const activeFilter = ref<'active' | 'archived'>('active');
+
+    function filterProjectsByCompany(projectList: readonly IProject[]): IProject[] {
+      const currentCompanyId = companyStore.currentCompanyId;
+
+      if (!currentCompanyId) {
+        return [...projectList];
+      }
+
+      const projectIdsToHide = new Set<number>();
+      for (const map of companyStore.companyProjectMap) {
+        if (map.company_id !== currentCompanyId) {
+          for (const projectId of map.project_ids) {
+            projectIdsToHide.add(projectId);
+          }
+        }
+      }
+
+      return projectList.filter(project => !projectIdsToHide.has(project.id));
+    }
 
     const filteredProjects = computed(() => {
       const allProjects = projectStore.projectsArray;
-      return activeFilter.value === 'archived'
+      const filteredByStatus = activeFilter.value === 'archived'
         ? allProjects.filter(p => p.isArchived)
         : allProjects.filter(p => !p.isArchived);
+
+      return filterProjectsByCompany(filteredByStatus);
     });
 
-    const hasProjects = computed(() => projectStore.projectsArray.length > 0);
+    const hasProjects = computed(() => filteredProjects.value.length > 0);
 
     const openProject = (project: IProject) => {
       router.push(`/mobile/project/${project.id}`);
@@ -90,12 +113,14 @@ export default defineComponent({
       }
     };
 
-    onMounted(() => {
+    onMounted(async () => {
+      await companyStore.loadCompanyProjectMap();
       loadProjects();
     });
 
     return {
       projectStore,
+      companyStore,
       activeFilter,
       filteredProjects,
       hasProjects,

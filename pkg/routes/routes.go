@@ -655,6 +655,7 @@ func registerAPIRoutes(a *echo.Group) {
 	// Company
 	a.GET("/companies", apiv1.GetUserCompanies)
 	a.GET("/companies/relations/subordinate", apiv1.GetUserRelationsAsSubordinate)
+	a.GET("/companies/project-map", apiv1.GetUserCompanyProjectMap)
 
 	// API Tokens
 	apiTokenProvider := &handler.WebHandler{

@@ -13,6 +13,11 @@ export interface ICompanyRelation {
 	superior_username: string
 }
 
+export interface ICompanyProjectMap {
+	company_id: number
+	project_ids: number[]
+}
+
 export default class CompanyService {
 	http = AuthenticatedHTTPFactory()
 
@@ -29,5 +34,10 @@ export default class CompanyService {
 	async getRelationsAsSubordinate(): Promise<ICompanyRelation[]> {
 		const response = await this.http.get('/companies/relations/subordinate')
 		return response.data as ICompanyRelation[]
+	}
+
+	async getCompanyProjectMap(): Promise<ICompanyProjectMap[]> {
+		const response = await this.http.get('/companies/project-map')
+		return response.data as ICompanyProjectMap[]
 	}
 }

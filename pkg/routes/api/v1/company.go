@@ -58,3 +58,27 @@ func GetUserRelationsAsSubordinate(c *echo.Context) error {
 
 	return c.JSON(http.StatusOK, relations)
 }
+
+// GetUserCompanyProjectMap retrieves a map of company IDs to project IDs for the current user
+func GetUserCompanyProjectMap(c *echo.Context) error {
+	a, err := auth.GetAuthFromClaims(c)
+	if err != nil {
+		return err
+	}
+
+	if _, is := a.(*models.LinkSharing); is {
+		return echo.ErrForbidden
+	}
+
+	userID := a.GetID()
+
+	s := db.NewSession()
+	defer s.Close()
+
+	projectMap, err := company.GetUserCompanyProjectMap(s, userID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	return c.JSON(http.StatusOK, projectMap)
+}

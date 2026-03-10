@@ -73,12 +73,14 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProjectStore } from '@/stores/projects'
 import { useTaskStore } from '@/stores/tasks'
+import { useCompanyStore } from '@/stores/company'
 import MobileTaskList from '../components/MobileTaskList.vue'
 import type { ITask } from '@/modelTypes/ITask'
 
 const router = useRouter()
 const projectStore = useProjectStore()
 const taskStore = useTaskStore()
+const companyStore = useCompanyStore()
 
 const tasks = computed<ITask[]>(() => {
 	return Object.values(taskStore.tasks)
@@ -91,13 +93,33 @@ const now = new Date()
 const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)
 
 const stats = computed(() => {
+	const filtered = filterTasksByCompany(tasks.value)
 	return {
-		inProgress: tasks.value.filter(t => !t.done && (!t.dueDate || new Date(t.dueDate) >= now)).length,
-		overdue: tasks.value.filter(t => !t.done && t.dueDate && new Date(t.dueDate) < now).length,
-		recent: tasks.value.filter(t => t.done && t.doneAt && new Date(t.doneAt) >= threeDaysAgo).length,
-		completed: tasks.value.length,
+		inProgress: filtered.filter(t => !t.done && (!t.dueDate || new Date(t.dueDate) >= now)).length,
+		overdue: filtered.filter(t => !t.done && t.dueDate && new Date(t.dueDate) < now).length,
+		recent: filtered.filter(t => t.done && t.doneAt && new Date(t.doneAt) >= threeDaysAgo).length,
+		completed: filtered.length,
 	}
 })
+
+function filterTasksByCompany(taskList: ITask[]): ITask[] {
+	const currentCompanyId = companyStore.currentCompanyId
+
+	if (!currentCompanyId) {
+		return taskList
+	}
+
+	const projectIdsToHide = new Set<number>()
+	for (const map of companyStore.companyProjectMap) {
+		if (map.company_id !== currentCompanyId) {
+			for (const projectId of map.project_ids) {
+				projectIdsToHide.add(projectId)
+			}
+		}
+	}
+
+	return taskList.filter(task => !projectIdsToHide.has(task.projectId))
+}
 
 const filteredTasks = computed(() => {
 	let result: ITask[] = []
@@ -117,7 +139,9 @@ const filteredTasks = computed(() => {
 			break
 	}
 
-	const sortedResult = result.sort((a, b) => {
+	const filteredByCompany = filterTasksByCompany(result)
+
+	const sortedResult = filteredByCompany.sort((a, b) => {
 		if (activeCategory.value === 'inProgress') {
 			const dueDateA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity
 			const dueDateB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity
@@ -176,7 +200,8 @@ const goToTask = (task: ITask) => {
 	router.push(`/mobile/task/${task.id}`)
 }
 
-onMounted(() => {
+onMounted(async () => {
+	await companyStore.loadCompanyProjectMap()
 	loadTasks()
 })
 </script>

@@ -221,3 +221,40 @@ func GetUserRelationsAsSubordinate(s *xorm.Session, userID int64) ([]*CompanyRel
 
 	return result, nil
 }
+
+type CompanyProjectMap struct {
+	CompanyID  int64   `json:"company_id"`
+	ProjectIDs []int64 `json:"project_ids"`
+}
+
+func GetUserCompanyProjectMap(s *xorm.Session, userID int64) ([]*CompanyProjectMap, error) {
+	var relations []*CompanyRelation
+	err := s.Where("superior_user_id = ? OR subordinate_user_id = ?", userID, userID).Find(&relations)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debugf("User %d: Found %d company relations (as superior or subordinate)", userID, len(relations))
+
+	if len(relations) == 0 {
+		log.Debugf("User %d: No company relations found, returning empty map", userID)
+		return []*CompanyProjectMap{}, nil
+	}
+
+	companyProjectMap := make(map[int64][]int64)
+	for _, rel := range relations {
+		companyProjectMap[rel.CompanyID] = append(companyProjectMap[rel.CompanyID], rel.ProjectID)
+	}
+
+	var result []*CompanyProjectMap
+	for companyID, projectIDs := range companyProjectMap {
+		result = append(result, &CompanyProjectMap{
+			CompanyID:  companyID,
+			ProjectIDs: projectIDs,
+		})
+	}
+
+	log.Debugf("User %d: Company project map: %+v", userID, result)
+
+	return result, nil
+}

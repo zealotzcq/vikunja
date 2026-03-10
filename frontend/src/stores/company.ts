@@ -2,7 +2,7 @@ import {ref, computed} from 'vue'
 import {defineStore, acceptHMRUpdate} from 'pinia'
 import CompanyService from '@/services/company'
 import type {ICompany} from '@/modelTypes/ICompany'
-import type {ICompanyRelation} from '@/services/company'
+import type {ICompanyRelation, ICompanyProjectMap} from '@/services/company'
 
 export const useCompanyStore = defineStore('company', () => {
 	const companies = ref<ICompany[]>([])
@@ -10,6 +10,7 @@ export const useCompanyStore = defineStore('company', () => {
 	const isLoading = ref(false)
 	const error = ref<string | null>(null)
 	const relations = ref<ICompanyRelation[]>([])
+	const companyProjectMap = ref<ICompanyProjectMap[]>([])
 
 	const companyService = new CompanyService()
 
@@ -18,6 +19,14 @@ export const useCompanyStore = defineStore('company', () => {
 			return null
 		}
 		return companies.value.find(c => c.id === currentCompanyId.value) || null
+	})
+
+	const currentCompanyProjectIds = computed(() => {
+		if (!currentCompanyId.value) {
+			return []
+		}
+		const map = companyProjectMap.value.find(m => m.company_id === currentCompanyId.value)
+		return map ? map.project_ids : []
 	})
 
 	async function loadCompanies() {
@@ -57,6 +66,15 @@ export const useCompanyStore = defineStore('company', () => {
 		}
 	}
 
+	async function loadCompanyProjectMap() {
+		try {
+			companyProjectMap.value = await companyService.getCompanyProjectMap()
+			console.log('[Company] Loaded company project map:', companyProjectMap.value)
+		} catch (err) {
+			console.error('[Company] Failed to load company project map:', err)
+		}
+	}
+
 	function setCurrentCompany(companyId: number) {
 		currentCompanyId.value = companyId
 		localStorage.setItem('vikunja-current-company-id', String(companyId))
@@ -69,8 +87,11 @@ export const useCompanyStore = defineStore('company', () => {
 		isLoading,
 		error,
 		relations,
+		companyProjectMap,
+		currentCompanyProjectIds,
 		loadCompanies,
 		loadRelationsAsSubordinate,
+		loadCompanyProjectMap,
 		setCurrentCompany,
 	}
 })

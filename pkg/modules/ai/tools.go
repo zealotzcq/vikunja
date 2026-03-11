@@ -330,19 +330,15 @@ func RegisterDefaultTools() error {
 	}
 
 	showNavigationTool := &Tool{
-		Name:           "show_navigation",
+		Name:           "show_status_or_progress",
 		ShouldStopLoop: true,
-		Description:    loadToolPrompt("show_navigation"),
+		Description:    loadToolPrompt("show_status_or_progress"),
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"route_name": map[string]interface{}{
-					"type":        "string",
-					"description": "The route name to navigate to (e.g., task.detail, project.index, tasks.range, projects.index, home)",
-				},
-				"params": map[string]interface{}{
-					"type":        "object",
-					"description": "Optional route parameters (e.g., id for task, projectId for project)",
+				"projectId": map[string]interface{}{
+					"type":        "integer",
+					"description": "Project ID. Use -1 for favorites (company-wide status), specific project ID for person's status, or user's own project ID for personal status.",
 				},
 				"label": map[string]interface{}{
 					"type":        "string",
@@ -350,19 +346,12 @@ func RegisterDefaultTools() error {
 				},
 				"title": map[string]interface{}{
 					"type":        "string",
-					"description": "The title of the target entity to display after the label (optional, e.g., task title, project title)",
+					"description": "The title of the target entity to display after the label (optional, e.g., person's name, company name)",
 				},
 			},
-			"required": []string{"route_name", "label"},
+			"required": []string{"projectId", "label"},
 		},
 		Execute: func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) {
-			routeName, ok := params["route_name"].(string)
-			if !ok || routeName == "" {
-				return &ToolExecutionResult{
-					Error: "route_name is required",
-				}, fmt.Errorf("route_name is required")
-			}
-
 			label, ok := params["label"].(string)
 			if !ok || label == "" {
 				return &ToolExecutionResult{
@@ -370,41 +359,39 @@ func RegisterDefaultTools() error {
 				}, fmt.Errorf("label is required")
 			}
 
-			var routeParams map[string]interface{}
-			if p, ok := params["params"].(map[string]interface{}); ok {
-				routeParams = p
-			}
-
 			var title string
 			if t, ok := params["title"].(string); ok {
 				title = t
 			}
 
-			if routeParams != nil {
-				if id, ok := routeParams["id"]; ok {
-					label += fmt.Sprintf(" %v", id)
-				}
-				if projectId, ok := routeParams["projectId"]; ok {
-					label += fmt.Sprintf(" %v", projectId)
-				}
+			projectIdFloat, ok := params["projectId"].(float64)
+			if !ok {
+				return &ToolExecutionResult{
+					Error: "projectId is required and must be an integer",
+				}, fmt.Errorf("projectId is required and must be an integer")
+			}
+			projectId := int64(projectIdFloat)
+
+			routeParams := map[string]interface{}{
+				"projectId": projectId,
+			}
+
+			if projectId > 0 {
+				label += fmt.Sprintf(" %d", projectId)
 			}
 
 			ctx.ButtonNavigation = &chat_session.ButtonNavigation{
-				RouteName: routeName,
+				RouteName: "project.index",
 				Params:    routeParams,
 				Label:     label,
 				Title:     title,
 			}
 
-			autoNavigate := routeName != "task.detail"
-
-			if autoNavigate {
-				ctx.NavigationInfo = &NavigationInfo{
-					RouteName: routeName,
-					Params:    routeParams,
-				}
-				ctx.ShouldNavigate = true
+			ctx.NavigationInfo = &NavigationInfo{
+				RouteName: "project.index",
+				Params:    routeParams,
 			}
+			ctx.ShouldNavigate = true
 
 			return &ToolExecutionResult{
 				Result: i18n.T(ctx.Language, "ai.tool.ok"),
@@ -413,7 +400,7 @@ func RegisterDefaultTools() error {
 	}
 
 	if err := tm.RegisterTool(showNavigationTool); err != nil {
-		return fmt.Errorf("failed to register show_navigation tool: %w", err)
+		return fmt.Errorf("failed to register show_status_or_progress tool: %w", err)
 	}
 
 	replyTaskTool := &Tool{

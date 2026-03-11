@@ -32,7 +32,20 @@
           :class="[msg.role]"
         >
           <div v-if="msg.content" class="message-content">
-            {{ msg.content }}
+            <template v-if="isTableContent(msg.content)">
+              <table class="message-table">
+                <tbody>
+                  <tr v-for="(row, index) in parseTableContent(msg.content)" :key="index">
+                    <td v-for="(cell, cellIndex) in row" :key="cellIndex" :class="{ 'header-cell': index === 0 }">
+                      {{ cell }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </template>
+            <template v-else>
+              {{ msg.content }}
+            </template>
           </div>
 
           <div
@@ -345,6 +358,18 @@ export default defineComponent({
       return `${hours}:${minutes}`;
     }
 
+    function isTableContent(content: string): boolean {
+      if (!content) return false;
+      const lines = content.trim().split('\n');
+      return lines.length > 1 && (lines[0]?.includes('\t') ?? false);
+    }
+
+    function parseTableContent(content: string): string[][] {
+      if (!content) return [];
+      const lines = content.trim().split('\n');
+      return lines.map(line => line.split('\t'));
+    }
+
     function handleEnter() {
       if (isProcessing.value) {
         return;
@@ -499,6 +524,8 @@ export default defineComponent({
       showCustomInputModal,
       customInputValue,
       t,
+      isTableContent,
+      parseTableContent,
     };
   },
 });
@@ -626,8 +653,35 @@ export default defineComponent({
 .message.assistant .message-content {
   background: var(--color-surface);
   color: var(--color-text-primary);
-  border: 1px solid var(--color-border);
+  border:1px solid var(--color-border);
   border-bottom-left-radius: 4px;
+}
+
+.message-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--font-size-sm);
+
+  tbody {
+    tr {
+      border-bottom:1px solid var(--color-border);
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      td {
+        padding: var(--spacing-xs) var(--spacing-sm);
+        text-align: left;
+      }
+
+      .header-cell {
+        font-weight: 600;
+        color: var(--color-text-primary);
+        background: var(--color-surface-hover);
+      }
+    }
+  }
 }
 
 .message-time {

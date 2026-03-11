@@ -1027,6 +1027,37 @@ func RegisterDefaultTools() error {
 		return fmt.Errorf("failed to register update_nickname tool: %w", err)
 	}
 
+	listSubordinatesTool := &Tool{
+		Name:           "list_subordinates",
+		ShouldStopLoop: true,
+		Description:    `List all subordinate staff members. Triggered when the user asks about their subordinates, staff, or team members.`,
+		Parameters: map[string]interface{}{
+			"type":       "object",
+			"properties": map[string]interface{}{},
+		},
+		Execute: func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) {
+			tableContent := "员工ID\t用户名\t当前昵称\n"
+			staffCount := len(ctx.SubordinateStaff)
+			for i, staff := range ctx.SubordinateStaff {
+				if i == staffCount-1 && staff.UserID == ctx.UserID {
+					continue
+				}
+				tableContent += fmt.Sprintf("%d\t%s\t%s\n", staff.UserID, staff.Username, staff.Name)
+			}
+
+			return &ToolExecutionResult{
+				Result: tableContent,
+				StopCommand: &ToolStopCommand{
+					Response: tableContent,
+				},
+			}, nil
+		},
+	}
+
+	if err := tm.RegisterTool(listSubordinatesTool); err != nil {
+		return fmt.Errorf("failed to register list_subordinates tool: %w", err)
+	}
+
 	return nil
 }
 

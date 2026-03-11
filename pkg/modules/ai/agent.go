@@ -242,7 +242,7 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext) (*Agen
 
 		for toolCallIndex, toolCall := range providerResponse.ToolCalls {
 			if toolCall.Name == "" {
-				GetLLMLogger().LogExchange("agent", "", fmt.Sprintf("Warning: Skipping tool call with empty name, ID: %s, arguments: %v", toolCall.ID, toolCall.Arguments))
+				fmt.Printf("Warning: Skipping tool call with empty name, ID: %s, arguments: %v\n", toolCall.ID, toolCall.Arguments)
 				continue
 			}
 
@@ -255,8 +255,12 @@ func (a *Agent) runAgentLoop(ctx context.Context, agentCtx *AgentContext) (*Agen
 			inputJSON, _ := json.Marshal(toolCall.Arguments)
 			step.Input = string(inputJSON)
 
-			if len(toolCall.Arguments) == 0 {
-				GetLLMLogger().LogExchange("agent", "", fmt.Sprintf("Warning: Tool call '%s' has empty arguments", toolCall.Name))
+			toolsWithoutParams := map[string]bool{
+				//"list_subordinates": true,
+			}
+
+			if len(toolCall.Arguments) == 0 && !toolsWithoutParams[toolCall.Name] {
+				fmt.Printf("Tool call '%s' has empty arguments\n", toolCall.Name)
 			}
 
 			tool, toolExists := a.toolManager.GetTool(toolCall.Name)

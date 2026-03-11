@@ -35,7 +35,20 @@
 						:class="[msg.role]"
 					>
 						<div class="message-content">
-							{{ msg.content }}
+							<template v-if="isTableContent(msg.content)">
+								<table class="message-table">
+									<tbody>
+										<tr v-for="(row, index) in parseTableContent(msg.content)" :key="index">
+											<td v-for="(cell, cellIndex) in row" :key="cellIndex" :class="{ 'header-cell': index === 0 }">
+												{{ cell }}
+											</td>
+										</tr>
+									</tbody>
+								</table>
+							</template>
+							<template v-else>
+								{{ msg.content }}
+							</template>
 						</div>
 
 						<div
@@ -306,6 +319,18 @@ function formatTime(timestamp: number): string {
 	return `${hours}:${minutes}`
 }
 
+function isTableContent(content: string): boolean {
+	if (!content) return false
+	const lines = content.trim().split('\n')
+	return lines.length > 1 && (lines[0]?.includes('\t') ?? false)
+}
+
+function parseTableContent(content: string): string[][] {
+	if (!content) return []
+	const lines = content.trim().split('\n')
+	return lines.map(line => line.split('\t'))
+}
+
 watch(
 	() => visibleMessages.value.length,
 	() => {
@@ -462,6 +487,33 @@ watch(
 		background: var(--grey-100);
 		color: var(--grey-800);
 		border-start-start-radius: 0.25rem;
+	}
+
+	.message-table {
+		border-collapse: collapse;
+		width: 100%;
+		font-size: 0.875rem;
+
+		tbody {
+			tr {
+				border-bottom: 1px solid var(--grey-200);
+
+				&:last-child {
+					border-bottom: none;
+				}
+
+				td {
+					padding: 0.5rem 0.75rem;
+					text-align: left;
+				}
+
+				.header-cell {
+					font-weight: 600;
+					color: var(--grey-800);
+					background: var(--grey-50);
+				}
+			}
+		}
 	}
 }
 

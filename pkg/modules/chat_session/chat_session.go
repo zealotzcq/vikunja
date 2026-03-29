@@ -473,9 +473,25 @@ func (m *Manager) ReleaseSessionLock(mu *sync.Mutex) {
 
 // SetCurrentTask sets the current task for a session
 func (m *Manager) SetCurrentTask(userID, companyID, taskID int64, title string, projectID int64) error {
-	session, err := m.GetOrCreateSession(userID, companyID)
+	sessionKey := getSessionKey(userID, companyID)
+
+	sessionData, exists, err := keyvalue.Get(sessionKey)
 	if err != nil {
 		return fmt.Errorf("failed to get session: %w", err)
+	}
+
+	var session *ChatSession
+	if !exists {
+		session, err = m.createNewSessionWithoutLock(userID, companyID)
+		if err != nil {
+			return fmt.Errorf("failed to create session: %w", err)
+		}
+	} else {
+		s, ok := sessionData.(ChatSession)
+		if !ok {
+			return fmt.Errorf("invalid session data type")
+		}
+		session = &s
 	}
 
 	updatedSession := *session
@@ -486,10 +502,12 @@ func (m *Manager) SetCurrentTask(userID, companyID, taskID int64, title string, 
 	}
 	updatedSession.ExpiresAt = time.Now().Add(sessionTTL)
 
-	sessionKey := getSessionKey(userID, companyID)
 	if err := keyvalue.Put(sessionKey, updatedSession); err != nil {
 		return fmt.Errorf("failed to update session: %w", err)
 	}
+
+	fmt.Printf("[Chat] Set current task for user %d, company %d: taskID=%d, title=%s, projectID=%d\n",
+		userID, companyID, taskID, title, projectID)
 
 	return nil
 }

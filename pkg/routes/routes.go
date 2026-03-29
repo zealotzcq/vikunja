@@ -646,6 +646,7 @@ func registerAPIRoutes(a *echo.Group) {
 	chat := a.Group("/chat")
 	chat.POST("/send", apiv1.SendMessage)
 	chat.POST("/submit-question-answer", apiv1.SubmitQuestionAnswer)
+	chat.POST("/set-current-task", apiv1.SetCurrentTask)
 	chat.GET("/session", apiv1.GetSession)
 	chat.GET("/history", apiv1.GetChatHistory)
 	chat.GET("/check-new", apiv1.CheckNewMessages)

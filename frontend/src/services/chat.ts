@@ -102,4 +102,23 @@ export default class ChatService {
 			company_id: companyID,
 		})
 	}
+
+	async setCurrentTask(
+		taskId: number,
+		title: string,
+		projectId: number,
+		companyID: number | undefined = undefined,
+	): Promise<void> {
+		const token = getToken()
+		if (!token) {
+			throw new Error('No authentication token available')
+		}
+
+		await this.http.post('/chat/set-current-task', {
+			task_id: taskId,
+			title,
+			project_id: projectId,
+			company_id: companyID,
+		})
+	}
 }

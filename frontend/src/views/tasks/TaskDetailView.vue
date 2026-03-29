@@ -622,6 +622,7 @@ import {klona} from 'klona/lite'
 
 import TaskService from '@/services/task'
 import TaskModel from '@/models/task'
+import ChatService from '@/services/chat'
 
 import type {ITask} from '@/modelTypes/ITask'
 import type {IProject} from '@/modelTypes/IProject'
@@ -666,6 +667,8 @@ import {useKanbanStore} from '@/stores/kanban'
 import {useProjectStore} from '@/stores/projects'
 import {useAuthStore} from '@/stores/auth'
 import {useBaseStore} from '@/stores/base'
+import {useChatStore} from '@/stores/chat'
+import {useCompanyStore} from '@/stores/company'
 
 import {useTitle} from '@/composables/useTitle'
 import {useTaskDetailShortcuts} from '@/composables/useTaskDetailShortcuts'
@@ -693,6 +696,7 @@ const taskStore = useTaskStore()
 const kanbanStore = useKanbanStore()
 const authStore = useAuthStore()
 const baseStore = useBaseStore()
+const companyStore = useCompanyStore()
 
 const task = ref<ITask>(new TaskModel())
 const taskNotFound = ref(false)
@@ -870,6 +874,8 @@ onMounted(async () => {
 })
 
 const taskService = shallowReactive(new TaskService())
+const chatService = new ChatService()
+const chatStore = useChatStore()
 
 // load task
 watch(
@@ -893,6 +899,30 @@ watch(
 
 			if (lastProject.value) {
 				await baseStore.handleSetCurrentProjectIfNotSet(lastProject.value)
+			}
+
+			if (task.value.id && task.value.title && project.value?.id) {
+				try {
+					console.log('[TaskDetail] Setting current task:', {
+						taskId: task.value.id,
+						title: task.value.title,
+						projectId: project.value.id,
+						companyId: companyStore.currentCompanyId,
+					})
+					if (companyStore.currentCompanyId && companyStore.currentCompanyId > 0) {
+						await chatService.setCurrentTask(
+							task.value.id,
+							task.value.title,
+							project.value.id,
+							companyStore.currentCompanyId,
+						)
+						await chatStore.setCurrentTask(task.value.id, task.value.title, project.value.id)
+					} else {
+						console.warn('[TaskDetail] Invalid companyId for current task:', companyStore.currentCompanyId)
+					}
+				} catch (e) {
+					console.error('Failed to set current task:', e)
+				}
 			}
 		} catch (e) {
 			if (e?.response?.status === 404) {

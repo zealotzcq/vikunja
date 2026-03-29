@@ -454,6 +454,10 @@ func (a *Agent) buildSystemPrompt(agentCtx *AgentContext) string {
 		sb.WriteString(fmt.Sprintf("  Task ID: %d\n", agentCtx.CurrentTask.TaskID))
 		sb.WriteString(fmt.Sprintf("  Title: %s\n", agentCtx.CurrentTask.Title))
 		sb.WriteString(fmt.Sprintf("  Project ID: %d\n", agentCtx.CurrentTask.ProjectID))
+		fmt.Printf("[AI] Current task in system prompt: TaskID=%d, Title=%s, ProjectID=%d\n",
+			agentCtx.CurrentTask.TaskID, agentCtx.CurrentTask.Title, agentCtx.CurrentTask.ProjectID)
+	} else {
+		fmt.Printf("[AI] No current task in agent context\n")
 	}
 
 	sb.WriteString("\n")

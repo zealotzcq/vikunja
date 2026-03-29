@@ -24,6 +24,7 @@ import (
 func isUserAllowedForChat(a web.Auth, companyID int64) bool {
 	userObj, isUser := a.(*user.User)
 	if !isUser {
+		fmt.Printf("[Chat] User is not a regular user\n")
 		return false
 	}
 
@@ -31,11 +32,14 @@ func isUserAllowedForChat(a web.Auth, companyID int64) bool {
 	defer s.Close()
 
 	role := company.GetUserRole(s, userObj.ID, companyID)
+	fmt.Printf("[Chat] isUserAllowedForChat: userID=%d, companyID=%d, role=%s\n", userObj.ID, companyID, role)
 	if role == "" {
 		return false
 	}
 
-	return role == "creator" || role == "admin"
+	allowed := role == "creator" || role == "admin"
+	fmt.Printf("[Chat] isUserAllowedForChat result: %v\n", allowed)
+	return allowed
 }
 
 // SendMessageRequest represents a request to send a chat message
@@ -50,6 +54,14 @@ type SendMessageRequest struct {
 // SubmitQuestionAnswerRequest represents a request to submit a question answer
 type SubmitQuestionAnswerRequest struct {
 	Answer    string `json:"answer" validate:"required"`
+	CompanyID int64  `json:"company_id" validate:"required"`
+}
+
+// SetCurrentTaskRequest represents a request to set the current task
+type SetCurrentTaskRequest struct {
+	TaskID    int64  `json:"task_id" validate:"required"`
+	Title     string `json:"title" validate:"required"`
+	ProjectID int64  `json:"project_id" validate:"required"`
 	CompanyID int64  `json:"company_id" validate:"required"`
 }
 
@@ -620,4 +632,33 @@ func SubmitQuestionAnswer(c *echo.Context) error {
 		"status":    "processing",
 		"timestamp": time.Now().Unix(),
 	})
+}
+
+// SetCurrentTask sets the current task for a chat session
+func SetCurrentTask(c *echo.Context) error {
+	a, err := auth.GetAuthFromClaims(c)
+	if err != nil {
+		return err
+	}
+
+	if _, is := a.(*models.LinkSharing); is {
+		return echo.ErrForbidden
+	}
+
+	userID := a.GetID()
+
+	req := new(SetCurrentTaskRequest)
+	if err := c.Bind(req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
+	}
+
+	if !isUserAllowedForChat(a, req.CompanyID) {
+		return echo.NewHTTPError(http.StatusForbidden, "Chat assistant is not available for your account")
+	}
+
+	if err := chat_session.GetDefault().SetCurrentTask(userID, req.CompanyID, req.TaskID, req.Title, req.ProjectID); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("Failed to set current task: %v", err))
+	}
+
+	return c.JSON(http.StatusOK, models.Message{Message: "Current task set successfully"})
 }

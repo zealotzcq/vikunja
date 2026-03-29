@@ -409,9 +409,13 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useTaskStore } from '@/stores/tasks'
 import { useProjectStore } from '@/stores/projects'
+import { useBaseStore } from '@/stores/base'
+import { useChatStore } from '@/stores/chat'
+import { useCompanyStore } from '@/stores/company'
 import TaskService from '@/services/task'
 import TaskCommentService from '@/services/taskComment'
 import TaskCommentModel from '@/models/taskComment'
+import ChatService from '@/services/chat'
 import { success } from '@/message'
 import type { ITask } from '@/modelTypes/ITask'
 import type { ITaskComment } from '@/modelTypes/ITaskComment'
@@ -421,6 +425,10 @@ const router = useRouter()
 const route = useRoute()
 const taskStore = useTaskStore()
 const projectStore = useProjectStore()
+const baseStore = useBaseStore()
+const chatStore = useChatStore()
+const companyStore = useCompanyStore()
+const chatService = new ChatService()
 const isLoading = ref(false)
 const loadError = ref<string | null>(null)
 const taskData = ref<ITask | null>(null)
@@ -593,6 +601,20 @@ const loadTask = async () => {
 		if (loaded.isUnread) {
 			await taskStore.markTaskAsRead(loaded.id)
 			loaded.isUnread = false
+		}
+
+		if (loaded.id && loaded.title && loaded.projectId) {
+			try {
+				await chatService.setCurrentTask(
+					loaded.id,
+					loaded.title,
+					loaded.projectId,
+					companyStore.currentCompanyId,
+				)
+				await chatStore.setCurrentTask(loaded.id, loaded.title, loaded.projectId)
+			} catch (e) {
+				console.error('Failed to set current task in mobile:', e)
+			}
 		}
 
 		await loadComments()

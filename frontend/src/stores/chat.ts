@@ -420,6 +420,14 @@ export const useChatStore = defineStore('chat', () => {
 		localStorage.removeItem('vikunja-chat-history')
 	}
 
+	async function setCurrentTask(taskId: number, title: string, projectId: number) {
+		currentTask.value = {
+			task_id: taskId,
+			title,
+			project_id: projectId,
+		}
+	}
+
 	function toggleOpen() {
 		isOpen.value = !isOpen.value
 		// State is automatically saved by the watch above
@@ -440,6 +448,7 @@ export const useChatStore = defineStore('chat', () => {
 		toggleOpen,
 		loadChatHistory,
 		setMobile,
+		setCurrentTask,
 		connectSSE,
 		disconnectSSE,
 		executeButtonNavigation,

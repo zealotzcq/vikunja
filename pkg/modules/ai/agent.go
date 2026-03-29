@@ -50,6 +50,7 @@ type AgentContext struct {
 	SessionData      map[string]interface{}              `json:"session_data"`
 	Language         string                              `json:"language"`
 	SubordinateStaff []chat_session.SubordinateStaffInfo `json:"subordinate_staff"`
+	CurrentTask      *chat_session.CurrentTask           `json:"current_task,omitempty"`
 
 	NavigationInfo   *NavigationInfo                `json:"navigation_info,omitempty"`
 	ShouldNavigate   bool                           `json:"should_navigate"`
@@ -446,6 +447,13 @@ func (a *Agent) buildSystemPrompt(agentCtx *AgentContext) string {
 		sb.WriteString("\n- Subordinate Staff:\n")
 		staffJSON, _ := json.Marshal(agentCtx.SubordinateStaff)
 		sb.WriteString(fmt.Sprintf("  %s\n", string(staffJSON)))
+	}
+
+	if agentCtx.CurrentTask != nil {
+		sb.WriteString("\n- Current Task:\n")
+		sb.WriteString(fmt.Sprintf("  Task ID: %d\n", agentCtx.CurrentTask.TaskID))
+		sb.WriteString(fmt.Sprintf("  Title: %s\n", agentCtx.CurrentTask.Title))
+		sb.WriteString(fmt.Sprintf("  Project ID: %d\n", agentCtx.CurrentTask.ProjectID))
 	}
 
 	sb.WriteString("\n")

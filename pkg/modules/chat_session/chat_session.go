@@ -41,6 +41,13 @@ type SubordinateStaffInfo struct {
 	ProjectID int64  `json:"project_id"`
 }
 
+// CurrentTask represents the current task context in a chat session
+type CurrentTask struct {
+	TaskID    int64  `json:"task_id"`
+	Title     string `json:"title"`
+	ProjectID int64  `json:"project_id"`
+}
+
 // ChatSession represents a chat session in memory
 type ChatSession struct {
 	ID               string                 `json:"id"`
@@ -50,6 +57,7 @@ type ChatSession struct {
 	ExpiresAt        time.Time              `json:"expires_at"`
 	Messages         []Message              `json:"messages"`
 	SubordinateStaff []SubordinateStaffInfo `json:"subordinate_staff"`
+	CurrentTask      *CurrentTask           `json:"current_task"`
 }
 
 // Message represents a chat message
@@ -461,6 +469,29 @@ func (m *Manager) ReleaseSessionLock(mu *sync.Mutex) {
 	fmt.Printf("[Chat] Releasing session lock\n")
 	mu.Unlock()
 	fmt.Printf("[Chat] Session lock released\n")
+}
+
+// SetCurrentTask sets the current task for a session
+func (m *Manager) SetCurrentTask(userID, companyID, taskID int64, title string, projectID int64) error {
+	session, err := m.GetOrCreateSession(userID, companyID)
+	if err != nil {
+		return fmt.Errorf("failed to get session: %w", err)
+	}
+
+	updatedSession := *session
+	updatedSession.CurrentTask = &CurrentTask{
+		TaskID:    taskID,
+		Title:     title,
+		ProjectID: projectID,
+	}
+	updatedSession.ExpiresAt = time.Now().Add(sessionTTL)
+
+	sessionKey := getSessionKey(userID, companyID)
+	if err := keyvalue.Put(sessionKey, updatedSession); err != nil {
+		return fmt.Errorf("failed to update session: %w", err)
+	}
+
+	return nil
 }
 
 // GetDefault returns the default session manager

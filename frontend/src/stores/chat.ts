@@ -74,6 +74,7 @@ export const useChatStore = defineStore('chat', () => {
 
 	const isOpen = ref(shouldAutoOpen())
 	const messages = ref<IChatMessage[]>([])
+	const currentTask = ref<{task_id: number, title: string, project_id: number} | null>(null)
 	const isLoading = ref(false)
 	const error = ref<string | null>(null)
 	const lastMessageId = ref<string>('')
@@ -127,6 +128,7 @@ export const useChatStore = defineStore('chat', () => {
 	watch(() => companyStore.currentCompanyId, async (newCompanyId) => {
 		if (authStore.authUser && newCompanyId) {
 			messages.value = []
+			currentTask.value = null
 			lastMessageId.value = ''
 			await loadChatHistory()
 			if (!isAvailable.value && isOpen.value) {
@@ -139,6 +141,7 @@ export const useChatStore = defineStore('chat', () => {
 			}
 		} else {
 			isAvailable.value = false
+			currentTask.value = null
 		}
 	}, {immediate: true})
 
@@ -245,6 +248,12 @@ export const useChatStore = defineStore('chat', () => {
 		try {
 			const response = await chatService.getHistory(companyStore.currentCompanyId)
 			isAvailable.value = true
+
+			if (response.current_task) {
+				currentTask.value = response.current_task
+			} else {
+				currentTask.value = null
+			}
 
 			const newMessages: IChatMessage[] = response.messages.map(msg => ({
 				id: msg.id,
@@ -404,6 +413,7 @@ export const useChatStore = defineStore('chat', () => {
 	async function clearMessages() {
 		error.value = null
 		messages.value = []
+		currentTask.value = null
 		lastMessageId.value = ''
 		clearProcessedRefreshMessages()
 		await chatService.clearSession(companyStore.currentCompanyId || undefined)
@@ -420,6 +430,7 @@ export const useChatStore = defineStore('chat', () => {
 		isAvailable,
 		isOpen,
 		messages,
+		currentTask,
 		isLoading,
 		error,
 		hasPendingResponse,

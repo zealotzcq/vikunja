@@ -6,7 +6,12 @@
 				class="chat-assistant-panel"
 			>
 				<header class="chat-header">
-					<h3>{{ $t('chatAssistant.title') }}</h3>
+					<div class="header-title">
+						<h3>{{ $t('chatAssistant.title') }}</h3>
+						<span v-if="chatStore.currentTask" class="current-task-badge">
+							{{ $t('chatAssistant.currentTask', { taskId: chatStore.currentTask.task_id, taskTitle: chatStore.currentTask.title }) }}
+						</span>
+					</div>
 					<div class="header-actions">
 						<BaseButton
 							class="action-btn clear-btn"
@@ -410,6 +415,12 @@ watch(
 	align-items: center;
 	padding: 0.5rem 1rem;
 	border-block-end: 1px solid var(--grey-200);
+}
+
+.header-title {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
 
 	h3 {
 		margin: 0;
@@ -417,6 +428,19 @@ watch(
 		font-weight: 600;
 		color: var(--grey-800);
 	}
+}
+
+.current-task-badge {
+	padding: 0.25rem 0.5rem;
+	background: var(--primary-light);
+	color: var(--primary);
+	border-radius: 0.25rem;
+	font-size: 0.75rem;
+	font-weight: 500;
+	max-width: 150px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .header-actions {

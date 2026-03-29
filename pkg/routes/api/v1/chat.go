@@ -311,12 +311,22 @@ func GetChatHistory(c *echo.Context) error {
 		}
 	}
 
+	var currentTask map[string]interface{}
+	if sessionData.CurrentTask != nil {
+		currentTask = map[string]interface{}{
+			"task_id":    sessionData.CurrentTask.TaskID,
+			"title":      sessionData.CurrentTask.Title,
+			"project_id": sessionData.CurrentTask.ProjectID,
+		}
+	}
+
 	response := map[string]interface{}{
-		"id":         sessionData.ID,
-		"user_id":    sessionData.UserID,
-		"created_at": sessionData.CreatedAt.Unix(),
-		"messages":   frontendMessages,
-		"expires_at": sessionData.ExpiresAt.Unix(),
+		"id":           sessionData.ID,
+		"user_id":      sessionData.UserID,
+		"created_at":   sessionData.CreatedAt.Unix(),
+		"messages":     frontendMessages,
+		"expires_at":   sessionData.ExpiresAt.Unix(),
+		"current_task": currentTask,
 	}
 
 	return c.JSON(http.StatusOK, response)
@@ -390,6 +400,7 @@ func processAgentInternal(ctx context.Context, userID, companyID int64, req *Sen
 	}
 
 	agentCtx.SubordinateStaff = session.SubordinateStaff
+	agentCtx.CurrentTask = session.CurrentTask
 
 	// Build message history from session (including all messages)
 	for _, msg := range session.Messages {

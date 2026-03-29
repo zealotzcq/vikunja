@@ -1,5 +1,13 @@
 <template>
   <div class="mobile-chat">
+    <header v-if="chatStore.currentTask" class="chat-header">
+      <div class="header-content">
+        <span class="header-title">{{ $t('chatAssistant.title') }}</span>
+        <span class="current-task-badge">
+          {{ $t('chatAssistant.currentTask', { taskId: chatStore.currentTask.task_id, taskTitle: chatStore.currentTask.title }) }}
+        </span>
+      </div>
+    </header>
     <main class="chat-area">
       <div v-if="chatStore.error" class="status-message error-message">
         {{ chatStore.error }}
@@ -538,6 +546,38 @@ export default defineComponent({
   background: var(--color-background);
   height: 100%;
   min-height: 0;
+}
+
+.chat-header {
+  flex-shrink: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.header-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.current-task-badge {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-area {

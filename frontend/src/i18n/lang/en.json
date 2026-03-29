@@ -1228,7 +1228,8 @@
     "customInput": "Custom Input",
     "customInputDescription": "Enter your answer manually",
     "customInputTitle": "Please enter your answer",
-    "customInputPlaceholder": "Enter your answer here..."
+    "customInputPlaceholder": "Enter your answer here...",
+    "currentTask": "Current Task:{taskId}-{taskTitle}",
   },
   "date": {
     "altFormatLong": "j M Y, H:i",

@@ -719,6 +719,10 @@ func RegisterDefaultTools() error {
 				Title: taskTitle,
 			}
 
+			if err := chat_session.GetDefault().SetCurrentTask(ctx.UserID, ctx.CompanyID, task.ID, taskTitle, projectID); err != nil {
+				fmt.Printf("[Chat] Failed to set current task: %v\n", err)
+			}
+
 			return &ToolExecutionResult{
 				Result: response,
 				StopCommand: &ToolStopCommand{

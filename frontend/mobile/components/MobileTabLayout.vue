@@ -1,178 +1,241 @@
 <template>
-  <div class="mobile-tab-layout mobile-viewport">
-    <header v-if="!isDetailPage" class="mobile-header">
-      <div class="header-left">
-        <div
-          v-if="companyStore.companies.length > 1"
-          class="company-selector"
-          @click="toggleCompanyDropdown"
-        >
-          <span class="company-name">{{ companyName }}</span>
-          <svg class="dropdown-arrow" :class="{ 'rotate': showCompanyDropdown }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6 9 12 15 18 9"></polyline>
-          </svg>
-        </div>
-        <span v-else class="company-name">{{ companyName }}</span>
-        <transition name="fade">
-          <div v-if="showCompanyDropdown" class="company-dropdown">
-            <button
-              v-for="company in companyStore.companies"
-              :key="company.id"
-              class="company-dropdown-item"
-              :class="{ 'active': company.id === companyStore.currentCompanyId }"
-              @click="handleCompanySwitch(company.id)"
-            >
-              {{ company.description }}
-            </button>
-          </div>
-        </transition>
-      </div>
-      <div class="header-right">
-        <div class="notification-wrapper">
-          <Notifications />
-        </div>
-        <div class="avatar-wrapper" @click="toggleMenu">
-          <div class="user-avatar">
-            <img
-              v-if="avatarUrl"
-              :src="avatarUrl"
-              alt=""
-              width="40"
-              height="40"
-            >
-            <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-          </div>
-        </div>
-        <transition name="fade">
-          <div v-if="showMenu" class="avatar-menu">
-            <button class="menu-item logout-item" @click="handleLogout">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                <polyline points="16 17 21 12 16 7"></polyline>
-                <line x1="21" y1="12" x2="9" y2="12"></line>
-              </svg>
-              登出
-            </button>
-          </div>
-        </transition>
-      </div>
-    </header>
-    <main class="layout-content" :class="{ 'full-height': isDetailPage }">
-      <RouterView />
-    </main>
-    <MobileTabBar v-if="!isDetailPage" :active-tab="activeTab" />
-  </div>
+	<div class="mobile-tab-layout mobile-viewport">
+		<header
+			v-if="!isDetailPage"
+			class="mobile-header"
+		>
+			<div class="header-left">
+				<div
+					v-if="companyStore.companies.length > 1"
+					class="company-selector"
+					@click="toggleCompanyDropdown"
+				>
+					<span class="company-name">{{ companyName }}</span>
+					<svg
+						class="dropdown-arrow"
+						:class="{ 'rotate': showCompanyDropdown }"
+						width="16"
+						height="16"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<polyline points="6 9 12 15 18 9" />
+					</svg>
+				</div>
+				<span
+					v-else
+					class="company-name"
+				>{{ companyName }}</span>
+				<transition name="fade">
+					<div
+						v-if="showCompanyDropdown"
+						class="company-dropdown"
+					>
+						<button
+							v-for="company in companyStore.companies"
+							:key="company.id"
+							class="company-dropdown-item"
+							:class="{ 'active': company.id === companyStore.currentCompanyId }"
+							@click="handleCompanySwitch(company.id)"
+						>
+							{{ company.description }}
+						</button>
+					</div>
+				</transition>
+			</div>
+			<div class="header-right">
+				<div class="notification-wrapper">
+					<Notifications />
+				</div>
+				<div
+					class="avatar-wrapper"
+					@click="toggleMenu"
+				>
+					<div class="user-avatar">
+						<img
+							v-if="avatarUrl"
+							:src="avatarUrl"
+							alt=""
+							width="40"
+							height="40"
+						>
+						<svg
+							v-else
+							width="20"
+							height="20"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+							<circle
+								cx="12"
+								cy="7"
+								r="4"
+							/>
+						</svg>
+					</div>
+				</div>
+				<transition name="fade">
+					<div
+						v-if="showMenu"
+						class="avatar-menu"
+					>
+						<button
+							class="menu-item logout-item"
+							@click="handleLogout"
+						>
+							<svg
+								width="18"
+								height="18"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+								<polyline points="16 17 21 12 16 7" />
+								<line
+									x1="21"
+									y1="12"
+									x2="9"
+									y2="12"
+								/>
+							</svg>
+							登出
+						</button>
+					</div>
+				</transition>
+			</div>
+		</header>
+		<main
+			class="layout-content"
+			:class="{ 'full-height': isDetailPage }"
+		>
+			<RouterView />
+		</main>
+		<MobileTabBar
+			v-if="!isDetailPage"
+			:active-tab="activeTab"
+		/>
+	</div>
 </template>
 
 <script lang="ts">
 import '../assets/mobile.css'
 
-import { defineComponent, computed, ref, onMounted, onUnmounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import MobileTabBar from './MobileTabBar.vue';
-import { useCompanyStore } from '@/stores/company';
-import { useAuthStore } from '@/stores/auth';
-import Notifications from '@/components/notifications/Notifications.vue';
+import { defineComponent, computed, ref, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import MobileTabBar from './MobileTabBar.vue'
+import { useCompanyStore } from '@/stores/company'
+import { useAuthStore } from '@/stores/auth'
+import Notifications from '@/components/notifications/Notifications.vue'
 
 export default defineComponent({
-  name: 'MobileTabLayout',
-  components: {
-    MobileTabBar,
-    Notifications,
-  },
-  setup() {
-    const route = useRoute();
-    const router = useRouter();
-    const companyStore = useCompanyStore();
-    const authStore = useAuthStore();
+	name: 'MobileTabLayout',
+	components: {
+		MobileTabBar,
+		Notifications,
+	},
+	setup() {
+		const route = useRoute()
+		const router = useRouter()
+		const companyStore = useCompanyStore()
+		const authStore = useAuthStore()
 
-    const activeTab = computed(() => {
-      if (route.path.startsWith('/mobile/chat')) return 'chat';
-      if (route.path.startsWith('/mobile/task') || route.path.startsWith('/mobile/project') || route.path.startsWith('/mobile/projects')) return 'projects';
-      return 'home';
-    });
+		const activeTab = computed(() => {
+			if (route.path.startsWith('/mobile/chat')) return 'chat'
+			if (route.path.startsWith('/mobile/task') || route.path.startsWith('/mobile/project') || route.path.startsWith('/mobile/projects')) return 'projects'
+			return 'home'
+		})
 
-    const isDetailPage = computed(() => {
-      return route.path.startsWith('/mobile/task/');
-    });
+		const isDetailPage = computed(() => {
+			return route.path.startsWith('/mobile/task/')
+		})
 
-    const companyName = computed(() => companyStore.currentCompany?.description || '任务助手');
-    const showMenu = ref(false);
-    const showCompanyDropdown = ref(false);
+		const companyName = computed(() => companyStore.currentCompany?.description || '任务助手')
+		const showMenu = ref(false)
+		const showCompanyDropdown = ref(false)
 
-    const toggleMenu = () => {
-      showMenu.value = !showMenu.value;
-      showCompanyDropdown.value = false;
-    };
+		const toggleMenu = () => {
+			showMenu.value = !showMenu.value
+			showCompanyDropdown.value = false
+		}
 
-    const toggleCompanyDropdown = () => {
-      showCompanyDropdown.value = !showCompanyDropdown.value;
-      showMenu.value = false;
-    };
+		const toggleCompanyDropdown = () => {
+			showCompanyDropdown.value = !showCompanyDropdown.value
+			showMenu.value = false
+		}
 
-    const closeMenu = () => {
-      showMenu.value = false;
-    };
+		const closeMenu = () => {
+			showMenu.value = false
+		}
 
-    const closeCompanyDropdown = () => {
-      showCompanyDropdown.value = false;
-    };
+		const closeCompanyDropdown = () => {
+			showCompanyDropdown.value = false
+		}
 
-    const handleLogout = () => {
-      closeMenu();
-      authStore.logout();
-      router.replace('/mobile/login');
-    };
+		const handleLogout = () => {
+			closeMenu()
+			authStore.logout()
+			router.replace('/mobile/login')
+		}
 
-    const handleCompanySwitch = (companyId: number) => {
-      companyStore.setCurrentCompany(companyId);
-      closeCompanyDropdown();
-    };
+		const handleCompanySwitch = (companyId: number) => {
+			companyStore.setCurrentCompany(companyId)
+			closeCompanyDropdown()
+		}
 
-    onMounted(() => {
-      authStore.checkAuth();
-      document.addEventListener('click', handleClickOutside);
-      companyStore.loadCompanies();
-    });
+		onMounted(() => {
+			authStore.checkAuth()
+			document.addEventListener('click', handleClickOutside)
+			companyStore.loadCompanies()
+		})
 
-    onUnmounted(() => {
-      document.removeEventListener('click', handleClickOutside);
-    });
+		onUnmounted(() => {
+			document.removeEventListener('click', handleClickOutside)
+		})
 
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      const avatarWrapper = target.closest('.avatar-wrapper');
-      const menu = target.closest('.avatar-menu');
-      if (!avatarWrapper && !menu) {
-        closeMenu();
-      }
+		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as HTMLElement
+			const avatarWrapper = target.closest('.avatar-wrapper')
+			const menu = target.closest('.avatar-menu')
+			if (!avatarWrapper && !menu) {
+				closeMenu()
+			}
 
-      const companySelector = target.closest('.company-selector');
-      const companyDropdown = target.closest('.company-dropdown');
-      if (!companySelector && !companyDropdown) {
-        closeCompanyDropdown();
-      }
-    };
+			const companySelector = target.closest('.company-selector')
+			const companyDropdown = target.closest('.company-dropdown')
+			if (!companySelector && !companyDropdown) {
+				closeCompanyDropdown()
+			}
+		}
 
-    return {
-      activeTab,
-      isDetailPage,
-      companyStore,
-      companyName,
-      avatarUrl: authStore.avatarUrl,
-      showMenu,
-      showCompanyDropdown,
-      toggleMenu,
-      toggleCompanyDropdown,
-      closeMenu,
-      handleLogout,
-      handleCompanySwitch,
-    };
-  },
-});
+		return {
+			activeTab,
+			isDetailPage,
+			companyStore,
+			companyName,
+			avatarUrl: authStore.avatarUrl,
+			showMenu,
+			showCompanyDropdown,
+			toggleMenu,
+			toggleCompanyDropdown,
+			closeMenu,
+			handleLogout,
+			handleCompanySwitch,
+		}
+	},
+})
 </script>
 
 <style scoped>

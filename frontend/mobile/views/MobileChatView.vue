@@ -1,542 +1,574 @@
 <template>
-  <div class="mobile-chat">
-    <header v-if="chatStore.currentTask" class="chat-header">
-      <div class="header-content">
-        <span class="header-title">{{ $t('chatAssistant.title') }}</span>
-        <span class="current-task-badge">
-          {{ $t('chatAssistant.currentTask', { taskId: chatStore.currentTask.task_id, taskTitle: chatStore.currentTask.title }) }}
-        </span>
-      </div>
-    </header>
-    <main class="chat-area">
-      <div v-if="chatStore.error" class="status-message error-message">
-        {{ chatStore.error }}
-      </div>
+	<div class="mobile-chat">
+		<header
+			v-if="chatStore.currentTask"
+			class="chat-header"
+		>
+			<div class="header-content">
+				<span class="header-title">{{ $t('chatAssistant.title') }}</span>
+				<span class="current-task-badge">
+					{{ $t('chatAssistant.currentTask', { taskId: chatStore.currentTask.task_id, taskTitle: chatStore.currentTask.title }) }}
+				</span>
+			</div>
+		</header>
+		<main class="chat-area">
+			<div
+				v-if="chatStore.error"
+				class="status-message error-message"
+			>
+				{{ chatStore.error }}
+			</div>
 
-      <div
-        v-else-if="chatStore.isLoading"
-        class="status-message loading-indicator"
-      >
-        <div class="loading-spinner" />
-        <span>{{ $t('chatAssistant.loading') }}</span>
-      </div>
+			<div
+				v-else-if="chatStore.isLoading"
+				class="status-message loading-indicator"
+			>
+				<div class="loading-spinner" />
+				<span>{{ $t('chatAssistant.loading') }}</span>
+			</div>
 
-      <div
-        v-else-if="!chatStore.isAvailable"
-        class="status-message unavailable-message"
-      >
-        {{ $t('chatAssistant.unavailable') }}
-      </div>
+			<div
+				v-else-if="!chatStore.isAvailable"
+				class="status-message unavailable-message"
+			>
+				{{ $t('chatAssistant.unavailable') }}
+			</div>
 
-      <div
-        v-else
-        class="messages-container"
-        ref="messagesContainer"
-      >
-        <div
-          v-for="msg in visibleMessages"
-          :key="msg.id"
-          class="message"
-          :class="[msg.role]"
-        >
-          <div v-if="msg.content" class="message-content">
-            <template v-if="isTableContent(msg.content)">
-              <table class="message-table">
-                <tbody>
-                  <tr v-for="(row, index) in parseTableContent(msg.content)" :key="index">
-                    <td v-for="(cell, cellIndex) in row" :key="cellIndex" :class="{ 'header-cell': index === 0 }">
-                      {{ cell }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </template>
-            <template v-else>
-              {{ msg.content }}
-            </template>
-          </div>
+			<div
+				v-else
+				ref="messagesContainer"
+				class="messages-container"
+			>
+				<div
+					v-for="msg in visibleMessages"
+					:key="msg.id"
+					class="message"
+					:class="[msg.role]"
+				>
+					<div
+						v-if="msg.content"
+						class="message-content"
+					>
+						<template v-if="isTableContent(msg.content)">
+							<table class="message-table">
+								<tbody>
+									<tr
+										v-for="(row, index) in parseTableContent(msg.content)"
+										:key="index"
+									>
+										<td
+											v-for="(cell, cellIndex) in row"
+											:key="cellIndex"
+											:class="{ 'header-cell': index === 0 }"
+										>
+											{{ cell }}
+										</td>
+									</tr>
+								</tbody>
+							</table>
+						</template>
+						<template v-else>
+							{{ msg.content }}
+						</template>
+					</div>
 
-          <div
-            v-if="msg.buttonNavigation"
-            class="button-navigation"
-          >
-            <button
-              class="nav-button"
-              @click="chatStore.executeButtonNavigation(msg.buttonNavigation.routeName, msg.buttonNavigation.params)"
-            >
-              {{ msg.buttonNavigation.label }}
-              <span
-                v-if="msg.buttonNavigation.title"
-                class="nav-title"
-              >
-                : {{ msg.buttonNavigation.title }}
-              </span>
-            </button>
-          </div>
+					<div
+						v-if="msg.buttonNavigation"
+						class="button-navigation"
+					>
+						<button
+							class="nav-button"
+							@click="chatStore.executeButtonNavigation(msg.buttonNavigation.routeName, msg.buttonNavigation.params)"
+						>
+							{{ msg.buttonNavigation.label }}
+							<span
+								v-if="msg.buttonNavigation.title"
+								class="nav-title"
+							>
+								: {{ msg.buttonNavigation.title }}
+							</span>
+						</button>
+					</div>
 
-          <div
-            v-if="msg.questionData"
-            class="question-panel"
-          >
-            <div
-              v-for="(question, qIndex) in parseQuestions(msg.questionData)"
-              :key="qIndex"
-              class="question-item"
-            >
-              <div class="question-text">
-                {{ question.question }}
-              </div>
-              <div class="question-options">
-                <button
-                  v-for="(option, oIndex) in question.options"
-                  :key="oIndex"
-                  class="question-option"
-                  :class="{ disabled: isQuestionDisabled(msg) }"
-                  @click="!isQuestionDisabled(msg) && handleQuestionOption(question, option)"
-                >
-                  <div class="option-label">
-                    {{ option.label }}
-                  </div>
-                  <div class="option-description">
-                    {{ option.description }}
-                  </div>
-                </button>
-                <button
-                  class="question-option custom-option"
-                  :class="{ disabled: isQuestionDisabled(msg) }"
-                  @click="!isQuestionDisabled(msg) && showCustomInput(question)"
-                >
-                  <div class="option-label">
-                    {{ $t('chatAssistant.customInput') }}
-                  </div>
-                  <div class="option-description">
-                    {{ $t('chatAssistant.customInputDescription') }}
-                  </div>
-                </button>
-              </div>
-            </div>
-          </div>
+					<div
+						v-if="msg.questionData"
+						class="question-panel"
+					>
+						<div
+							v-for="(question, qIndex) in parseQuestions(msg.questionData)"
+							:key="qIndex"
+							class="question-item"
+						>
+							<div class="question-text">
+								{{ question.question }}
+							</div>
+							<div class="question-options">
+								<button
+									v-for="(option, oIndex) in question.options"
+									:key="oIndex"
+									class="question-option"
+									:class="{ disabled: isQuestionDisabled(msg) }"
+									@click="!isQuestionDisabled(msg) && handleQuestionOption(question, option)"
+								>
+									<div class="option-label">
+										{{ option.label }}
+									</div>
+									<div class="option-description">
+										{{ option.description }}
+									</div>
+								</button>
+								<button
+									class="question-option custom-option"
+									:class="{ disabled: isQuestionDisabled(msg) }"
+									@click="!isQuestionDisabled(msg) && showCustomInput(question)"
+								>
+									<div class="option-label">
+										{{ $t('chatAssistant.customInput') }}
+									</div>
+									<div class="option-description">
+										{{ $t('chatAssistant.customInputDescription') }}
+									</div>
+								</button>
+							</div>
+						</div>
+					</div>
 
-          <span v-if="msg.content || msg.buttonNavigation || msg.questionData" class="message-time">{{ formatTime(msg.timestamp) }}</span>
-        </div>
+					<span
+						v-if="msg.content || msg.buttonNavigation || msg.questionData"
+						class="message-time"
+					>{{ formatTime(msg.timestamp) }}</span>
+				</div>
 
-        <div
-          v-if="isProcessing"
-          class="message assistant loading-message"
-        >
-          <div class="message-content loading-content">
-            <div class="loading-dots">
-              <span class="dot" />
-              <span class="dot" />
-              <span class="dot" />
-            </div>
-            <div class="loading-text">
-              {{ processingText }}
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
+				<div
+					v-if="isProcessing"
+					class="message assistant loading-message"
+				>
+					<div class="message-content loading-content">
+						<div class="loading-dots">
+							<span class="dot" />
+							<span class="dot" />
+							<span class="dot" />
+						</div>
+						<div class="loading-text">
+							{{ processingText }}
+						</div>
+					</div>
+				</div>
+			</div>
+		</main>
 
-    <div
-      v-if="chatStore.isAvailable"
-      class="input-area"
-    >
-      <button class="clear-input-button" @click="clearMessages" :title="$t('chatAssistant.clear')">
-        <Icon icon="trash-alt" />
-      </button>
-      <input
-        ref="messageInput"
-        v-model="userInput"
-        class="message-input"
-        :placeholder="$t('chatAssistant.placeholder')"
-        @keyup.enter="handleEnter"
-      >
-      <button
-        class="send-button"
-        @click="handleSend"
-        :disabled="!userInput.trim() || sendDisabled"
-      >
-        <Icon icon="arrow-up-from-bracket" />
-      </button>
-    </div>
+		<div
+			v-if="chatStore.isAvailable"
+			class="input-area"
+		>
+			<button
+				class="clear-input-button"
+				:title="$t('chatAssistant.clear')"
+				@click="clearMessages"
+			>
+				<Icon icon="trash-alt" />
+			</button>
+			<input
+				ref="messageInput"
+				v-model="userInput"
+				class="message-input"
+				:placeholder="$t('chatAssistant.placeholder')"
+				@keyup.enter="handleEnter"
+			>
+			<button
+				class="send-button"
+				:disabled="!userInput.trim() || sendDisabled"
+				@click="handleSend"
+			>
+				<Icon icon="arrow-up-from-bracket" />
+			</button>
+		</div>
 
-    <div v-if="showCustomInputModal" class="custom-input-modal" @click.self="closeCustomInput">
-      <div class="custom-input-content">
-        <h3 class="custom-input-title">{{ $t('chatAssistant.customInputTitle') }}</h3>
-        <textarea
-          v-model="customInputValue"
-          class="custom-input-textarea"
-          :placeholder="$t('chatAssistant.customInputPlaceholder')"
-          @keyup.enter.ctrl="confirmCustomInput"
-        />
-        <div class="custom-input-buttons">
-          <button class="custom-input-button cancel" @click="closeCustomInput">
-            {{ $t('misc.cancel') }}
-          </button>
-          <button
-            class="custom-input-button confirm"
-            @click="confirmCustomInput"
-            :disabled="!customInputValue.trim()"
-          >
-            {{ $t('misc.confirm') }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+		<div
+			v-if="showCustomInputModal"
+			class="custom-input-modal"
+			@click.self="closeCustomInput"
+		>
+			<div class="custom-input-content">
+				<h3 class="custom-input-title">
+					{{ $t('chatAssistant.customInputTitle') }}
+				</h3>
+				<textarea
+					v-model="customInputValue"
+					class="custom-input-textarea"
+					:placeholder="$t('chatAssistant.customInputPlaceholder')"
+					@keyup.enter.ctrl="confirmCustomInput"
+				/>
+				<div class="custom-input-buttons">
+					<button
+						class="custom-input-button cancel"
+						@click="closeCustomInput"
+					>
+						{{ $t('misc.cancel') }}
+					</button>
+					<button
+						class="custom-input-button confirm"
+						:disabled="!customInputValue.trim()"
+						@click="confirmCustomInput"
+					>
+						{{ $t('misc.confirm') }}
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
-import { useRoute } from 'vue-router';
-import { useI18n } from 'vue-i18n';
-import Icon from '@/components/misc/Icon';
-import { useChatStore } from '@/stores/chat';
-import { useCompanyStore } from '@/stores/company';
-import type { IChatMessage, IQuestion, IQuestionOption } from '@/modelTypes/IChatMessage';
+import { defineComponent, ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import Icon from '@/components/misc/Icon'
+import { useChatStore } from '@/stores/chat'
+import { useCompanyStore } from '@/stores/company'
+import type { IChatMessage, IQuestion, IQuestionOption } from '@/modelTypes/IChatMessage'
 
 export default defineComponent({
-  name: 'MobileChatView',
-  components: {
-    Icon,
-  },
-  setup() {
-    const route = useRoute();
-    const { t } = useI18n({ useScope: 'global' });
-    const chatStore = useChatStore();
-    const companyStore = useCompanyStore();
+	name: 'MobileChatView',
+	components: {
+		Icon,
+	},
+	setup() {
+		const route = useRoute()
+		const { t } = useI18n({ useScope: 'global' })
+		const chatStore = useChatStore()
+		const companyStore = useCompanyStore()
 
-    const userInput = ref('');
-    const messagesContainer = ref<HTMLElement | null>(null);
-    const messageInput = ref<HTMLInputElement | null>(null);
-    const isProcessing = ref(false);
-    const processingText = ref('');
-    const sendDisabled = ref(false);
-    const showCustomInputModal = ref(false);
-    const customInputValue = ref('');
-    const currentQuestion = ref<IQuestion | null>(null);
-    let historyPollingTimer: number | null = null;
+		const userInput = ref('')
+		const messagesContainer = ref<HTMLElement | null>(null)
+		const messageInput = ref<HTMLInputElement | null>(null)
+		const isProcessing = ref(false)
+		const processingText = ref('')
+		const sendDisabled = ref(false)
+		const showCustomInputModal = ref(false)
+		const customInputValue = ref('')
+		const currentQuestion = ref<IQuestion | null>(null)
+		let historyPollingTimer: number | null = null
 
-    const ANSWERED_TOOL_CALLS_KEY = 'vikunja-answered-tool-calls';
+		const ANSWERED_TOOL_CALLS_KEY = 'vikunja-answered-tool-calls'
 
-    function getAnsweredToolCalls(): Set<string> {
-      const stored = localStorage.getItem(ANSWERED_TOOL_CALLS_KEY);
-      if (!stored) return new Set();
-      try {
-        return new Set(JSON.parse(stored));
-      } catch {
-        return new Set();
-      }
-    }
+		function getAnsweredToolCalls(): Set<string> {
+			const stored = localStorage.getItem(ANSWERED_TOOL_CALLS_KEY)
+			if (!stored) return new Set()
+			try {
+				return new Set(JSON.parse(stored))
+			} catch {
+				return new Set()
+			}
+		}
 
-    function setToolCallAnswered(toolCallId: string) {
-      const set = getAnsweredToolCalls();
-      set.add(toolCallId);
-      localStorage.setItem(ANSWERED_TOOL_CALLS_KEY, JSON.stringify([...set]));
-    }
+		function setToolCallAnswered(toolCallId: string) {
+			const set = getAnsweredToolCalls()
+			set.add(toolCallId)
+			localStorage.setItem(ANSWERED_TOOL_CALLS_KEY, JSON.stringify([...set]))
+		}
 
-    watch(
-      () => chatStore.hasPendingResponse,
-      (pending) => {
-        if (!pending) {
-          isProcessing.value = false;
-          processingText.value = '';
-        }
-      },
-    );
+		watch(
+			() => chatStore.hasPendingResponse,
+			(pending) => {
+				if (!pending) {
+					isProcessing.value = false
+					processingText.value = ''
+				}
+			},
+		)
 
-    watch(
-      () => chatStore.messages.length,
-      (newLength, oldLength) => {
-        if (oldLength === 0 && newLength > 0) {
-          nextTick(() => {
-            setTimeout(scrollToBottom, 100);
-          });
-        }
-      },
-    );
+		watch(
+			() => chatStore.messages.length,
+			(newLength, oldLength) => {
+				if (oldLength === 0 && newLength > 0) {
+					nextTick().then(() => {
+						setTimeout(scrollToBottom, 100)
+					})
+				}
+			},
+		)
 
-    const lastMessageWithQuestion = computed(() => {
-      const answeredToolCalls = getAnsweredToolCalls();
-      const messagesWithQuestions = chatStore.messages.filter(msg =>
-        msg.questionData &&
+		const lastMessageWithQuestion = computed(() => {
+			const answeredToolCalls = getAnsweredToolCalls()
+			const messagesWithQuestions = chatStore.messages.filter(msg =>
+				msg.questionData &&
         msg.toolCallID &&
         !answeredToolCalls.has(msg.toolCallID),
-      );
-      return messagesWithQuestions[messagesWithQuestions.length - 1] || undefined;
-    });
+			)
+			return messagesWithQuestions[messagesWithQuestions.length - 1] || undefined
+		})
 
-    const visibleMessages = computed(() => {
-      return chatStore.messages.filter(msg =>
-        msg.type === 'user_input' ||
+		const visibleMessages = computed(() => {
+			return chatStore.messages.filter(msg =>
+				msg.type === 'user_input' ||
         msg.type === 'assistant_response' ||
         msg.type === 'question' ||
         msg.type === 'button_navigation' ||
         msg.type === 'question_answer',
-      );
-    });
+			)
+		})
 
-    function parseQuestions(questionData: string): IQuestion[] {
-      if (!questionData) {
-        return [];
-      }
-      try {
-        return JSON.parse(questionData);
-      } catch (e) {
-        return [];
-      }
-    }
+		function parseQuestions(questionData: string): IQuestion[] {
+			if (!questionData) {
+				return []
+			}
+			try {
+				return JSON.parse(questionData)
+			} catch {
+				return []
+			}
+		}
 
-    function isQuestionDisabled(msg: IChatMessage): boolean {
-      if (!msg.toolCallID) {
-        return false;
-      }
+		function isQuestionDisabled(msg: IChatMessage): boolean {
+			if (!msg.toolCallID) {
+				return false
+			}
 
-      const msgIndex = chatStore.messages.findIndex(m => m.id === msg.id);
-      if (msgIndex === -1) {
-        return false;
-      }
+			const msgIndex = chatStore.messages.findIndex(m => m.id === msg.id)
+			if (msgIndex === -1) {
+				return false
+			}
 
-      const messagesAfter = chatStore.messages.slice(msgIndex + 1);
-      return messagesAfter.some(m => m.type === 'user_input');
-    }
+			const messagesAfter = chatStore.messages.slice(msgIndex + 1)
+			return messagesAfter.some(m => m.type === 'user_input')
+		}
 
-    onMounted(async () => {
-      await chatStore.loadChatHistory();
-      chatStore.setMobile(true);
-      chatStore.isOpen = true;
-      await nextTick();
-      setTimeout(scrollToBottom, 100);
+		onMounted(async () => {
+			await chatStore.loadChatHistory()
+			chatStore.setMobile(true)
+			chatStore.isOpen = true
+			await nextTick()
+			setTimeout(scrollToBottom, 100)
 
-      historyPollingTimer = window.setInterval(async () => {
-        if (chatStore.isOpen && chatStore.isAvailable) {
-          const previousLastMessageId = chatStore.messages.length > 0 ? chatStore.messages[chatStore.messages.length - 1]?.id ?? '' : '';
+			historyPollingTimer = window.setInterval(async () => {
+				if (chatStore.isOpen && chatStore.isAvailable) {
+					const previousLastMessageId = chatStore.messages.length > 0 ? chatStore.messages[chatStore.messages.length - 1]?.id ?? '' : ''
 
-          const result = await chatStore.checkNewMessages(companyStore.currentCompanyId ?? undefined, previousLastMessageId);
+					const result = await chatStore.checkNewMessages(companyStore.currentCompanyId ?? undefined, previousLastMessageId)
 
-          if (result.has_new) {
-            await chatStore.loadChatHistory();
-            await nextTick();
-            scrollToBottom();
-          }
-        }
-      }, 5000);
-    });
+					if (result.has_new) {
+						await chatStore.loadChatHistory()
+						await nextTick()
+						scrollToBottom()
+					}
+				}
+			}, 5000)
+		})
 
-    onUnmounted(() => {
-      chatStore.isOpen = false;
-      if (historyPollingTimer !== null) {
-        clearInterval(historyPollingTimer);
-        historyPollingTimer = null;
-      }
-    });
+		onUnmounted(() => {
+			chatStore.isOpen = false
+			if (historyPollingTimer !== null) {
+				clearInterval(historyPollingTimer)
+				historyPollingTimer = null
+			}
+		})
 
-    watch(
-      () => route.path,
-      (newPath) => {
-        if (newPath.startsWith('/mobile/chat')) {
-          chatStore.setMobile(true);
-          chatStore.isOpen = true;
-        } else {
-          chatStore.isOpen = false;
-        }
-      },
-    );
+		watch(
+			() => route.path,
+			(newPath) => {
+				if (newPath.startsWith('/mobile/chat')) {
+					chatStore.setMobile(true)
+					chatStore.isOpen = true
+				} else {
+					chatStore.isOpen = false
+				}
+			},
+		)
 
-    function scrollToBottom() {
-      const scroll = () => {
-        if (messagesContainer.value) {
-          messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-        }
-      };
-      nextTick(() => {
-        scroll();
-        requestAnimationFrame(scroll);
-        requestAnimationFrame(() => {
-          requestAnimationFrame(scroll);
-        });
-      });
-    }
+		function scrollToBottom() {
+			const scroll = () => {
+				if (messagesContainer.value) {
+					messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+				}
+			}
+			nextTick().then(() => {
+				scroll()
+				requestAnimationFrame(scroll)
+				requestAnimationFrame(() => {
+					requestAnimationFrame(scroll)
+				})
+			})
+		}
 
-    function formatTime(timestamp: number): string {
-      const date = new Date(timestamp);
-      const hours = date.getHours().toString().padStart(2, '0');
-      const minutes = date.getMinutes().toString().padStart(2, '0');
-      return `${hours}:${minutes}`;
-    }
+		function formatTime(timestamp: number): string {
+			const date = new Date(timestamp)
+			const hours = date.getHours().toString().padStart(2, '0')
+			const minutes = date.getMinutes().toString().padStart(2, '0')
+			return `${hours}:${minutes}`
+		}
 
-    function isTableContent(content: string): boolean {
-      if (!content) return false;
-      const lines = content.trim().split('\n');
-      return lines.length > 1 && (lines[0]?.includes('\t') ?? false);
-    }
+		function isTableContent(content: string): boolean {
+			if (!content) return false
+			const lines = content.trim().split('\n')
+			return lines.length > 1 && (lines[0]?.includes('\t') ?? false)
+		}
 
-    function parseTableContent(content: string): string[][] {
-      if (!content) return [];
-      const lines = content.trim().split('\n');
-      return lines.map(line => line.split('\t'));
-    }
+		function parseTableContent(content: string): string[][] {
+			if (!content) return []
+			const lines = content.trim().split('\n')
+			return lines.map(line => line.split('\t'))
+		}
 
-    function handleEnter() {
-      if (isProcessing.value) {
-        return;
-      }
-      handleSend();
-    }
+		function handleEnter() {
+			if (isProcessing.value) {
+				return
+			}
+			handleSend()
+		}
 
-    function handleSend() {
-      if (userInput.value.trim() === '' || sendDisabled.value) {
-        return;
-      }
+		function handleSend() {
+			if (userInput.value.trim() === '' || sendDisabled.value) {
+				return
+			}
       
-      const message = userInput.value.trim();
-      userInput.value = '';
+			const message = userInput.value.trim()
+			userInput.value = ''
       
-      sendDisabled.value = true;
-      isProcessing.value = true;
-      processingText.value = t('chatAssistant.processing');
+			sendDisabled.value = true
+			isProcessing.value = true
+			processingText.value = t('chatAssistant.processing')
       
-      chatStore.sendMessage(message);
+			chatStore.sendMessage(message)
       
-      setTimeout(() => {
-        sendDisabled.value = false;
-      }, 500);
-    }
+			setTimeout(() => {
+				sendDisabled.value = false
+			}, 500)
+		}
 
-    function sendMessage() {
-      handleSend();
-    }
+		function sendMessage() {
+			handleSend()
+		}
 
-    async function clearMessages() {
-      await chatStore.clearMessages();
-      isProcessing.value = false;
-      processingText.value = '';
-      localStorage.removeItem(ANSWERED_TOOL_CALLS_KEY);
-    }
+		async function clearMessages() {
+			await chatStore.clearMessages()
+			isProcessing.value = false
+			processingText.value = ''
+			localStorage.removeItem(ANSWERED_TOOL_CALLS_KEY)
+		}
 
-    async function handleQuestionOption(question: IQuestion, option: IQuestionOption) {
-      const answer = option.label;
-      const toolCallId = lastMessageWithQuestion.value?.toolCallID;
+		async function handleQuestionOption(question: IQuestion, option: IQuestionOption) {
+			const answer = option.label
+			const toolCallId = lastMessageWithQuestion.value?.toolCallID
 
-      if (toolCallId) {
-        setToolCallAnswered(toolCallId);
-      }
+			if (toolCallId) {
+				setToolCallAnswered(toolCallId)
+			}
 
-      const userMessageText = t('chatAssistant.selectedOption', { option: answer });
-      chatStore.addMessage({
-        id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-        type: 'user_input',
-        role: 'user',
-        content: userMessageText,
-        timestamp: Date.now(),
-      });
+			const userMessageText = t('chatAssistant.selectedOption', { option: answer })
+			chatStore.addMessage({
+				id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+				type: 'user_input',
+				role: 'user',
+				content: userMessageText,
+				timestamp: Date.now(),
+			})
 
-      isProcessing.value = true;
-      processingText.value = t('chatAssistant.processing');
+			isProcessing.value = true
+			processingText.value = t('chatAssistant.processing')
 
-      await chatStore.submitQuestionAnswer(answer);
-    }
+			await chatStore.submitQuestionAnswer(answer)
+		}
 
-    function showCustomInput(question: IQuestion) {
-      currentQuestion.value = question;
-      customInputValue.value = '';
-      showCustomInputModal.value = true;
-    }
+		function showCustomInput(question: IQuestion) {
+			currentQuestion.value = question
+			customInputValue.value = ''
+			showCustomInputModal.value = true
+		}
 
-    function closeCustomInput() {
-      showCustomInputModal.value = false;
-      customInputValue.value = '';
-      currentQuestion.value = null;
-    }
+		function closeCustomInput() {
+			showCustomInputModal.value = false
+			customInputValue.value = ''
+			currentQuestion.value = null
+		}
 
-    async function confirmCustomInput() {
-      if (!customInputValue.value.trim() || !currentQuestion.value) {
-        return;
-      }
+		async function confirmCustomInput() {
+			if (!customInputValue.value.trim() || !currentQuestion.value) {
+				return
+			}
 
-      const answer = customInputValue.value.trim();
-      const toolCallId = lastMessageWithQuestion.value?.toolCallID;
+			const answer = customInputValue.value.trim()
+			const toolCallId = lastMessageWithQuestion.value?.toolCallID
 
-      if (toolCallId) {
-        setToolCallAnswered(toolCallId);
-      }
+			if (toolCallId) {
+				setToolCallAnswered(toolCallId)
+			}
 
-      const userMessageText = t('chatAssistant.selectedOption', { option: answer });
-      chatStore.addMessage({
-        id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-        type: 'user_input',
-        role: 'user',
-        content: userMessageText,
-        timestamp: Date.now(),
-      });
+			const userMessageText = t('chatAssistant.selectedOption', { option: answer })
+			chatStore.addMessage({
+				id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+				type: 'user_input',
+				role: 'user',
+				content: userMessageText,
+				timestamp: Date.now(),
+			})
 
-      isProcessing.value = true;
-      processingText.value = t('chatAssistant.processing');
+			isProcessing.value = true
+			processingText.value = t('chatAssistant.processing')
 
-      await chatStore.submitQuestionAnswer(answer);
-      closeCustomInput();
-    }
+			await chatStore.submitQuestionAnswer(answer)
+			closeCustomInput()
+		}
 
-    watch(
-      () => visibleMessages.value.length,
-      (newLength, oldLength) => {
-        if (oldLength === 0 && newLength > 0) {
-          setTimeout(scrollToBottom, 100);
-        } else {
-          scrollToBottom();
-        }
-      },
-    );
+		watch(
+			() => visibleMessages.value.length,
+			(newLength, oldLength) => {
+				if (oldLength === 0 && newLength > 0) {
+					setTimeout(scrollToBottom, 100)
+				} else {
+					scrollToBottom()
+				}
+			},
+		)
 
-    watch(
-      visibleMessages,
-      (newMessages) => {
-        if (newMessages.length === 0) {
-          isProcessing.value = false;
-          processingText.value = '';
-          return;
-        }
+		watch(
+			visibleMessages,
+			(newMessages) => {
+				if (newMessages.length === 0) {
+					isProcessing.value = false
+					processingText.value = ''
+					return
+				}
 
-        const lastMessage = newMessages[newMessages.length - 1];
-        if (!lastMessage) return;
+				const lastMessage = newMessages[newMessages.length - 1]
+				if (!lastMessage) return
 
-        isProcessing.value = lastMessage.role === 'user';
-        processingText.value = isProcessing.value ? t('chatAssistant.processing') : '';
-      },
-      { deep: true },
-    );
+				isProcessing.value = lastMessage.role === 'user'
+				processingText.value = isProcessing.value ? t('chatAssistant.processing') : ''
+			},
+			{ deep: true },
+		)
 
-    return {
-      chatStore,
-      userInput,
-      messagesContainer,
-      messageInput,
-      isProcessing,
-      sendDisabled,
-      processingText,
-      visibleMessages,
-      lastMessageWithQuestion,
-      parseQuestions,
-      isQuestionDisabled,
-      scrollToBottom,
-      formatTime,
-      sendMessage,
-      handleSend,
-      handleEnter,
-      clearMessages,
-      handleQuestionOption,
-      showCustomInput,
-      closeCustomInput,
-      confirmCustomInput,
-      showCustomInputModal,
-      customInputValue,
-      t,
-      isTableContent,
-      parseTableContent,
-    };
-  },
-});
+		return {
+			chatStore,
+			userInput,
+			messagesContainer,
+			messageInput,
+			isProcessing,
+			sendDisabled,
+			processingText,
+			visibleMessages,
+			lastMessageWithQuestion,
+			parseQuestions,
+			isQuestionDisabled,
+			scrollToBottom,
+			formatTime,
+			sendMessage,
+			handleSend,
+			handleEnter,
+			clearMessages,
+			handleQuestionOption,
+			showCustomInput,
+			closeCustomInput,
+			confirmCustomInput,
+			showCustomInputModal,
+			customInputValue,
+			t,
+			isTableContent,
+			parseTableContent,
+		}
+	},
+})
 </script>
 
 <style scoped>

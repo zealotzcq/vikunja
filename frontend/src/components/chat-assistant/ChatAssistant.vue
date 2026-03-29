@@ -8,7 +8,10 @@
 				<header class="chat-header">
 					<div class="header-title">
 						<h3>{{ $t('chatAssistant.title') }}</h3>
-						<span v-if="chatStore.currentTask" class="current-task-badge">
+						<span
+							v-if="chatStore.currentTask"
+							class="current-task-badge"
+						>
 							{{ $t('chatAssistant.currentTask', { taskId: chatStore.currentTask.task_id, taskTitle: chatStore.currentTask.title }) }}
 						</span>
 					</div>
@@ -43,8 +46,15 @@
 							<template v-if="isTableContent(msg.content)">
 								<table class="message-table">
 									<tbody>
-										<tr v-for="(row, index) in parseTableContent(msg.content)" :key="index">
-											<td v-for="(cell, cellIndex) in row" :key="cellIndex" :class="{ 'header-cell': index === 0 }">
+										<tr
+											v-for="(row, index) in parseTableContent(msg.content)"
+											:key="index"
+										>
+											<td
+												v-for="(cell, cellIndex) in row"
+												:key="cellIndex"
+												:class="{ 'header-cell': index === 0 }"
+											>
 												{{ cell }}
 											</td>
 										</tr>
@@ -218,16 +228,7 @@ const visibleMessages = computed(() => {
 	)
 })
 
-const parsedQuestions = computed<IQuestion[]>(() => {
-	if (!lastMessageWithQuestion.value?.questionData) {
-		return []
-	}
-	try {
-		return JSON.parse(lastMessageWithQuestion.value.questionData)
-	} catch (e) {
-		return []
-	}
-})
+
 
 function parseQuestions(questionData: string): IQuestion[] {
 	if (!questionData) {
@@ -235,7 +236,7 @@ function parseQuestions(questionData: string): IQuestion[] {
 	}
 	try {
 		return JSON.parse(questionData)
-	} catch (e) {
+	} catch {
 		return []
 	}
 }

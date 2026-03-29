@@ -1,24 +1,28 @@
 <template>
-  <nav class="mobile-tab-bar">
-    <button
-      v-for="tab in tabs"
-      :key="tab.name"
-      class="tab-item"
-      :class="{ active: activeTab === tab.name }"
-      @click="handleTabClick(tab)"
-    >
-      <component :is="tab.icon" :size="24" class="tab-icon" />
-      <span class="tab-label">{{ tab.label }}</span>
-    </button>
-  </nav>
+	<nav class="mobile-tab-bar">
+		<button
+			v-for="tab in tabs"
+			:key="tab.name"
+			class="tab-item"
+			:class="{ active: activeTab === tab.name }"
+			@click="handleTabClick(tab)"
+		>
+			<component
+				:is="tab.icon"
+				:size="24"
+				class="tab-icon"
+			/>
+			<span class="tab-label">{{ tab.label }}</span>
+		</button>
+	</nav>
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue';
-import { useRouter } from 'vue-router';
-import HomeIcon from './icons/HomeIcon.vue';
-import ChatIcon from './icons/ChatIcon.vue';
-import ProjectsIcon from './icons/ProjectsIcon.vue';
+import { defineComponent } from 'vue'
+import { useRouter } from 'vue-router'
+import HomeIcon from './icons/HomeIcon.vue'
+import ChatIcon from './icons/ChatIcon.vue'
+import ProjectsIcon from './icons/ProjectsIcon.vue'
 
 interface Tab {
   name: string;
@@ -28,37 +32,37 @@ interface Tab {
 }
 
 export default defineComponent({
-  name: 'MobileTabBar',
-  components: {
-    HomeIcon,
-    ChatIcon,
-    ProjectsIcon,
-  },
-  props: {
-    activeTab: {
-      type: String,
-      required: true,
-    },
-  },
-  setup() {
-    const router = useRouter();
+	name: 'MobileTabBar',
+	components: {
+		HomeIcon,
+		ChatIcon,
+		ProjectsIcon,
+	},
+	props: {
+		activeTab: {
+			type: String,
+			required: true,
+		},
+	},
+	setup() {
+		const router = useRouter()
 
-    const tabs: Tab[] = [
-      { name: 'home', label: '首页', icon: HomeIcon, path: '/mobile/home' },
-      { name: 'projects', label: '项目', icon: ProjectsIcon, path: '/mobile/projects' },
-      { name: 'chat', label: '聊天', icon: ChatIcon, path: '/mobile/chat' },
-    ];
+		const tabs: Tab[] = [
+			{ name: 'home', label: '首页', icon: HomeIcon, path: '/mobile/home' },
+			{ name: 'projects', label: '项目', icon: ProjectsIcon, path: '/mobile/projects' },
+			{ name: 'chat', label: '聊天', icon: ChatIcon, path: '/mobile/chat' },
+		]
 
-    const handleTabClick = (tab: Tab) => {
-      router.push(tab.path);
-    };
+		const handleTabClick = (tab: Tab) => {
+			router.push(tab.path)
+		}
 
-    return {
-      tabs,
-      handleTabClick,
-    };
-  },
-});
+		return {
+			tabs,
+			handleTabClick,
+		}
+	},
+})
 </script>
 
 <style scoped>

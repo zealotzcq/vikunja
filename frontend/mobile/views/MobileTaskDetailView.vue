@@ -1,485 +1,677 @@
 <template>
-  <div class="mobile-task-detail">
-    <div class="task-header">
-      <div class="header-banner" :style="{ background: getPriorityColor(task?.priority) }">
-        <button class="back-btn" @click="goBack" aria-label="返回">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="15 18 9 12 15 6"></polyline>
-          </svg>
-          <span class="back-text">返回</span>
-        </button>
-      </div>
-    </div>
+	<div class="mobile-task-detail">
+		<div class="task-header">
+			<div
+				class="header-banner"
+				:style="{ background: getPriorityColor(task?.priority) }"
+			>
+				<button
+					class="back-btn"
+					aria-label="返回"
+					@click="goBack"
+				>
+					<svg
+						width="24"
+						height="24"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<polyline points="15 18 9 12 15 6" />
+					</svg>
+					<span class="back-text">返回</span>
+				</button>
+			</div>
+		</div>
 
-    <main class="task-content" :class="{ 'is-loading': isLoading }">
-      <div v-if="loadError && !task && !isLoading" class="empty-state error">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8" x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
-        </svg>
-        <h3 class="empty-title">无法加载任务</h3>
-        <p class="empty-subtitle">{{ loadError }}</p>
-        <button class="retry-btn" @click="loadTask">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="23 4 23 10 17 10"></polyline>
-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-          </svg>
-          重新加载
-        </button>
-      </div>
+		<main
+			class="task-content"
+			:class="{ 'is-loading': isLoading }"
+		>
+			<div
+				v-if="loadError && !task && !isLoading"
+				class="empty-state error"
+			>
+				<svg
+					width="64"
+					height="64"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.5"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<circle
+						cx="12"
+						cy="12"
+						r="10"
+					/>
+					<line
+						x1="12"
+						y1="8"
+						x2="12"
+						y2="12"
+					/>
+					<line
+						x1="12"
+						y1="16"
+						x2="12.01"
+						y2="16"
+					/>
+				</svg>
+				<h3 class="empty-title">
+					无法加载任务
+				</h3>
+				<p class="empty-subtitle">
+					{{ loadError }}
+				</p>
+				<button
+					class="retry-btn"
+					@click="loadTask"
+				>
+					<svg
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<polyline points="23 4 23 10 17 10" />
+						<path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+					</svg>
+					重新加载
+				</button>
+			</div>
 
-      <div v-else-if="!task && !isLoading" class="empty-state">
-        <h3 class="empty-title">任务不存在</h3>
-      </div>
+			<div
+				v-else-if="!task && !isLoading"
+				class="empty-state"
+			>
+				<h3 class="empty-title">
+					任务不存在
+				</h3>
+			</div>
 
-      <div v-else-if="task" class="task-details">
-        <section v-if="task.projectId" class="project-section">
-          <div class="project-badge">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="9" y1="3" x2="9" y2="21"></line>
-            </svg>
-            {{ projectName }}
-          </div>
-        </section>
+			<div
+				v-else-if="task"
+				class="task-details"
+			>
+				<section
+					v-if="task.projectId"
+					class="project-section"
+				>
+					<div class="project-badge">
+						<svg
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<rect
+								x="3"
+								y="3"
+								width="18"
+								height="18"
+								rx="2"
+								ry="2"
+							/>
+							<line
+								x1="9"
+								y1="3"
+								x2="9"
+								y2="21"
+							/>
+						</svg>
+						{{ projectName }}
+					</div>
+				</section>
 
-        <section class="detail-section">
-          <div class="title-section">
-            <input
-              v-if="isEditingTitle"
-              ref="titleInputRef"
-              v-model="tempTitle"
-              class="task-title-input"
-              @blur="saveTitle"
-              @keyup.enter="saveTitle"
-            />
-            <h1 v-else class="task-title" :class="{ 'done': task.done }">
-              {{ task.title }}
-            </h1>
-            <button class="edit-title-btn" @click="toggleEditTitle" :aria-label="isEditingTitle ? '保存' : '编辑'">
-              <svg v-if="!isEditingTitle" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-              </svg>
-              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-            </button>
-          </div>
-        </section>
+				<section class="detail-section">
+					<div class="title-section">
+						<input
+							v-if="isEditingTitle"
+							ref="titleInputRef"
+							v-model="tempTitle"
+							class="task-title-input"
+							@blur="saveTitle"
+							@keyup.enter="saveTitle"
+						>
+						<h1
+							v-else
+							class="task-title"
+							:class="{ 'done': task.done }"
+						>
+							{{ task.title }}
+						</h1>
+						<button
+							class="edit-title-btn"
+							:aria-label="isEditingTitle ? '保存' : '编辑'"
+							@click="toggleEditTitle"
+						>
+							<svg
+								v-if="!isEditingTitle"
+								width="18"
+								height="18"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+								<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+							</svg>
+							<svg
+								v-else
+								width="18"
+								height="18"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<polyline points="20 6 9 17 4 12" />
+							</svg>
+						</button>
+					</div>
+				</section>
 
-        <section v-if="task.description" class="detail-section">
-          <h3 class="section-title">描述</h3>
-          <div class="description" v-html="task.description"></div>
-        </section>
+				<section
+					v-if="task.description"
+					class="detail-section"
+				>
+					<h3 class="section-title">
+						描述
+					</h3>
+					<div
+						class="description"
+						v-html="task.description"
+					/>
+				</section>
 
-        <section class="detail-section">
-          <h3 class="section-title">属性</h3>
-          <div class="attributes-list">
-            <div class="attribute-item">
-              <span class="attribute-label">优先级</span>
-              <div class="attribute-value">
-                <select
-                  v-model="tempPriority"
-                  @change="onPriorityChange(tempPriority)"
-                  class="priority-select"
-                  :disabled="isSaving"
-                >
-                  <option :value="PRIORITIES.LOW">{{ getPriorityLabel(PRIORITIES.LOW) }}</option>
-                  <option :value="PRIORITIES.MEDIUM">{{ getPriorityLabel(PRIORITIES.MEDIUM) }}</option>
-                  <option :value="PRIORITIES.HIGH">{{ getPriorityLabel(PRIORITIES.HIGH) }}</option>
-                  <option :value="PRIORITIES.URGENT">{{ getPriorityLabel(PRIORITIES.URGENT) }}</option>
-                </select>
-              </div>
-            </div>
-            <div class="attribute-item">
-              <span class="attribute-label">截止日期</span>
-              <span class="attribute-value" :class="{ 'overdue': isOverdue(task.dueDate) }">
-                {{ task.dueDate ? formatDate(task.dueDate) : '无' }}
-              </span>
-            </div>
-            <div class="attribute-item">
-              <span class="attribute-label">进度</span>
-              <div class="attribute-value percent-done-container">
-                <input
-                  type="range"
-                  v-model.number="tempPercentDone"
-                  @input="onPercentDoneChange(tempPercentDone)"
-                  min="0"
-                  max="100"
-                  step="10"
-                  class="percent-done-slider"
-                  :disabled="isSaving"
-                />
-                <span class="percent-done-value">{{ tempPercentDone }}%</span>
-              </div>
-            </div>
-          </div>
-        </section>
+				<section class="detail-section">
+					<h3 class="section-title">
+						属性
+					</h3>
+					<div class="attributes-list">
+						<div class="attribute-item">
+							<span class="attribute-label">优先级</span>
+							<div class="attribute-value">
+								<select
+									v-model="tempPriority"
+									class="priority-select"
+									:disabled="isSaving"
+									@change="onPriorityChange(tempPriority)"
+								>
+									<option :value="PRIORITIES.LOW">
+										{{ getPriorityLabel(PRIORITIES.LOW) }}
+									</option>
+									<option :value="PRIORITIES.MEDIUM">
+										{{ getPriorityLabel(PRIORITIES.MEDIUM) }}
+									</option>
+									<option :value="PRIORITIES.HIGH">
+										{{ getPriorityLabel(PRIORITIES.HIGH) }}
+									</option>
+									<option :value="PRIORITIES.URGENT">
+										{{ getPriorityLabel(PRIORITIES.URGENT) }}
+									</option>
+								</select>
+							</div>
+						</div>
+						<div class="attribute-item">
+							<span class="attribute-label">截止日期</span>
+							<span
+								class="attribute-value"
+								:class="{ 'overdue': isOverdue(task.dueDate) }"
+							>
+								{{ task.dueDate ? formatDate(task.dueDate) : '无' }}
+							</span>
+						</div>
+						<div class="attribute-item">
+							<span class="attribute-label">进度</span>
+							<div class="attribute-value percent-done-container">
+								<input
+									v-model.number="tempPercentDone"
+									type="range"
+									min="0"
+									max="100"
+									step="10"
+									class="percent-done-slider"
+									:disabled="isSaving"
+									@input="onPercentDoneChange(tempPercentDone)"
+								>
+								<span class="percent-done-value">{{ tempPercentDone }}%</span>
+							</div>
+						</div>
+					</div>
+				</section>
 
-        <section v-if="task.assignees && task.assignees.length > 0" class="detail-section">
-          <h3 class="section-title">指派给</h3>
-          <div class="assignees-list">
-            <div
-              v-for="assignee in task.assignees"
-              :key="assignee.id"
-              class="assignee-item"
-            >
-              <div class="assignee-avatar">
-                <img v-if="assignee.avatarUrl" :src="assignee.avatarUrl" alt="" />
-                <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-              </div>
-              <span class="assignee-name">{{ assignee.username || assignee.name }}</span>
-            </div>
-          </div>
-        </section>
+				<section
+					v-if="task.assignees && task.assignees.length > 0"
+					class="detail-section"
+				>
+					<h3 class="section-title">
+						指派给
+					</h3>
+					<div class="assignees-list">
+						<div
+							v-for="assignee in task.assignees"
+							:key="assignee.id"
+							class="assignee-item"
+						>
+							<div class="assignee-avatar">
+								<img
+									v-if="assignee.avatarUrl"
+									:src="assignee.avatarUrl"
+									alt=""
+								>
+								<svg
+									v-else
+									width="24"
+									height="24"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+									<circle
+										cx="12"
+										cy="7"
+										r="4"
+									/>
+								</svg>
+							</div>
+							<span class="assignee-name">{{ assignee.username || assignee.name }}</span>
+						</div>
+					</div>
+				</section>
 
-        <section v-if="task.labels && task.labels.length > 0" class="detail-section">
-          <h3 class="section-title">标签</h3>
-          <div class="labels-list">
-            <span 
-              v-for="label in task.labels" 
-              :key="label.id" 
-              class="label-badge"
-              :style="{ background: label.hexColor }"
-            >
-              {{ label.title }}
-            </span>
-          </div>
-        </section>
+				<section
+					v-if="task.labels && task.labels.length > 0"
+					class="detail-section"
+				>
+					<h3 class="section-title">
+						标签
+					</h3>
+					<div class="labels-list">
+						<span 
+							v-for="label in task.labels" 
+							:key="label.id" 
+							class="label-badge"
+							:style="{ background: label.hexColor }"
+						>
+							{{ label.title }}
+						</span>
+					</div>
+				</section>
 
-        <section v-if="task.attachments && task.attachments.length > 0" class="detail-section">
-          <h3 class="section-title">附件</h3>
-          <div class="attachments-list">
-            <div 
-              v-for="attachment in task.attachments" 
-              :key="attachment.id" 
-              class="attachment-item"
-            >
-              <div class="attachment-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
-                  <polyline points="13 2 13 9 20 9"></polyline>
-                </svg>
-              </div>
-              <span class="attachment-name">{{ attachment.file.name }}</span>
-            </div>
-          </div>
-        </section>
+				<section
+					v-if="task.attachments && task.attachments.length > 0"
+					class="detail-section"
+				>
+					<h3 class="section-title">
+						附件
+					</h3>
+					<div class="attachments-list">
+						<div 
+							v-for="attachment in task.attachments" 
+							:key="attachment.id" 
+							class="attachment-item"
+						>
+							<div class="attachment-icon">
+								<svg
+									width="24"
+									height="24"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+									<polyline points="13 2 13 9 20 9" />
+								</svg>
+							</div>
+							<span class="attachment-name">{{ attachment.file.name }}</span>
+						</div>
+					</div>
+				</section>
 
-        <section class="detail-section">
-          <h3 class="section-title">评论 ({{ comments.length }})</h3>
-          <div class="comments-list">
-            <div
-              v-for="comment in comments"
-              :key="comment.id"
-              class="comment-item"
-            >
-              <div class="comment-header">
-                <span class="comment-author">{{ comment.author?.username || comment.author?.name }}</span>
-                <span class="comment-time">{{ formatTime(comment.created) }}</span>
-              </div>
-              <div class="comment-content" v-html="comment.comment"></div>
-            </div>
-            <div v-if="comments.length === 0" class="no-comments">
-              暂无评论
-            </div>
-          </div>
-          <div class="add-comment-section">
-            <textarea
-              v-model="newCommentText"
-              placeholder="添加评论..."
-              class="comment-input"
-              :disabled="isAddingComment"
-              rows="3"
-            ></textarea>
-            <button
-              class="submit-comment-btn"
-              @click="addComment"
-              :disabled="!newCommentText.trim() || isAddingComment"
-            >
-              <span v-if="isAddingComment">发送中...</span>
-              <span v-else>发送评论</span>
-            </button>
-          </div>
-        </section>
-      </div>
-    </main>
-  </div>
+				<section class="detail-section">
+					<h3 class="section-title">
+						评论 ({{ comments.length }})
+					</h3>
+					<div class="comments-list">
+						<div
+							v-for="comment in comments"
+							:key="comment.id"
+							class="comment-item"
+						>
+							<div class="comment-header">
+								<span class="comment-author">{{ comment.author?.username || comment.author?.name }}</span>
+								<span class="comment-time">{{ formatTime(comment.created) }}</span>
+							</div>
+							<div
+								class="comment-content"
+								v-html="comment.comment"
+							/>
+						</div>
+						<div
+							v-if="comments.length === 0"
+							class="no-comments"
+						>
+							暂无评论
+						</div>
+					</div>
+					<div class="add-comment-section">
+						<textarea
+							v-model="newCommentText"
+							placeholder="添加评论..."
+							class="comment-input"
+							:disabled="isAddingComment"
+							rows="3"
+						/>
+						<button
+							class="submit-comment-btn"
+							:disabled="!newCommentText.trim() || isAddingComment"
+							@click="addComment"
+						>
+							<span v-if="isAddingComment">发送中...</span>
+							<span v-else>发送评论</span>
+						</button>
+					</div>
+				</section>
+			</div>
+		</main>
+	</div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import { useTaskStore } from '@/stores/tasks';
-import { useProjectStore } from '@/stores/projects';
-import TaskService from '@/services/task';
-import TaskCommentService from '@/services/taskComment';
-import TaskCommentModel from '@/models/taskComment';
-import { success } from '@/message';
-import type { ITask } from '@/modelTypes/ITask';
-import type { ITaskComment } from '@/modelTypes/ITaskComment';
-import { PRIORITIES } from '@/constants/priorities';
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { useTaskStore } from '@/stores/tasks'
+import { useProjectStore } from '@/stores/projects'
+import TaskService from '@/services/task'
+import TaskCommentService from '@/services/taskComment'
+import TaskCommentModel from '@/models/taskComment'
+import { success } from '@/message'
+import type { ITask } from '@/modelTypes/ITask'
+import type { ITaskComment } from '@/modelTypes/ITaskComment'
+import { PRIORITIES } from '@/constants/priorities'
 
-const router = useRouter();
-const route = useRoute();
-const taskStore = useTaskStore();
-const projectStore = useProjectStore();
-const isLoading = ref(false);
-const loadError = ref<string | null>(null);
-const taskData = ref<ITask | null>(null);
-const taskCommentService = new TaskCommentService();
-const comments = ref<ITaskComment[]>([]);
-const newCommentText = ref('');
-const isAddingComment = ref(false);
-const tempPriority = ref<number>(0);
-const tempPercentDone = ref<number>(0);
-const tempTitle = ref('');
-const isEditingTitle = ref(false);
-const titleInputRef = ref<HTMLInputElement | null>(null);
-const isSaving = ref(false);
+const router = useRouter()
+const route = useRoute()
+const taskStore = useTaskStore()
+const projectStore = useProjectStore()
+const isLoading = ref(false)
+const loadError = ref<string | null>(null)
+const taskData = ref<ITask | null>(null)
+const taskCommentService = new TaskCommentService()
+const comments = ref<ITaskComment[]>([])
+const newCommentText = ref('')
+const isAddingComment = ref(false)
+const tempPriority = ref<number>(0)
+const tempPercentDone = ref<number>(0)
+const tempTitle = ref('')
+const isEditingTitle = ref(false)
+const titleInputRef = ref<HTMLInputElement | null>(null)
+const isSaving = ref(false)
 
-const taskId = computed(() => Number(route.params.taskId));
+const taskId = computed(() => Number(route.params.taskId))
 
 const task = computed(() => {
-  if (!taskData.value) return null;
+	if (!taskData.value) return null
 
-  return {
-    ...taskData.value,
-    title: isEditingTitle.value ? tempTitle.value : taskData.value.title,
-    assignees: taskData.value.assignees || [],
-    labels: taskData.value.labels || [],
-    attachments: taskData.value.attachments || [],
-    comments: taskData.value.comments || [],
-    priority: tempPriority.value,
-    percentDone: tempPercentDone.value,
-  };
-});
+	return {
+		...taskData.value,
+		title: isEditingTitle.value ? tempTitle.value : taskData.value.title,
+		assignees: taskData.value.assignees || [],
+		labels: taskData.value.labels || [],
+		attachments: taskData.value.attachments || [],
+		comments: taskData.value.comments || [],
+		priority: tempPriority.value,
+		percentDone: tempPercentDone.value,
+	}
+})
 
 const projectName = computed(() => {
-  if (!task.value) return '';
-  const project = projectStore.projects[task.value.projectId];
-  return project?.title || '未知项目';
-});
+	if (!task.value) return ''
+	const project = projectStore.projects[task.value.projectId]
+	return project?.title || '未知项目'
+})
 
 const goBack = () => {
-  router.back();
-};
+	router.back()
+}
 
 const toggleTaskDone = async () => {
-  if (!task.value) return;
-  try {
-    await taskStore.update({
-      ...task.value,
-      done: !task.value.done,
-    });
-  } catch (error) {
-    console.error('Failed to toggle task:', error);
-  }
-};
+	if (!task.value) return
+	try {
+		await taskStore.update({
+			...task.value,
+			done: !task.value.done,
+		})
+	} catch (error) {
+		console.error('Failed to toggle task:', error)
+	}
+}
 
 const toggleEditTitle = async () => {
-  if (isEditingTitle.value) {
-    await saveTitle();
-  } else {
-    tempTitle.value = task.value?.title || '';
-    isEditingTitle.value = true;
-    await nextTick();
-    titleInputRef.value?.focus();
-  }
-};
+	if (isEditingTitle.value) {
+		await saveTitle()
+	} else {
+		tempTitle.value = task.value?.title || ''
+		isEditingTitle.value = true
+		await nextTick()
+		titleInputRef.value?.focus()
+	}
+}
 
 const saveTitle = async () => {
-  if (!task.value || !tempTitle.value.trim()) {
-    isEditingTitle.value = false;
-    return;
-  }
+	if (!task.value || !tempTitle.value.trim()) {
+		isEditingTitle.value = false
+		return
+	}
 
-  try {
-    isSaving.value = true;
-    const updatedTask = await taskStore.update({
-      ...task.value,
-      title: tempTitle.value.trim(),
-    });
-    if (taskData.value) {
-      taskData.value = updatedTask;
-    }
-    success({ message: '标题已更新' });
-  } catch (error) {
-    console.error('Failed to update title:', error);
-    tempTitle.value = task.value?.title || '';
-  } finally {
-    isSaving.value = false;
-    isEditingTitle.value = false;
-  }
-};
+	try {
+		isSaving.value = true
+		const updatedTask = await taskStore.update({
+			...task.value,
+			title: tempTitle.value.trim(),
+		})
+		if (taskData.value) {
+			taskData.value = updatedTask
+		}
+		success({ message: '标题已更新' })
+	} catch (error) {
+		console.error('Failed to update title:', error)
+		tempTitle.value = task.value?.title || ''
+	} finally {
+		isSaving.value = false
+		isEditingTitle.value = false
+	}
+}
 
 const isOverdue = (dueDate: Date | null) => {
-  if (!dueDate) return false;
-  return new Date(dueDate) < new Date();
-};
+	if (!dueDate) return false
+	return new Date(dueDate) < new Date()
+}
 
 const formatDate = (dateString: Date | string) => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diff = date.getTime() - now.getTime();
-  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+	const date = new Date(dateString)
+	const now = new Date()
+	const diff = date.getTime() - now.getTime()
+	const days = Math.ceil(diff / (1000 * 60 * 60 * 24))
 
-  if (days === 0) return '今天';
-  if (days === 1) return '明天';
-  if (days === -1) return '昨天';
-  if (days > 1) return `${days}天后`;
-  if (days < -1) return `${Math.abs(days)}天前`;
+	if (days === 0) return '今天'
+	if (days === 1) return '明天'
+	if (days === -1) return '昨天'
+	if (days > 1) return `${days}天后`
+	if (days < -1) return `${Math.abs(days)}天前`
 
-  return date.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+	return date.toLocaleDateString('zh-CN', {
+		year: 'numeric',
+		month: 'short',
+		day: 'numeric',
+		hour: '2-digit',
+		minute: '2-digit',
+	})
+}
 
 const formatTime = (dateString: Date | string) => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const minutes = Math.floor(diff / (1000 * 60));
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+	const date = new Date(dateString)
+	const now = new Date()
+	const diff = now.getTime() - date.getTime()
+	const minutes = Math.floor(diff / (1000 * 60))
+	const hours = Math.floor(diff / (1000 * 60 * 60))
+	const days = Math.floor(diff / (1000 * 60 * 60 * 24))
 
-  if (minutes < 1) return '刚刚';
-  if (minutes < 60) return `${minutes}分钟前`;
-  if (hours < 24) return `${hours}小时前`;
-  if (days < 7) return `${days}天前`;
+	if (minutes < 1) return '刚刚'
+	if (minutes < 60) return `${minutes}分钟前`
+	if (hours < 24) return `${hours}小时前`
+	if (days < 7) return `${days}天前`
 
-  return date.toLocaleDateString('zh-CN', {
-    month: 'short',
-    day: 'numeric',
-  });
-};
+	return date.toLocaleDateString('zh-CN', {
+		month: 'short',
+		day: 'numeric',
+	})
+}
 
 const getPriorityLabel = (priority: number) => {
-  const labels = { 0: '无', 1: '低', 2: '中', 3: '高', 4: '紧急', 5: '立即' };
-  return labels[priority as keyof typeof labels] || '无';
-};
+	const labels = { 0: '无', 1: '低', 2: '中', 3: '高', 4: '紧急', 5: '立即' }
+	return labels[priority as keyof typeof labels] || '无'
+}
 
 const getPriorityColor = (priority: number) => {
-  const colors = { 0: '#9CA3AF', 1: '#10B981', 2: '#F59E0B', 3: '#F97316', 4: '#EF4444', 5: '#7C3AED' };
-  return colors[priority as keyof typeof colors] || '#9CA3AF';
-};
+	const colors = { 0: '#9CA3AF', 1: '#10B981', 2: '#F59E0B', 3: '#F97316', 4: '#EF4444', 5: '#7C3AED' }
+	return colors[priority as keyof typeof colors] || '#9CA3AF'
+}
 
 const loadTask = async () => {
-  try {
-    isLoading.value = true;
-    loadError.value = null;
+	try {
+		isLoading.value = true
+		loadError.value = null
 
-    const taskService = new TaskService();
-    const loaded = await taskService.get({ id: taskId.value }, {
-      expand: ['reactions', 'comments', 'is_unread']
-    });
+		const taskService = new TaskService()
+		const loaded = await taskService.get({ id: taskId.value }, {
+			expand: ['reactions', 'comments', 'is_unread'],
+		})
 
-        taskData.value = loaded;
-        taskStore.tasks[taskId.value] = loaded;
+		taskData.value = loaded
+		taskStore.tasks[taskId.value] = loaded
 
-        tempTitle.value = loaded.title;
-        tempPriority.value = loaded.priority;
-        tempPercentDone.value = loaded.percentDone;
+		tempTitle.value = loaded.title
+		tempPriority.value = loaded.priority
+		tempPercentDone.value = loaded.percentDone
 
-    if (loaded.projectId) {
-      try {
-        await projectStore.loadProject(loaded.projectId);
-      } catch (e) {
-        console.warn('Failed to load project info:', e);
-      }
-    }
+		if (loaded.projectId) {
+			try {
+				await projectStore.loadProject(loaded.projectId)
+			} catch (e) {
+				console.warn('Failed to load project info:', e)
+			}
+		}
 
-    if (loaded.isUnread) {
-      await taskStore.markTaskAsRead(loaded.id);
-      loaded.isUnread = false;
-    }
+		if (loaded.isUnread) {
+			await taskStore.markTaskAsRead(loaded.id)
+			loaded.isUnread = false
+		}
 
-    await loadComments();
-  } catch (error: any) {
-    console.error('Failed to load task:', error);
-    if (error?.response?.status === 404) {
-      loadError.value = '任务不存在或您没有权限访问';
-    } else {
-      loadError.value = '加载任务时出错，请稍后重试';
-    }
-  } finally {
-    isLoading.value = false;
-  }
-};
+		await loadComments()
+	} catch (error: any) {
+		console.error('Failed to load task:', error)
+		if (error?.response?.status === 404) {
+			loadError.value = '任务不存在或您没有权限访问'
+		} else {
+			loadError.value = '加载任务时出错，请稍后重试'
+		}
+	} finally {
+		isLoading.value = false
+	}
+}
 
 const loadComments = async () => {
-  if (!task.value) return;
-  try {
-    comments.value = await taskCommentService.getAll({ taskId: task.value.id });
-  } catch (error) {
-    console.error('Failed to load comments:', error);
-  }
-};
+	if (!task.value) return
+	try {
+		comments.value = await taskCommentService.getAll({ taskId: task.value.id })
+	} catch (error) {
+		console.error('Failed to load comments:', error)
+	}
+}
 
 const saveTaskChanges = async () => {
-  if (!taskData.value) return;
+	if (!taskData.value) return
 
-  try {
-    isSaving.value = true;
-    const updatedTask = await taskStore.update({
-      ...taskData.value,
-      priority: tempPriority.value,
-      percentDone: tempPercentDone.value,
-    });
-    taskData.value = updatedTask;
-    taskStore.tasks[taskId.value] = updatedTask;
-    success({ message: '任务已更新' });
-  } catch (error) {
-    console.error('Failed to update task:', error);
-  } finally {
-    isSaving.value = false;
-  }
-};
+	try {
+		isSaving.value = true
+		const updatedTask = await taskStore.update({
+			...taskData.value,
+			priority: tempPriority.value,
+			percentDone: tempPercentDone.value,
+		})
+		taskData.value = updatedTask
+		taskStore.tasks[taskId.value] = updatedTask
+		success({ message: '任务已更新' })
+	} catch (error) {
+		console.error('Failed to update task:', error)
+	} finally {
+		isSaving.value = false
+	}
+}
 
 const onPriorityChange = async (value: number) => {
-  if (!task.value) return;
-  tempPriority.value = value;
-  await saveTaskChanges();
-};
+	if (!task.value) return
+	tempPriority.value = value
+	await saveTaskChanges()
+}
 
 const onPercentDoneChange = async (value: number) => {
-  if (!taskData.value) return;
-  tempPercentDone.value = value;
-  await saveTaskChanges();
-};
+	if (!taskData.value) return
+	tempPercentDone.value = value
+	await saveTaskChanges()
+}
 
 const addComment = async () => {
-  if (!task.value || !newCommentText.value.trim()) return;
+	if (!task.value || !newCommentText.value.trim()) return
 
-  try {
-    isAddingComment.value = true;
-    const comment = new TaskCommentModel();
-    comment.taskId = task.value.id;
-    comment.comment = newCommentText.value;
+	try {
+		isAddingComment.value = true
+		const comment = new TaskCommentModel()
+		comment.taskId = task.value.id
+		comment.comment = newCommentText.value
 
-    const created = await taskCommentService.create(comment);
-    comments.value.push(created);
-    newCommentText.value = '';
-    success({ message: '评论已添加' });
-  } catch (error) {
-    console.error('Failed to add comment:', error);
-  } finally {
-    isAddingComment.value = false;
-  }
-};
+		const created = await taskCommentService.create(comment)
+		comments.value.push(created)
+		newCommentText.value = ''
+		success({ message: '评论已添加' })
+	} catch (error) {
+		console.error('Failed to add comment:', error)
+	} finally {
+		isAddingComment.value = false
+	}
+}
 
 onMounted(() => {
-  loadTask();
-});
+	loadTask()
+})
 </script>
 
 <style scoped>

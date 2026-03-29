@@ -64,15 +64,15 @@ function toggle() {
 }
 
 const mergedStyle = computed(() => {
-  const style = props.popupStyle
+	const style = props.popupStyle
 
-  return {
+	return {
   	position: 'fixed' as const,
   	zIndex: 100 as number,
   	top: style?.top || '0px',
   	left: style?.left || '0px',
   	width: style?.width || 'auto',
-  }
+	}
 })
 
 onClickOutside(menuRef, () => {

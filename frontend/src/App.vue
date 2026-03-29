@@ -71,21 +71,21 @@ const isMobileRoute = computed(() => route.path.startsWith('/mobile'))
 
 // Track mobile route state for CSS selectors
 watch(isMobileRoute, (isMobile) => {
-  if (isMobile) {
-    document.body.classList.add('mobile-route')
-  } else {
-    document.body.classList.remove('mobile-route')
-  }
+	if (isMobile) {
+		document.body.classList.add('mobile-route')
+	} else {
+		document.body.classList.remove('mobile-route')
+	}
 })
 
 onMounted(() => {
-  if (isMobileRoute.value) {
-    document.body.classList.add('mobile-route')
-  }
+	if (isMobileRoute.value) {
+		document.body.classList.add('mobile-route')
+	}
 })
 
 onUnmounted(() => {
-  document.body.classList.remove('mobile-route')
+	document.body.classList.remove('mobile-route')
 })
 
 useBodyClass('is-touch', isTouchDevice())

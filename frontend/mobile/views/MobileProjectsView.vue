@@ -1,133 +1,185 @@
 <template>
-  <div class="mobile-projects">
-    <main class="projects-content" :class="{ 'is-loading': projectStore.isLoading }">
-      <div v-if="!hasProjects && !projectStore.isLoading" class="empty-state">
-        <div class="empty-icon">
-          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="9" y1="3" x2="9" y2="21"></line>
-          </svg>
-        </div>
-        <h3 class="empty-title">暂无项目</h3>
-        <p class="empty-subtitle">创建您的第一个项目开始管理任务</p>
-      </div>
+	<div class="mobile-projects">
+		<main
+			class="projects-content"
+			:class="{ 'is-loading': projectStore.isLoading }"
+		>
+			<div
+				v-if="!hasProjects && !projectStore.isLoading"
+				class="empty-state"
+			>
+				<div class="empty-icon">
+					<svg
+						width="64"
+						height="64"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.5"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<rect
+							x="3"
+							y="3"
+							width="18"
+							height="18"
+							rx="2"
+							ry="2"
+						/>
+						<line
+							x1="9"
+							y1="3"
+							x2="9"
+							y2="21"
+						/>
+					</svg>
+				</div>
+				<h3 class="empty-title">
+					暂无项目
+				</h3>
+				<p class="empty-subtitle">
+					创建您的第一个项目开始管理任务
+				</p>
+			</div>
 
-      <div v-else class="projects-list">
-        <div 
-          v-for="project in filteredProjects" 
-          :key="project.id" 
-          class="project-card card card-interactive"
-          @click="openProject(project)"
-        >
-          <div 
-            class="project-color" 
-            :style="{ background: project.hexColor || 'var(--color-primary)' }"
-          ></div>
-          <div class="project-info">
-            <h3 class="project-title">{{ project.title }}</h3>
-            <div class="project-meta">
-              <span v-if="project.isArchived" class="badge badge-warning">已归档</span>
-              <span v-if="project.parentProjectId !== 0" class="badge badge-secondary">子项目</span>
-            </div>
-          </div>
-          <svg class="project-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
-      </div>
-    </main>
+			<div
+				v-else
+				class="projects-list"
+			>
+				<div 
+					v-for="project in filteredProjects" 
+					:key="project.id" 
+					class="project-card card card-interactive"
+					@click="openProject(project)"
+				>
+					<div 
+						class="project-color" 
+						:style="{ background: project.hexColor || 'var(--color-primary)' }"
+					/>
+					<div class="project-info">
+						<h3 class="project-title">
+							{{ project.title }}
+						</h3>
+						<div class="project-meta">
+							<span
+								v-if="project.isArchived"
+								class="badge badge-warning"
+							>已归档</span>
+							<span
+								v-if="project.parentProjectId !== 0"
+								class="badge badge-secondary"
+							>子项目</span>
+						</div>
+					</div>
+					<svg
+						class="project-arrow"
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<polyline points="9 18 15 12 9 6" />
+					</svg>
+				</div>
+			</div>
+		</main>
 
-    <div class="filter-tabs">
-      <button 
-        class="filter-tab"
-        :class="{ active: activeFilter === 'active' }"
-        @click="activeFilter = 'active'"
-      >
-        进行中
-      </button>
-      <button 
-        class="filter-tab"
-        :class="{ active: activeFilter === 'archived' }"
-        @click="activeFilter = 'archived'"
-      >
-        已归档
-      </button>
-    </div>
-  </div>
+		<div class="filter-tabs">
+			<button 
+				class="filter-tab"
+				:class="{ active: activeFilter === 'active' }"
+				@click="activeFilter = 'active'"
+			>
+				进行中
+			</button>
+			<button 
+				class="filter-tab"
+				:class="{ active: activeFilter === 'archived' }"
+				@click="activeFilter = 'archived'"
+			>
+				已归档
+			</button>
+		</div>
+	</div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { useProjectStore } from '@/stores/projects';
-import { useCompanyStore } from '@/stores/company';
-import type { IProject } from '@/modelTypes/IProject';
+import { defineComponent, ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useProjectStore } from '@/stores/projects'
+import { useCompanyStore } from '@/stores/company'
+import type { IProject } from '@/modelTypes/IProject'
 
 export default defineComponent({
-  name: 'MobileProjectsView',
-  setup() {
-    const router = useRouter();
-    const projectStore = useProjectStore();
-    const companyStore = useCompanyStore();
-    const activeFilter = ref<'active' | 'archived'>('active');
+	name: 'MobileProjectsView',
+	setup() {
+		const router = useRouter()
+		const projectStore = useProjectStore()
+		const companyStore = useCompanyStore()
+		const activeFilter = ref<'active' | 'archived'>('active')
 
-    function filterProjectsByCompany(projectList: readonly IProject[]): IProject[] {
-      const currentCompanyId = companyStore.currentCompanyId;
+		function filterProjectsByCompany(projectList: readonly IProject[]): IProject[] {
+			const currentCompanyId = companyStore.currentCompanyId
 
-      if (!currentCompanyId) {
-        return [...projectList];
-      }
+			if (!currentCompanyId) {
+				return [...projectList]
+			}
 
-      const projectIdsToHide = new Set<number>();
-      for (const map of companyStore.companyProjectMap) {
-        if (map.company_id !== currentCompanyId) {
-          for (const projectId of map.project_ids) {
-            projectIdsToHide.add(projectId);
-          }
-        }
-      }
+			const projectIdsToHide = new Set<number>()
+			for (const map of companyStore.companyProjectMap) {
+				if (map.company_id !== currentCompanyId) {
+					for (const projectId of map.project_ids) {
+						projectIdsToHide.add(projectId)
+					}
+				}
+			}
 
-      return projectList.filter(project => !projectIdsToHide.has(project.id));
-    }
+			return projectList.filter(project => !projectIdsToHide.has(project.id))
+		}
 
-    const filteredProjects = computed(() => {
-      const allProjects = projectStore.projectsArray;
-      const filteredByStatus = activeFilter.value === 'archived'
-        ? allProjects.filter(p => p.isArchived)
-        : allProjects.filter(p => !p.isArchived);
+		const filteredProjects = computed(() => {
+			const allProjects = projectStore.projectsArray
+			const filteredByStatus = activeFilter.value === 'archived'
+				? allProjects.filter(p => p.isArchived)
+				: allProjects.filter(p => !p.isArchived)
 
-      return filterProjectsByCompany(filteredByStatus);
-    });
+			return filterProjectsByCompany(filteredByStatus)
+		})
 
-    const hasProjects = computed(() => filteredProjects.value.length > 0);
+		const hasProjects = computed(() => filteredProjects.value.length > 0)
 
-    const openProject = (project: IProject) => {
-      router.push(`/mobile/project/${project.id}`);
-    };
+		const openProject = (project: IProject) => {
+			router.push(`/mobile/project/${project.id}`)
+		}
 
-    const loadProjects = async () => {
-      try {
-        await projectStore.loadAllProjects();
-      } catch (error) {
-        console.error('Failed to load projects:', error);
-      }
-    };
+		const loadProjects = async () => {
+			try {
+				await projectStore.loadAllProjects()
+			} catch (error) {
+				console.error('Failed to load projects:', error)
+			}
+		}
 
-    onMounted(async () => {
-      await companyStore.loadCompanyProjectMap();
-      loadProjects();
-    });
+		onMounted(async () => {
+			await companyStore.loadCompanyProjectMap()
+			loadProjects()
+		})
 
-    return {
-      projectStore,
-      companyStore,
-      activeFilter,
-      filteredProjects,
-      hasProjects,
-      openProject,
-    };
-  },
-});
+		return {
+			projectStore,
+			companyStore,
+			activeFilter,
+			filteredProjects,
+			hasProjects,
+			openProject,
+		}
+	},
+})
 </script>
 
 <style scoped>

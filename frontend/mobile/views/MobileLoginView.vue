@@ -1,112 +1,176 @@
 <template>
-  <div class="mobile-container mobile-viewport">
-    <div class="login-wrapper">
-      <div class="logo-section">
-        <div class="logo-icon">
-          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-            <path d="M2 17l10 5 10-5"></path>
-            <path d="M2 12l10 5 10-5"></path>
-          </svg>
-        </div>
-        <h1 class="app-name">任务助手</h1>
-        <p class="app-tagline">高效任务管理</p>
-      </div>
+	<div class="mobile-container mobile-viewport">
+		<div class="login-wrapper">
+			<div class="logo-section">
+				<div class="logo-icon">
+					<svg
+						width="64"
+						height="64"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.5"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path d="M12 2L2 7l10 5 10-5-10-5z" />
+						<path d="M2 17l10 5 10-5" />
+						<path d="M2 12l10 5 10-5" />
+					</svg>
+				</div>
+				<h1 class="app-name">
+					任务助手
+				</h1>
+				<p class="app-tagline">
+					高效任务管理
+				</p>
+			</div>
 
-      <div class="login-card">
-        <h2 class="login-title">欢迎回来</h2>
-        <p class="login-subtitle">登录以继续管理您的任务</p>
+			<div class="login-card">
+				<h2 class="login-title">
+					欢迎回来
+				</h2>
+				<p class="login-subtitle">
+					登录以继续管理您的任务
+				</p>
 
-        <form @submit.prevent="onLogin" class="login-form">
-          <div class="form-group">
-            <label for="username" class="form-label">用户名</label>
-            <div class="input-wrapper">
-              <svg class="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
-              <input
-                id="username"
-                v-model="username"
-                placeholder="输入用户名"
-                class="input-field"
-                type="text"
-                autocomplete="username"
-              />
-            </div>
-          </div>
+				<form
+					class="login-form"
+					@submit.prevent="onLogin"
+				>
+					<div class="form-group">
+						<label
+							for="username"
+							class="form-label"
+						>用户名</label>
+						<div class="input-wrapper">
+							<svg
+								class="input-icon"
+								width="20"
+								height="20"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+								<circle
+									cx="12"
+									cy="7"
+									r="4"
+								/>
+							</svg>
+							<input
+								id="username"
+								v-model="username"
+								placeholder="输入用户名"
+								class="input-field"
+								type="text"
+								autocomplete="username"
+							>
+						</div>
+					</div>
 
-          <div class="form-group">
-            <label for="password" class="form-label">密码</label>
-            <div class="input-wrapper">
-              <svg class="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-              </svg>
-              <input
-                id="password"
-                v-model="password"
-                placeholder="输入密码"
-                class="input-field"
-                type="password"
-                autocomplete="current-password"
-              />
-            </div>
-          </div>
+					<div class="form-group">
+						<label
+							for="password"
+							class="form-label"
+						>密码</label>
+						<div class="input-wrapper">
+							<svg
+								class="input-icon"
+								width="20"
+								height="20"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<rect
+									x="3"
+									y="11"
+									width="18"
+									height="11"
+									rx="2"
+									ry="2"
+								/>
+								<path d="M7 11V7a5 5 0 0 1 10 0v4" />
+							</svg>
+							<input
+								id="password"
+								v-model="password"
+								placeholder="输入密码"
+								class="input-field"
+								type="password"
+								autocomplete="current-password"
+							>
+						</div>
+					</div>
 
-          <button type="submit" class="submit-button" :disabled="isLoading">
-            <span v-if="!isLoading">登录</span>
-            <span v-else class="loading-spinner"></span>
-          </button>
-        </form>
-      </div>
-    </div>
-  </div>
+					<button
+						type="submit"
+						class="submit-button"
+						:disabled="isLoading"
+					>
+						<span v-if="!isLoading">登录</span>
+						<span
+							v-else
+							class="loading-spinner"
+						/>
+					</button>
+				</form>
+			</div>
+		</div>
+	</div>
 </template>
 
 <script lang="ts">
 import '../assets/mobile.css'
 
-import { defineComponent, ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '../../src/stores/auth';
-import { useChatStore } from '../../src/stores/chat';
+import { defineComponent, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '../../src/stores/auth'
+import { useChatStore } from '../../src/stores/chat'
 
 export default defineComponent({
-  name: 'MobileLoginView',
-  setup() {
-    const router = useRouter();
-    const authStore = useAuthStore();
-    const chatStore = useChatStore();
-    const username = ref('');
-    const password = ref('');
-    const isLoading = ref(false);
+	name: 'MobileLoginView',
+	setup() {
+		const router = useRouter()
+		const authStore = useAuthStore()
+		const chatStore = useChatStore()
+		const username = ref('')
+		const password = ref('')
+		const isLoading = ref(false)
 
-    const onLogin = async () => {
-      try {
-        isLoading.value = true;
-        await authStore.login({
-          username: username.value,
-          password: password.value,
-        });
-        const redirectPath = chatStore.isOpen ? '/mobile/chat' : '/mobile/home';
-        router.replace(redirectPath);
-      } catch (e) {
-        console.error(e);
-        alert('登录失败，请检查凭证');
-      } finally {
-        isLoading.value = false;
-      }
-    };
+		const onLogin = async () => {
+			try {
+				isLoading.value = true
+				await authStore.login({
+					username: username.value,
+					password: password.value,
+				})
+				const redirectPath = chatStore.isOpen ? '/mobile/chat' : '/mobile/home'
+				router.replace(redirectPath)
+			} catch (e) {
+				console.error(e)
+				alert('登录失败，请检查凭证')
+			} finally {
+				isLoading.value = false
+			}
+		}
 
-    return {
-      username,
-      password,
-      isLoading,
-      onLogin,
-    };
-  },
-});
+		return {
+			username,
+			password,
+			isLoading,
+			onLogin,
+		}
+	},
+})
 </script>
 
 <style scoped>

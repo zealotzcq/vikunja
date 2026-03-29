@@ -53,7 +53,7 @@ import Card from '@/components/misc/Card.vue'
 // We're loading the language before creating the app so that it won't fail to load when the user's 
 // language file is not yet loaded.
 const browserLanguage = getBrowserLanguage()
- setLanguage(browserLanguage).then(async () => {
+setLanguage(browserLanguage).then(async () => {
  	// Dynamically register mobile routes before mounting the app
  	await registerMobileRoutes(router as any)
  	const app = createApp(App)

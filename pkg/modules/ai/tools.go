@@ -1070,8 +1070,53 @@ func RegisterDefaultTools() error {
 // - Weekdays: next Monday, last Friday, 下周一, 上周五
 // - Weekday in period: Tuesday in next week, 下周三, 周五在下周
 // - Day in month: 25th day in next month, 下个月的25号
+// - Time of day: 8am, 3:30pm, 11:00 am, 14:00
+// - Combined expressions: tomorrow at 8am, next Monday at 3pm
 func parseTimeExpression(expr string, now time.Time) (time.Time, error) {
 	expr = strings.ToLower(strings.TrimSpace(expr))
+
+	// Check for combined expressions with "at" separator: "tomorrow at 8am", "next Monday at 3pm"
+	if strings.Contains(expr, " at ") {
+		parts := strings.Split(expr, " at ")
+		if len(parts) == 2 {
+			datePart := strings.TrimSpace(parts[0])
+			timePart := strings.TrimSpace(parts[1])
+
+			var dateResult time.Time
+			var dateFound bool
+
+			// Parse date part
+			if t, ok := parseWeekdayInPeriod(datePart, now); ok {
+				dateResult = t
+				dateFound = true
+			} else if t, ok := parseDayInMonth(datePart, now); ok {
+				dateResult = t
+				dateFound = true
+			} else if t, ok := parseAbsoluteDate(datePart, now); ok {
+				dateResult = t
+				dateFound = true
+			} else if t, ok := parseRelativeDate(datePart, now); ok {
+				dateResult = t
+				dateFound = true
+			} else if t, ok := parseTimePeriod(datePart, now); ok {
+				dateResult = t
+				dateFound = true
+			} else if t, ok := parseWeekday(datePart, now); ok {
+				dateResult = t
+				dateFound = true
+			}
+
+			if dateFound {
+				// Parse time part
+				hour, minute, ok := parseTimeOfDay(timePart)
+				if ok {
+					return time.Date(dateResult.Year(), dateResult.Month(), dateResult.Day(), hour, minute, 0, 0, now.Location()), nil
+				}
+				// Fallback: if time part parsing fails, return the date part as is
+				return dateResult, nil
+			}
+		}
+	}
 
 	// Weekday in period: Tuesday in next week, 下周三, 周五在下周
 	if t, ok := parseWeekdayInPeriod(expr, now); ok {
@@ -1106,6 +1151,11 @@ func parseTimeExpression(expr string, now time.Time) (time.Time, error) {
 	// Weekdays: next Monday, last Friday, etc.
 	if t, ok := parseWeekday(expr, now); ok {
 		return t, nil
+	}
+
+	// Time of day only: 8am, 3:30pm, etc.
+	if hour, minute, ok := parseTimeOfDay(expr); ok {
+		return time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location()), nil
 	}
 
 	return time.Time{}, fmt.Errorf("unable to parse time expression: %s", expr)
@@ -1228,6 +1278,53 @@ func parseRelativeTime(expr string, now time.Time) (time.Time, bool) {
 	}
 
 	return time.Time{}, false
+}
+
+// parseTimeOfDay parses time of day expressions like "8am", "3:30pm", "14:00", "9:30"
+// Returns hour, minute, and whether parsing was successful
+func parseTimeOfDay(expr string) (hour, minute int, ok bool) {
+	expr = strings.TrimSpace(expr)
+
+	// Patterns for 12-hour format with am/pm
+	// Matches: 8am, 8am, 3:30pm, 11:00 am, 11:00pm, 9:30 pm
+	re12Hour := regexp.MustCompile(`^(\d{1,2})(?::(\d{1,2}))?\s*(am|pm)$`)
+	if matches := re12Hour.FindStringSubmatch(expr); matches != nil {
+		hour, _ = strconv.Atoi(matches[1])
+		if matches[2] != "" {
+			minute, _ = strconv.Atoi(matches[2])
+		} else {
+			minute = 0
+		}
+		meridiem := strings.ToLower(matches[3])
+
+		if meridiem == "pm" && hour != 12 {
+			hour += 12
+		} else if meridiem == "am" && hour == 12 {
+			hour = 0
+		}
+
+		if hour >= 0 && hour < 24 && minute >= 0 && minute < 60 {
+			return hour, minute, true
+		}
+	}
+
+	// Patterns for 24-hour format
+	// Matches: 14:00, 9:30, 14, 0:00
+	re24Hour := regexp.MustCompile(`^(\d{1,2})(?::(\d{1,2}))?$`)
+	if matches := re24Hour.FindStringSubmatch(expr); matches != nil {
+		hour, _ = strconv.Atoi(matches[1])
+		if matches[2] != "" {
+			minute, _ = strconv.Atoi(matches[2])
+		} else {
+			minute = 0
+		}
+
+		if hour >= 0 && hour < 24 && minute >= 0 && minute < 60 {
+			return hour, minute, true
+		}
+	}
+
+	return 0, 0, false
 }
 
 // parseTimePeriod parses time periods like "next week", "this month"

@@ -41,6 +41,8 @@ ai:
     # base_url: http://localhost:11434
     # 模型名称（如：llama2, mistral）
     # model: llama2
+    # 上下文窗口大小（默认：64000）
+    # num_ctx: 64000
   # Agent 行为配置
   max_iterations: 5
   # 最大对话轮数（保留最近的N轮对话，默认3）

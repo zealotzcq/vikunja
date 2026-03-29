@@ -254,6 +254,156 @@ func TestParseTimeExpression(t *testing.T) {
 				return t.Equal(expected)
 			},
 		},
+		{
+			name:    "8am",
+			expr:    "8am",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2024, 12, 20, 8, 0, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "3:30pm",
+			expr:    "3:30pm",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2024, 12, 20, 15, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "11:00 am",
+			expr:    "11:00 am",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2024, 12, 20, 11, 0, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "14:00",
+			expr:    "14:00",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2024, 12, 20, 14, 0, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "9:30",
+			expr:    "9:30",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2024, 12, 20, 9, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "tomorrow at 8am",
+			expr:    "tomorrow at 8am",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2024, 12, 21, 8, 0, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "next Monday at 3pm",
+			expr:    "next Monday at 3pm",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				// Dec 20, 2024 is Friday, next Monday is Dec 23
+				expected := time.Date(2024, 12, 23, 15, 0, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "tomorrow at 9:30am",
+			expr:    "tomorrow at 9:30am",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2024, 12, 21, 9, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "today at 5pm",
+			expr:    "today at 5pm",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2024, 12, 20, 17, 0, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "next week at 10am",
+			expr:    "next week at 10am",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				// Dec 20, 2024 is Friday, next week starts Sunday Dec 22 at 10am
+				expected := time.Date(2024, 12, 22, 10, 0, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "下周三 at 2pm",
+			expr:    "下周三 at 2pm",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2024, 12, 25, 14, 0, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "12:00am",
+			expr:    "12:00am",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2024, 12, 20, 0, 0, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "12:00pm",
+			expr:    "12:00pm",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				expected := time.Date(2024, 12, 20, 12, 0, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "tomorrow at invalid",
+			expr:    "tomorrow at invalid",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				// Fallback: should return tomorrow at current time
+				expected := time.Date(2024, 12, 21, 10, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "next Monday at abc",
+			expr:    "next Monday at abc",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				// Fallback: should return next Monday at current time
+				// Dec 20, 2024 is Friday, next Monday is Dec 23
+				expected := time.Date(2024, 12, 23, 10, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
+		{
+			name:    "today at 25:00",
+			expr:    "today at 25:00",
+			wantErr: false,
+			checkTime: func(t time.Time) bool {
+				// Fallback: invalid time, should return today at current time
+				expected := time.Date(2024, 12, 20, 10, 30, 0, 0, time.UTC)
+				return t.Equal(expected)
+			},
+		},
 	}
 
 	for _, tt := range tests {

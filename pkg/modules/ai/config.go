@@ -22,6 +22,7 @@ type Config struct {
 	// Ollama Configuration
 	OllamaBaseURL string `mapstructure:"base_url"`
 	OllamaModel   string `mapstructure:"model"`
+	OllamaNumCtx  int      `mapstructure:"num_ctx"`
 
 	// Agent Configuration
 	MaxIterations        int      `mapstructure:"max_iterations"`
@@ -71,6 +72,9 @@ func LoadConfig() (*Config, error) {
 		}
 		if viper.IsSet("ai.ollama.model") {
 			config.OllamaModel = viper.GetString("ai.ollama.model")
+		}
+		if viper.IsSet("ai.ollama.num_ctx") {
+			config.OllamaNumCtx = viper.GetInt("ai.ollama.num_ctx")
 		}
 
 		// Load agent config
@@ -123,6 +127,9 @@ func LoadConfig() (*Config, error) {
 		}
 		if config.OllamaModel == "" {
 			config.OllamaModel = "llama2"
+		}
+		if config.OllamaNumCtx == 0 {
+			config.OllamaNumCtx = 64000
 		}
 		if config.MaxIterations == 0 {
 			config.MaxIterations = 10

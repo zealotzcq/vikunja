@@ -24,6 +24,7 @@ type ollamaRequest struct {
 	Stream      bool            `json:"stream"`
 	Temperature float64         `json:"temperature,omitempty"`
 	MaxTokens   int             `json:"num_predict,omitempty"`
+	NumCtx      int             `json:"num_ctx,omitempty"`
 	Tools       []ollamaTool    `json:"tools,omitempty"`
 	ToolChoice  string          `json:"tool_choice,omitempty"`
 }
@@ -181,6 +182,7 @@ func (p *OllamaProvider) makeRequest(ctx context.Context, messages []ollamaMessa
 		Stream:      false,
 		Temperature: p.config.Temperature,
 		MaxTokens:   32000,
+		NumCtx:      p.config.OllamaNumCtx,
 	}
 
 	if tools != nil && len(tools) > 0 {

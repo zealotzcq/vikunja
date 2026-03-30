@@ -1209,8 +1209,6 @@ func RegisterDefaultTools() error {
 					}, nil
 				}
 
-				task.ProjectID = targetProjectID
-				task.Assignees = []*user.User{{ID: newAssignee.UserID}}
 				updates = append(updates, fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.assignee"), newAssignee.Name))
 
 				if oldProjectID != targetProjectID {
@@ -1237,6 +1235,53 @@ func RegisterDefaultTools() error {
 						Response: errMsg,
 					},
 				}, nil
+			}
+
+			if assigneeChanged {
+				oldProjectID := task.ProjectID
+				targetProjectID := newAssignee.ProjectID
+
+				taskToUpdate := &models.Task{ID: task.ID}
+				taskToUpdate.Assignees = []*user.User{{ID: ctx.UserID}}
+				err = taskToUpdate.Update(s, authUser)
+				if err != nil {
+					errMsg := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.error_update_task"), err)
+					return &ToolExecutionResult{
+						Result: errMsg,
+						StopCommand: &ToolStopCommand{
+							Response: errMsg,
+						},
+					}, nil
+				}
+
+				if oldProjectID != targetProjectID {
+					taskToUpdate = &models.Task{ID: task.ID}
+					taskToUpdate.ProjectID = targetProjectID
+					err = taskToUpdate.Update(s, authUser)
+					if err != nil {
+						errMsg := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.error_update_task"), err)
+						return &ToolExecutionResult{
+							Result: errMsg,
+							StopCommand: &ToolStopCommand{
+								Response: errMsg,
+							},
+						}, nil
+					}
+					task.ProjectID = targetProjectID
+				}
+
+				taskToUpdate = &models.Task{ID: task.ID}
+				taskToUpdate.Assignees = []*user.User{{ID: newAssignee.UserID}}
+				err = taskToUpdate.Update(s, authUser)
+				if err != nil {
+					errMsg := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.error_update_task"), err)
+					return &ToolExecutionResult{
+						Result: errMsg,
+						StopCommand: &ToolStopCommand{
+							Response: errMsg,
+						},
+					}, nil
+				}
 			}
 
 			response := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.success"), task.Title)

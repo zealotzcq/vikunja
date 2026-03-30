@@ -1174,31 +1174,20 @@ func RegisterDefaultTools() error {
 
 			if assigneeChanged {
 				oldProjectID := task.ProjectID
-				if newAssignee.ProjectID > 0 {
-					task.ProjectID = newAssignee.ProjectID
-				} else {
-					targetUser := &user.User{ID: newAssignee.UserID}
-					projectsInterface, _, _, err := (&models.Project{}).ReadAll(s, targetUser, "", 1, 1)
-					if err != nil {
-						return &ToolExecutionResult{
-							Error: fmt.Sprintf("Failed to get projects for user %s: %v", newAssignee.Username, err),
-						}, fmt.Errorf("failed to get projects: %w", err)
-					}
+				targetProjectID := newAssignee.ProjectID
 
-					projects, ok := projectsInterface.([]*models.Project)
-					if !ok || len(projects) == 0 {
-						return &ToolExecutionResult{
-							Error: fmt.Sprintf("Staff member %s does not have an associated project", newAssignee.Username),
-						}, fmt.Errorf("staff member %s does not have an associated project", newAssignee.Username)
-					}
-					task.ProjectID = projects[0].ID
+				if targetProjectID == 0 {
+					return &ToolExecutionResult{
+						Error: fmt.Sprintf("Staff member %s does not have an associated project", newAssignee.Username),
+					}, fmt.Errorf("staff member %s does not have an associated project", newAssignee.Username)
 				}
 
+				task.ProjectID = targetProjectID
 				task.Assignees = []*user.User{{ID: newAssignee.UserID}}
 				updates = append(updates, fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.assignee"), newAssignee.Name))
 
-				if oldProjectID != task.ProjectID {
-					updates = append(updates, fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.project"), oldProjectID, task.ProjectID))
+				if oldProjectID != targetProjectID {
+					updates = append(updates, fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.project"), oldProjectID, targetProjectID))
 				}
 			}
 

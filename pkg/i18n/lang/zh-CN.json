@@ -201,6 +201,15 @@
 				"error_update": "更新昵称失败：%v",
 				"success": "已成功将用户 '%s' 的昵称从 '%s' 更新为 '%s'"
 			},
+			"edit_current_task": {
+				"title": "标题",
+				"description": "描述",
+				"due_date": "截止日期",
+				"assignee": "已更改执行人为 %[1]s",
+				"project": "项目已从 %[1]d 更改为 %[2]d",
+				"success": "已成功更新任务：%[1]s",
+				"updates": "已更新的字段：%[1]s"
+			},
 			"skills_no_available": "<available_skills>  没有可用的技能  </available_skills>",
 			"skill_format": "   <skill>     <name>%[1]s</name>     <description>%[2]s</description>   </skill> "
 		},

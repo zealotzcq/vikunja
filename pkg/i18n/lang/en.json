@@ -206,6 +206,15 @@
                 "error_update": "Failed to update nickname: %v",
                 "success": "Successfully updated nickname for user '%s' from '%s' to '%s' "
             },
+            "edit_current_task": {
+                "title": "Title",
+                "description": "Description",
+                "due_date": "Due date",
+                "assignee": "Assignee changed to %[1]s",
+                "project": "Project changed from %[1]d to %[2]d",
+                "success": "Successfully updated task: %[1]s",
+                "updates": "Updated fields: %[1]s"
+            },
             "skills_no_available": "<available_skills>  No skills available  </available_skills>",
             "skill_format": "   <skill>     <name>%[1]s</name>     <description>%[2]s</description>   </skill> "
         },

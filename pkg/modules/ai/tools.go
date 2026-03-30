@@ -1062,6 +1062,193 @@ func RegisterDefaultTools() error {
 		return fmt.Errorf("failed to register list_subordinates tool: %w", err)
 	}
 
+	editCurrentTaskTool := &Tool{
+		Name:           "edit_current_task",
+		ShouldStopLoop: true,
+		Description:    loadToolPrompt("edit_current_task"),
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"user_identifier": map[string]interface{}{
+					"type":        "integer",
+					"description": "The user ID (integer) of person to assign task to. If provided, task will be reassigned and moved to that person's project.",
+				},
+				"title": map[string]interface{}{
+					"type":        "string",
+					"description": "The new title for the task.",
+				},
+				"description": map[string]interface{}{
+					"type":        "string",
+					"description": "The new description/content for the task.",
+				},
+				"time_expression": map[string]interface{}{
+					"type":        "string",
+					"description": "Optional natural language time expression (e.g., 'tomorrow', 'Next Friday', '2 hours later', '2024-12-25'). If provided, this updates the task's due date. Current date/time is " + time.Now().Format("2006-01-02") + ".",
+				},
+			},
+		},
+		Execute: func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) {
+			if ctx.CurrentTask == nil {
+				return &ToolExecutionResult{
+					Error: "No current task selected. Please select a task first.",
+				}, fmt.Errorf("no current task selected")
+			}
+
+			s := db.NewSession()
+			if s == nil {
+				return &ToolExecutionResult{
+					Error: "Failed to create database session",
+				}, fmt.Errorf("failed to create database session")
+			}
+			defer s.Close()
+
+			authUser := &user.User{
+				ID: ctx.UserID,
+			}
+
+			task := &models.Task{ID: ctx.CurrentTask.TaskID}
+			err := task.ReadOne(s, authUser)
+			if err != nil {
+				return &ToolExecutionResult{
+					Error: fmt.Sprintf("Failed to read task: %v", err),
+				}, fmt.Errorf("failed to read task: %w", err)
+			}
+
+			var updates []string
+			var assigneeChanged bool
+			var newAssignee *chat_session.SubordinateStaffInfo
+
+			userIdentifierFloat, userIdentifierProvided := params["user_identifier"].(float64)
+			if userIdentifierProvided {
+				userIdentifier := int64(userIdentifierFloat)
+
+				if userIdentifier <= 0 {
+					return &ToolExecutionResult{
+						Error: "user_identifier must be a positive integer",
+					}, fmt.Errorf("user_identifier must be a positive integer")
+				}
+
+				for _, staff := range ctx.SubordinateStaff {
+					if staff.UserID == userIdentifier {
+						newAssignee = &staff
+						break
+					}
+				}
+
+				if newAssignee == nil {
+					return &ToolExecutionResult{
+						Error: fmt.Sprintf("No staff found with user ID %d", userIdentifier),
+					}, fmt.Errorf("no staff found with user ID %d", userIdentifier)
+				}
+
+				assigneeChanged = true
+			}
+
+			var dueDateChanged bool
+			var dueDate time.Time
+			if timeExpr, ok := params["time_expression"].(string); ok && timeExpr != "" {
+				parsedTime, err := parseTimeExpression(timeExpr, time.Now())
+				if err != nil {
+					return &ToolExecutionResult{
+						Error: fmt.Sprintf("Failed to parse time expression '%s': %v", timeExpr, err),
+					}, fmt.Errorf("failed to parse time expression: %w", err)
+				}
+				dueDate = parsedTime
+				dueDateChanged = true
+			}
+
+			if title, ok := params["title"].(string); ok && title != "" {
+				task.Title = title
+				updates = append(updates, i18n.T(ctx.Language, "ai.tool.edit_current_task.title"))
+			}
+
+			if description, ok := params["description"].(string); ok && description != "" {
+				task.Description = description
+				updates = append(updates, i18n.T(ctx.Language, "ai.tool.edit_current_task.description"))
+			}
+
+			if dueDateChanged {
+				task.DueDate = dueDate
+				updates = append(updates, i18n.T(ctx.Language, "ai.tool.edit_current_task.due_date"))
+			}
+
+			if assigneeChanged {
+				oldProjectID := task.ProjectID
+				if newAssignee.ProjectID > 0 {
+					task.ProjectID = newAssignee.ProjectID
+				} else {
+					targetUser := &user.User{ID: newAssignee.UserID}
+					projectsInterface, _, _, err := (&models.Project{}).ReadAll(s, targetUser, "", 1, 1)
+					if err != nil {
+						return &ToolExecutionResult{
+							Error: fmt.Sprintf("Failed to get projects for user %s: %v", newAssignee.Username, err),
+						}, fmt.Errorf("failed to get projects: %w", err)
+					}
+
+					projects, ok := projectsInterface.([]*models.Project)
+					if !ok || len(projects) == 0 {
+						return &ToolExecutionResult{
+							Error: fmt.Sprintf("Staff member %s does not have an associated project", newAssignee.Username),
+						}, fmt.Errorf("staff member %s does not have an associated project", newAssignee.Username)
+					}
+					task.ProjectID = projects[0].ID
+				}
+
+				task.Assignees = []*user.User{{ID: newAssignee.UserID}}
+				updates = append(updates, fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.assignee"), newAssignee.Name))
+
+				if oldProjectID != task.ProjectID {
+					updates = append(updates, fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.project"), oldProjectID, task.ProjectID))
+				}
+			}
+
+			if len(updates) == 0 {
+				return &ToolExecutionResult{
+					Error: "At least one parameter (title, description, user_identifier, or time_expression) must be provided",
+				}, fmt.Errorf("no parameters provided")
+			}
+
+			err = task.Update(s, authUser)
+			if err != nil {
+				return &ToolExecutionResult{
+					Error: fmt.Sprintf("Failed to update task: %v", err),
+				}, fmt.Errorf("failed to update task: %w", err)
+			}
+
+			response := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.success"), task.Title)
+			response += "\n"
+			response += fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.updates"), strings.Join(updates, ", "))
+
+			ctx.ButtonNavigation = &chat_session.ButtonNavigation{
+				RouteName: "task.detail",
+				Params: map[string]interface{}{
+					"id": task.ID,
+				},
+				Label: i18n.T(ctx.Language, "ai.tool.assign_task.view_task"),
+				Title: task.Title,
+			}
+
+			if err := chat_session.GetDefault().SetCurrentTask(ctx.UserID, ctx.CompanyID, task.ID, task.Title, task.ProjectID); err != nil {
+				fmt.Printf("[Chat] Failed to update current task: %v\n", err)
+			}
+
+			return &ToolExecutionResult{
+				Result: response,
+				StopCommand: &ToolStopCommand{
+					Response: response,
+					Metadata: map[string]interface{}{
+						"task_id":    task.ID,
+						"project_id": task.ProjectID,
+					},
+				},
+			}, nil
+		},
+	}
+
+	if err := tm.RegisterTool(editCurrentTaskTool); err != nil {
+		return fmt.Errorf("failed to register edit_current_task tool: %w", err)
+	}
+
 	return nil
 }
 

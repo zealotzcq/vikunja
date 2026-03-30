@@ -1089,15 +1089,23 @@ func RegisterDefaultTools() error {
 		},
 		Execute: func(ctx *AgentContext, params map[string]interface{}) (*ToolExecutionResult, error) {
 			if ctx.CurrentTask == nil {
+				errMsg := i18n.T(ctx.Language, "ai.tool.edit_current_task.error_no_task")
 				return &ToolExecutionResult{
-					Error: "No current task selected. Please select a task first.",
+					Error: errMsg,
+					StopCommand: &ToolStopCommand{
+						Response: errMsg,
+					},
 				}, fmt.Errorf("no current task selected")
 			}
 
 			s := db.NewSession()
 			if s == nil {
+				errMsg := i18n.T(ctx.Language, "ai.tool.edit_current_task.error_db_session")
 				return &ToolExecutionResult{
-					Error: "Failed to create database session",
+					Error: errMsg,
+					StopCommand: &ToolStopCommand{
+						Response: errMsg,
+					},
 				}, fmt.Errorf("failed to create database session")
 			}
 			defer s.Close()
@@ -1109,8 +1117,12 @@ func RegisterDefaultTools() error {
 			task := &models.Task{ID: ctx.CurrentTask.TaskID}
 			err := task.ReadOne(s, authUser)
 			if err != nil {
+				errMsg := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.error_read_task"), err)
 				return &ToolExecutionResult{
-					Error: fmt.Sprintf("Failed to read task: %v", err),
+					Error: errMsg,
+					StopCommand: &ToolStopCommand{
+						Response: errMsg,
+					},
 				}, fmt.Errorf("failed to read task: %w", err)
 			}
 
@@ -1123,8 +1135,12 @@ func RegisterDefaultTools() error {
 				userIdentifier := int64(userIdentifierFloat)
 
 				if userIdentifier <= 0 {
+					errMsg := i18n.T(ctx.Language, "ai.tool.edit_current_task.error_invalid_user_id")
 					return &ToolExecutionResult{
-						Error: "user_identifier must be a positive integer",
+						Error: errMsg,
+						StopCommand: &ToolStopCommand{
+							Response: errMsg,
+						},
 					}, fmt.Errorf("user_identifier must be a positive integer")
 				}
 
@@ -1136,8 +1152,12 @@ func RegisterDefaultTools() error {
 				}
 
 				if newAssignee == nil {
+					errMsg := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.error_user_not_found"), userIdentifier)
 					return &ToolExecutionResult{
-						Error: fmt.Sprintf("No staff found with user ID %d", userIdentifier),
+						Error: errMsg,
+						StopCommand: &ToolStopCommand{
+							Response: errMsg,
+						},
 					}, fmt.Errorf("no staff found with user ID %d", userIdentifier)
 				}
 
@@ -1149,8 +1169,12 @@ func RegisterDefaultTools() error {
 			if timeExpr, ok := params["time_expression"].(string); ok && timeExpr != "" {
 				parsedTime, err := parseTimeExpression(timeExpr, time.Now())
 				if err != nil {
+					errMsg := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.error_parse_time"), timeExpr, err)
 					return &ToolExecutionResult{
-						Error: fmt.Sprintf("Failed to parse time expression '%s': %v", timeExpr, err),
+						Error: errMsg,
+						StopCommand: &ToolStopCommand{
+							Response: errMsg,
+						},
 					}, fmt.Errorf("failed to parse time expression: %w", err)
 				}
 				dueDate = parsedTime
@@ -1177,8 +1201,12 @@ func RegisterDefaultTools() error {
 				targetProjectID := newAssignee.ProjectID
 
 				if targetProjectID == 0 {
+					errMsg := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.error_no_project"), newAssignee.Username)
 					return &ToolExecutionResult{
-						Error: fmt.Sprintf("Staff member %s does not have an associated project", newAssignee.Username),
+						Error: errMsg,
+						StopCommand: &ToolStopCommand{
+							Response: errMsg,
+						},
 					}, fmt.Errorf("staff member %s does not have an associated project", newAssignee.Username)
 				}
 
@@ -1192,15 +1220,23 @@ func RegisterDefaultTools() error {
 			}
 
 			if len(updates) == 0 {
+				errMsg := i18n.T(ctx.Language, "ai.tool.edit_current_task.error_no_params")
 				return &ToolExecutionResult{
-					Error: "At least one parameter (title, description, user_identifier, or time_expression) must be provided",
+					Error: errMsg,
+					StopCommand: &ToolStopCommand{
+						Response: errMsg,
+					},
 				}, fmt.Errorf("no parameters provided")
 			}
 
 			err = task.Update(s, authUser)
 			if err != nil {
+				errMsg := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.error_update_task"), err)
 				return &ToolExecutionResult{
-					Error: fmt.Sprintf("Failed to update task: %v", err),
+					Error: errMsg,
+					StopCommand: &ToolStopCommand{
+						Response: errMsg,
+					},
 				}, fmt.Errorf("failed to update task: %w", err)
 			}
 

@@ -24,7 +24,6 @@ import (
 func isUserAllowedForChat(a web.Auth, companyID int64) bool {
 	userObj, isUser := a.(*user.User)
 	if !isUser {
-		fmt.Printf("[Chat] User is not a regular user\n")
 		return false
 	}
 
@@ -32,13 +31,11 @@ func isUserAllowedForChat(a web.Auth, companyID int64) bool {
 	defer s.Close()
 
 	role := company.GetUserRole(s, userObj.ID, companyID)
-	fmt.Printf("[Chat] isUserAllowedForChat: userID=%d, companyID=%d, role=%s\n", userObj.ID, companyID, role)
 	if role == "" {
 		return false
 	}
 
 	allowed := role == "creator" || role == "admin"
-	fmt.Printf("[Chat] isUserAllowedForChat result: %v\n", allowed)
 	return allowed
 }
 
@@ -137,7 +134,6 @@ func SendMessage(c *echo.Context) error {
 
 	chat_session.GetDefault().PushPendingMessage(userID, req.CompanyID, userMessage)
 
-	fmt.Printf("[Chat] Starting goroutine for user message: userID=%d, companyID=%d\n", userID, req.CompanyID)
 	go processPendingMessagesAsync(context.Background(), userID, req.CompanyID, req)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
@@ -346,21 +342,15 @@ func GetChatHistory(c *echo.Context) error {
 
 // processPendingMessagesAsync processes all pending messages for a session
 func processPendingMessagesAsync(ctx context.Context, userID, companyID int64, req *SendMessageRequest) {
-	fmt.Printf("[Chat] processPendingMessagesAsync started: userID=%d, companyID=%d\n", userID, companyID)
-
 	mu, pendingMessages := chat_session.GetDefault().PopAllPendingMessages(userID, companyID)
 
 	if len(pendingMessages) == 0 {
-		fmt.Printf("[Chat] No pending messages, exiting: userID=%d, companyID=%d\n", userID, companyID)
 		chat_session.GetDefault().ReleaseSessionLock(mu)
 		return
 	}
 
-	fmt.Printf("[Chat] Processing %d pending messages: userID=%d, companyID=%d\n", len(pendingMessages), userID, companyID)
-
 	// Save all pending messages to session
 	for _, msg := range pendingMessages {
-		fmt.Printf("[Chat] Saving message to session: type=%s, id=%s\n", msg.Type, msg.ID)
 		if err := chat_session.GetDefault().SaveMessageToSession(userID, companyID, msg); err != nil {
 		}
 	}
@@ -372,8 +362,6 @@ func processPendingMessagesAsync(ctx context.Context, userID, companyID int64, r
 
 	// Call agent once to process all messages
 	processAgentInternal(ctx, userID, companyID, req)
-
-	fmt.Printf("[Chat] All pending messages processed: userID=%d, companyID=%d\n", userID, companyID)
 	chat_session.GetDefault().ReleaseSessionLock(mu)
 }
 
@@ -624,7 +612,6 @@ func SubmitQuestionAnswer(c *echo.Context) error {
 
 	chat_session.GetDefault().PushPendingMessage(userID, req.CompanyID, answerMessage)
 
-	fmt.Printf("[Chat] Starting goroutine for question answer: userID=%d, companyID=%d\n", userID, req.CompanyID)
 	go processPendingMessagesAsync(context.Background(), userID, req.CompanyID, nil)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{

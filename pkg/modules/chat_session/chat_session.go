@@ -312,7 +312,6 @@ func (m *Manager) NotifyListeners(userID, companyID int64, msg Message) {
 		case listener <- msg:
 			sentCount++
 		default:
-			fmt.Printf("[Chat] Listener channel full, skipping\n")
 		}
 	}
 }
@@ -441,34 +440,24 @@ func (m *Manager) PushPendingMessage(userID, companyID int64, msg Message) {
 	processor.mu.Lock()
 	processor.pendingMessages = append(processor.pendingMessages, msg)
 	processor.mu.Unlock()
-
-	fmt.Printf("[Chat] Pushed pending message: userID=%d, companyID=%d, msgType=%s, msgID=%s, pendingCount=%d\n",
-		userID, companyID, msg.Type, msg.ID, len(processor.pendingMessages))
 }
 
 // popAllPendingMessages pops all pending messages from the queue and returns the lock
 func (m *Manager) PopAllPendingMessages(userID, companyID int64) (*sync.Mutex, []Message) {
 	processor := m.getSessionProcessor(userID, companyID)
 
-	fmt.Printf("[Chat] Acquiring session lock: userID=%d, companyID=%d\n", userID, companyID)
 	processor.mu.Lock()
-	fmt.Printf("[Chat] Session lock acquired: userID=%d, companyID=%d\n", userID, companyID)
 
 	messages := make([]Message, len(processor.pendingMessages))
 	copy(messages, processor.pendingMessages)
 	processor.pendingMessages = processor.pendingMessages[:0]
-
-	fmt.Printf("[Chat] Popped pending messages: userID=%d, companyID=%d, count=%d\n",
-		userID, companyID, len(messages))
 
 	return &processor.mu, messages
 }
 
 // releaseSessionLock releases the session lock
 func (m *Manager) ReleaseSessionLock(mu *sync.Mutex) {
-	fmt.Printf("[Chat] Releasing session lock\n")
 	mu.Unlock()
-	fmt.Printf("[Chat] Session lock released\n")
 }
 
 // SetCurrentTask sets the current task for a session
@@ -505,9 +494,6 @@ func (m *Manager) SetCurrentTask(userID, companyID, taskID int64, title string, 
 	if err := keyvalue.Put(sessionKey, updatedSession); err != nil {
 		return fmt.Errorf("failed to update session: %w", err)
 	}
-
-	fmt.Printf("[Chat] Set current task for user %d, company %d: taskID=%d, title=%s, projectID=%d\n",
-		userID, companyID, taskID, title, projectID)
 
 	return nil
 }

@@ -191,16 +191,87 @@
 				</section>
 
 				<section
-					v-if="task.description"
 					class="detail-section"
 				>
-					<h3 class="section-title">
-						描述
-					</h3>
+					<div class="section-header">
+						<h3 class="section-title">
+							描述
+						</h3>
+						<button
+							v-if="!isEditingDescription && (task.description || !task.description)"
+							class="edit-desc-btn"
+							aria-label="编辑描述"
+							@click="toggleEditDescription"
+						>
+							<svg
+								width="16"
+								height="16"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+								<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+							</svg>
+						</button>
+					</div>
 					<div
+						v-if="isEditingDescription"
+						class="description-edit"
+					>
+						<textarea
+							ref="descriptionInputRef"
+							v-model="tempDescription"
+							class="description-input"
+							placeholder="添加任务描述..."
+							rows="6"
+						/>
+						<div class="edit-actions">
+							<button
+								class="action-btn cancel-btn"
+								:disabled="isSaving"
+								@click="isEditingDescription = false"
+							>
+								取消
+							</button>
+							<button
+								class="action-btn save-btn"
+								:disabled="isSaving || !tempDescription.trim()"
+								@click="saveDescription"
+							>
+								{{ isSaving ? '保存中...' : '保存' }}
+							</button>
+						</div>
+					</div>
+					<div
+						v-else-if="taskData && taskData.description"
 						class="description"
-						v-html="task.description"
+						:class="{ 'is-plain-text': !isHtmlDescription }"
+						v-html="formatDescription(taskData.description)"
 					/>
+					<div
+						v-else
+						class="no-description"
+						@click="toggleEditDescription"
+					>
+						<svg
+							width="24"
+							height="24"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.5"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+							<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+						</svg>
+						<span>点击添加描述</span>
+					</div>
 				</section>
 
 				<section class="detail-section">
@@ -441,6 +512,9 @@ const tempPercentDone = ref<number>(0)
 const tempTitle = ref('')
 const isEditingTitle = ref(false)
 const titleInputRef = ref<HTMLInputElement | null>(null)
+const tempDescription = ref('')
+const isEditingDescription = ref(false)
+const descriptionInputRef = ref<HTMLTextAreaElement | null>(null)
 const isSaving = ref(false)
 
 const taskId = computed(() => Number(route.params.taskId))
@@ -451,6 +525,7 @@ const task = computed(() => {
 	return {
 		...taskData.value,
 		title: isEditingTitle.value ? tempTitle.value : taskData.value.title,
+		description: isEditingDescription.value ? tempDescription.value : taskData.value.description,
 		assignees: taskData.value.assignees || [],
 		labels: taskData.value.labels || [],
 		attachments: taskData.value.attachments || [],
@@ -458,6 +533,11 @@ const task = computed(() => {
 		priority: tempPriority.value,
 		percentDone: tempPercentDone.value,
 	}
+})
+
+const isHtmlDescription = computed(() => {
+	if (!taskData.value?.description) return false
+	return /<[a-z][\s\S]*>/i.test(taskData.value.description)
 })
 
 const projectName = computed(() => {
@@ -493,6 +573,17 @@ const toggleEditTitle = async () => {
 	}
 }
 
+const toggleEditDescription = () => {
+	if (isEditingDescription.value) {
+		return
+	}
+	tempDescription.value = task.value?.description || ''
+	isEditingDescription.value = true
+	nextTick(() => {
+		descriptionInputRef.value?.focus()
+	})
+}
+
 const saveTitle = async () => {
 	if (!task.value || !tempTitle.value.trim()) {
 		isEditingTitle.value = false
@@ -516,6 +607,51 @@ const saveTitle = async () => {
 		isSaving.value = false
 		isEditingTitle.value = false
 	}
+}
+
+const saveDescription = async () => {
+	if (!task.value) {
+		isEditingDescription.value = false
+		return
+	}
+
+	const descriptionValue = tempDescription.value.trim()
+
+	if (descriptionValue === (taskData.value?.description || '')) {
+		isEditingDescription.value = false
+		return
+	}
+
+	try {
+		isSaving.value = true
+		console.log('Updating description:', descriptionValue)
+		const updatedTask = await taskStore.update({
+			...task.value,
+			description: descriptionValue || '',
+		})
+		console.log('Description updated result:', updatedTask)
+		if (taskData.value) {
+			taskData.value = updatedTask
+			console.log('taskData updated:', taskData.value.description)
+		}
+		if (descriptionValue) {
+			success({ message: '描述已更新' })
+		}
+	} catch (error) {
+		console.error('Failed to update description:', error)
+		tempDescription.value = task.value?.description || ''
+	} finally {
+		isSaving.value = false
+		isEditingDescription.value = false
+	}
+}
+
+const formatDescription = (description: string) => {
+	if (!description) return ''
+	if (/<[a-z][\s\S]*>/i.test(description)) {
+		return description
+	}
+	return description.replace(/\n/g, '<br>')
 }
 
 const isOverdue = (dueDate: Date | null) => {
@@ -587,6 +723,7 @@ const loadTask = async () => {
 		taskStore.tasks[taskId.value] = loaded
 
 		tempTitle.value = loaded.title
+		tempDescription.value = loaded.description || ''
 		tempPriority.value = loaded.priority
 		tempPercentDone.value = loaded.percentDone
 
@@ -927,10 +1064,137 @@ onMounted(() => {
   color: var(--color-primary);
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.section-header .section-title {
+  margin-bottom: 0;
+}
+
+.edit-desc-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.edit-desc-btn:hover {
+  background: var(--color-primary-lighter);
+  color: var(--color-primary);
+}
+
 .description {
   font-size: var(--font-size-base);
   line-height: 1.6;
   color: var(--color-text-secondary);
+}
+
+.description.is-plain-text {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.description-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.description-input {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+}
+
+.description-input:focus {
+  border-color: var(--color-primary);
+}
+
+.edit-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  justify-content: flex-end;
+}
+
+.action-btn {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: none;
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cancel-btn {
+  background: var(--color-background);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.cancel-btn:hover:not(:disabled) {
+  background: var(--color-surface);
+}
+
+.save-btn {
+  background: var(--color-primary);
+  color: white;
+}
+
+.save-btn:hover:not(:disabled) {
+  background: var(--color-primary-dark);
+}
+
+.no-description {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xl);
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.no-description:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.no-description svg {
+  opacity: 0.5;
+}
+
+.no-description span {
+  font-size: var(--font-size-sm);
 }
 
 .attributes-list {

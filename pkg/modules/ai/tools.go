@@ -1078,7 +1078,11 @@ func RegisterDefaultTools() error {
 				},
 				"description": map[string]interface{}{
 					"type":        "string",
-					"description": "The new description/content for the task.",
+					"description": "The new description/content for the task. If append_description is true, this content will be appended to the existing description. Otherwise, it replaces the existing description.",
+				},
+				"append_description": map[string]interface{}{
+					"type":        "boolean",
+					"description": "If true, append the description to existing content instead of replacing it. Default is false.",
 				},
 				"time_expression": map[string]interface{}{
 					"type":        "string",
@@ -1186,7 +1190,19 @@ func RegisterDefaultTools() error {
 			}
 
 			if description, ok := params["description"].(string); ok && description != "" {
-				task.Description = description
+				appendDesc := false
+				if appendDescParam, ok := params["append_description"].(bool); ok {
+					appendDesc = appendDescParam
+				}
+				if appendDesc {
+					if task.Description != "" {
+						task.Description = task.Description + "\n\n" + description
+					} else {
+						task.Description = description
+					}
+				} else {
+					task.Description = description
+				}
 				updates = append(updates, i18n.T(ctx.Language, "ai.tool.edit_current_task.description"))
 			}
 
@@ -1242,6 +1258,17 @@ func RegisterDefaultTools() error {
 				targetProjectID := newAssignee.ProjectID
 
 				taskToUpdate := &models.Task{ID: task.ID}
+				err := taskToUpdate.ReadOne(s, authUser)
+				if err != nil {
+					errMsg := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.error_read_task"), err)
+					return &ToolExecutionResult{
+						Result: errMsg,
+						StopCommand: &ToolStopCommand{
+							Response: errMsg,
+						},
+					}, nil
+				}
+
 				taskToUpdate.Assignees = []*user.User{{ID: ctx.UserID}}
 				err = taskToUpdate.Update(s, authUser)
 				if err != nil {
@@ -1256,6 +1283,16 @@ func RegisterDefaultTools() error {
 
 				if oldProjectID != targetProjectID {
 					taskToUpdate = &models.Task{ID: task.ID}
+					err = taskToUpdate.ReadOne(s, authUser)
+					if err != nil {
+						errMsg := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.error_read_task"), err)
+						return &ToolExecutionResult{
+							Result: errMsg,
+							StopCommand: &ToolStopCommand{
+								Response: errMsg,
+							},
+						}, nil
+					}
 					taskToUpdate.ProjectID = targetProjectID
 					err = taskToUpdate.Update(s, authUser)
 					if err != nil {
@@ -1271,6 +1308,16 @@ func RegisterDefaultTools() error {
 				}
 
 				taskToUpdate = &models.Task{ID: task.ID}
+				err = taskToUpdate.ReadOne(s, authUser)
+				if err != nil {
+					errMsg := fmt.Sprintf(i18n.T(ctx.Language, "ai.tool.edit_current_task.error_read_task"), err)
+					return &ToolExecutionResult{
+						Result: errMsg,
+						StopCommand: &ToolStopCommand{
+							Response: errMsg,
+						},
+					}, nil
+				}
 				taskToUpdate.Assignees = []*user.User{{ID: newAssignee.UserID}}
 				err = taskToUpdate.Update(s, authUser)
 				if err != nil {
